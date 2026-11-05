@@ -38,13 +38,13 @@ CSS = """
 .dr-stat-l{font-size:12.5px;color:var(--muted)}
 /* トップページ */
 .dr-hero{position:relative;overflow:hidden;background:#F3F0EA;border-radius:6px;padding:54px 44px 60px;min-height:440px}
-.dr-hero-shape{position:absolute;right:0;top:0;bottom:0;width:46%;background:url("__HERO__") right center/cover no-repeat;pointer-events:none}
+.dr-hero-shape{position:absolute;right:0;top:0;bottom:0;width:34%;background:url("__HERO__") right center/cover no-repeat;pointer-events:none}
 .dr-markimg{display:inline-block;width:26px;height:26px;background:url("__MARK__") center/contain no-repeat}
-.dr-hero-in{position:relative;max-width:min(640px,47%)}
+.dr-hero-in{position:relative;max-width:min(740px,66%)}
 .dr-mark{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink);letter-spacing:.01em}
 .dr-h1{font-size:42px;line-height:1.32;font-weight:900;margin:26px 0 0;color:var(--ink);letter-spacing:-.01em;padding:0}
 .dr-h1 span{display:inline-block}
-.dr-sub{font-size:15px;line-height:1.95;color:#B4420A;font-weight:500;margin:6px 0 0;max-width:600px}
+.dr-sub{font-size:15px;line-height:1.95;color:#B4420A;font-weight:500;margin:6px 0 0}
 .dr-jp{font-size:17px;font-weight:900;color:#B8290A;margin-top:12px}
 .dr-sec{font-size:24px;font-weight:900;margin:24px 0 4px;color:var(--ink);padding:0}
 .dr-sec-l{font-size:14px;color:var(--muted);margin:0 0 14px;line-height:1.7}
