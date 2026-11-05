@@ -61,11 +61,12 @@ def requirements(p: dict) -> None:
     head("要件", "段階的に入力できます。未設定と該当なしを区別します。合意済みの要件を変更すると、確認待ちに戻ります。", "整理")
     rows = [{"ID": r["id"], "名称": r["title"], "版": r["version"], "分野": DOMAINS.get(r.get("domain"), "未設定"), "種類": display(r.get("kind")), "優先": display(r.get("priority")),
              "範囲": display(r.get("scope")), "状態": r["status"], "受入条件": len(r.get("acceptance") or []), "根拠": len(r.get("evidence") or [])} for r in p["requirements"]]
-    c1, c2 = st.columns(2)
-    fs = c1.multiselect("状態", AGREEMENT_STATES, key="rq_fs")
-    fq = c2.text_input("検索", key="rq_q")
-    rows = [r for r in rows if (not fs or r["状態"] in fs) and (not fq or fq in r["名称"] or fq in r["ID"])]
-    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    if rows:  # 要件がないときは絞り込みを出さない
+        c1, c2 = st.columns(2)
+        fs = c1.multiselect("状態", AGREEMENT_STATES, key="rq_fs")
+        fq = c2.text_input("検索", key="rq_q")
+        rows = [r for r in rows if (not fs or r["状態"] in fs) and (not fq or fq in r["名称"] or fq in r["ID"])]
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     with edit_block("addreq"), st.expander("要件を追加する"):
         with st.form("add_req", clear_on_submit=True):
             title = st.text_input("名称")

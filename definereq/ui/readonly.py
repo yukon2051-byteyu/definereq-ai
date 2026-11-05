@@ -1,4 +1,4 @@
-"""デモを閲覧専用にする。
+"""画面部品の共通処理（空の表の表示、デモの閲覧専用）。
 
 デモでは、入力欄を無効にし、編集のボタンを表示しない。表示の切替（項目の選択、段階、案内、質問）だけを許可する。
 各画面に条件分岐を書かず、部品の呼び出しを1か所で包むことで、許可の漏れを防いでいる。
@@ -52,11 +52,32 @@ def _button(original):
     return call
 
 
+EMPTY_MESSAGE = "該当する項目はありません。"
+
+
+def _is_empty(args, kwargs) -> bool:
+    data = args[0] if args else kwargs.get("data")
+    return hasattr(data, "empty") and data.empty
+
+
+def _dataframe(original):
+    """0件の表は「empty」と表示されるため、文章に置き換える。"""
+    def call(self, *args, **kwargs):
+        if _is_empty(args, kwargs):
+            self.caption(EMPTY_MESSAGE)
+            return None
+        return original(self, *args, **kwargs)
+    return call
+
+
 def _data_editor(original):
     def call(self, *args, **kwargs):
         if is_demo():
             kwargs["disabled"] = True
             kwargs["num_rows"] = "fixed"
+        if _is_empty(args, kwargs) and kwargs.get("num_rows") != "dynamic":
+            self.caption(EMPTY_MESSAGE)
+            return args[0] if args else kwargs.get("data")
         return original(self, *args, **kwargs)
     return call
 
@@ -81,6 +102,7 @@ def install() -> None:
     for name in DISABLE:
         _patch(name, _disable)
     _patch("button", _button)
+    _patch("dataframe", _dataframe)
     _patch("data_editor", _data_editor)
     _patch("file_uploader", _uploader)
     _patch("form_submit_button", _submit)

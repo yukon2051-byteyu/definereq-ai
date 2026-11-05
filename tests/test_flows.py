@@ -182,6 +182,25 @@ def test_new_project_all_pages_render_empty():
         assert not at.exception and not at.error, page
 
 
+def test_empty_tables_show_message_instead_of_grid():
+    from definereq import project as pj
+    from definereq.ui.shell import PAGES
+
+    for page in PAGES:
+        at = run(project=pj.new_project("t", ["app"]), page=page)
+        for table in at.dataframe:
+            assert len(table.value) > 0, page
+    at = run(project=pj.new_project("t", ["app"]), page="requirements")
+    assert not at.multiselect and any("要件はまだありません" in i.value for i in at.info)
+
+
+def test_requirement_filter_with_no_match_shows_message():
+    at = run(project=builder.build("d1", 4), page="requirements")
+    next(t for t in at.text_input if t.label == "検索").set_value("存在しない言葉")
+    at = at.run()
+    assert not at.exception and any("該当する項目はありません" in c.value for c in at.caption)
+
+
 def test_why_page_example_question():
     at = run(project=builder.build("d1", 4), page="why")
     at = click(at, "なぜ再申請なのか")
