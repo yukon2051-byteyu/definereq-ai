@@ -20,6 +20,12 @@ FLOW = [("準備", "案件の分野・要望・資料を登録し、不足情報
 
 
 def render() -> None:
+    # トップ専用の入れ物。余白の指定をこの中に限定し、作業画面へ影響させない
+    with st.container(key="home"):
+        _sections()
+
+
+def _sections() -> None:
     # ヒーローのボタンはページ内リンク。再実行が起きないため、入力中の内容は消えない
     st.html(f"""<div class="dr-hero">{HERO_SHAPE}<div class="dr-hero-in">
 <div class="dr-mark">{MARK}<span>DefineReq_AI</span></div>
@@ -49,7 +55,7 @@ def render() -> None:
                 state.open_demo(d["id"], tour=False)
 
     st.html('<h2 id="dr-new" class="dr-sec">あなたの案件で試す</h2>')
-    with st.container(border=True):
+    with st.container(border=True, key="home_new"):
         c1, c2 = st.columns(2)
         name = c1.text_input("案件名", placeholder="例：勤怠システムの更新", key="new_name")
         domains = c2.multiselect("対象分野（複合は複数選択）", list(DOMAINS), format_func=DOMAINS.get, default=["app"], key="new_dom")
@@ -64,5 +70,5 @@ def render() -> None:
                 st.session_state["ai_code"] = code.strip()  # AI実行の画面で使う（入力欄はここだけ）
                 state.open_project(created)
 
-    st.html('<p class="dr-tiny" style="margin-top:36px">要件定義の完全性や正しさを保証するものではありません。人が確認・判断するための根拠と残件を示します。'
+    st.html('<p class="dr-tiny" style="margin-top:16px">要件定義の完全性や正しさを保証するものではありません。人が確認・判断するための根拠と残件を示します。'
             '公開環境の無料CPUは利用がないと休止するため、開くまでに時間がかかることがあります。</p>')

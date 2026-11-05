@@ -54,17 +54,17 @@ CSS = """
 .dr-btn-s:hover{border-color:#D9330F;color:#B8290A}
 .dr-note{font-size:12.5px;color:var(--muted);margin-top:10px}
 .dr-jp{font-size:18px;font-weight:900;color:#B8290A;margin-top:12px}
-.dr-sec{font-size:24px;font-weight:900;margin:24px 0 4px;color:var(--ink);padding:0;scroll-margin-top:16px}
-.dr-sec-l{font-size:14px;color:var(--muted);margin:0 0 14px;line-height:1.7}
+.dr-sec{font-size:24px;font-weight:900;line-height:1.3;margin:16px 0 0;color:var(--ink);padding:0;scroll-margin-top:16px}
+.dr-sec-l{font-size:14px;color:var(--muted);margin:6px 0 0;line-height:1.6}
 .dr-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;counter-reset:s}
-.dr-step{counter-increment:s;font-size:13px;line-height:1.65;color:#2F3036;padding:16px 34px 18px 30px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 50%,calc(100% - 22px) 100%,0 100%,18px 50%)}
+.dr-step{counter-increment:s;font-size:13px;line-height:1.5;color:#2F3036;padding:10px 32px 10px 30px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 50%,calc(100% - 22px) 100%,0 100%,18px 50%)}
 .dr-step:nth-child(1){background:#FFF4EA;padding-left:16px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 50%,calc(100% - 22px) 100%,0 100%)}
 .dr-step:nth-child(2){background:#FFE8D6}
 .dr-step:nth-child(3){background:#FFDBC8}
 .dr-step:nth-child(4){background:#FDCCBF}
 .dr-step:nth-child(5){background:#FAB9BE}
-.dr-step:before{content:counter(s,decimal-leading-zero);display:block;font-size:24px;font-weight:900;color:#B8290A;line-height:1.2}
-.dr-step b{display:block;font-size:16px;font-weight:900;color:var(--ink);margin:2px 0}
+.dr-step:before{content:counter(s,decimal-leading-zero);display:block;font-size:22px;font-weight:900;color:#B8290A;line-height:1.15}
+.dr-step b{display:block;font-size:15px;font-weight:900;color:var(--ink);line-height:1.4;margin:0 0 1px}
 .dr-tiny{font-size:12px;color:var(--muted);line-height:1.7}
 .dr-demo-n{font-size:12px;font-weight:900;color:#B8290A}
 @media (max-width:760px){
@@ -76,7 +76,7 @@ CSS = """
  .dr-h1{font-size:30px}
  .dr-jp{font-size:17px}
  .dr-steps{grid-template-columns:1fr}
- .dr-step,.dr-step:nth-child(1){clip-path:none;padding:12px 16px;border-radius:4px}
+ .dr-step,.dr-step:nth-child(1){clip-path:none;padding:10px 14px;border-radius:4px}
  .dr-flow{grid-template-columns:1fr 1fr}
  .dr-flow-c{border-bottom:1px solid var(--line)}
  .dr-title{font-size:22px}
@@ -91,6 +91,13 @@ CSS = """
 [data-testid="stSidebar"] .stButton button:hover{background:#26262B;color:#fff}
 [data-testid="stSidebar"] .stButton button[kind="primary"]{background:#fff;color:#161618}
 [data-testid="stSidebar"] .stButton button[kind="primary"] p{font-weight:700;color:#161618}
+/* トップページ専用の余白。見た目の間隔は 区切り30px／説明→内容14px／カード内8px */
+.st-key-home{gap:14px}
+.stMainBlockContainer:has(.st-key-home){padding-bottom:32px}
+.st-key-home [data-testid="stColumn"] [data-testid="stVerticalBlock"]{gap:8px}
+.st-key-home [data-testid="stColumn"] p,.st-key-home_new p{margin-bottom:0}
+.st-key-home [data-testid="stColumn"] [data-testid="stMarkdownContainer"],.st-key-home [data-testid="stColumn"] [data-testid="stCaptionContainer"],.st-key-home_new [data-testid="stMarkdownContainer"],.st-key-home_new [data-testid="stCaptionContainer"]{margin-bottom:0}
+.st-key-home_new{gap:10px}
 </style>
 """
 
