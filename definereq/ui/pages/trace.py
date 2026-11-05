@@ -202,19 +202,8 @@ def share_page(p: dict) -> None:
         include = st.toggle("Excelに内部メモを含める（社外共有は不可）", value=False, key="xl_in")
         st.download_button("Excelをダウンロード（要件・質問・残件・リスク・履歴）", excelx.render(p, include), file_name=f"{pj.today()}_DefineReq_要件一覧.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        st.download_button("案件JSONをダウンロード（保存・受け渡し）", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json")
-        st.caption("JSONには資料の本文と文字起こしが含まれます。元ファイルは含みません。取り扱いに注意してください。公開環境のディスクは再起動で消えるため、案件はJSONで保存してください。")
-        st.divider()
-        up = st.file_uploader("案件JSONを読み込む（現在の案件と入れ替えます）", type=["json"], key="ws_json")
-        if up is not None and st.button("読み込む", key="ws_load"):
-            from .. import state
-
-            try:
-                state.open_project(jsonio.loads(up.getvalue()))
-            except jsonio.LoadError as e:
-                st.error("読み込めませんでした。作業中のデータは変更していません。")
-                for msg in e.errors[:6]:
-                    st.caption(msg)
+        st.download_button("案件JSONをダウンロード（要件IDつきの受け渡し用）", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json")
+        st.caption("JSONには資料の本文と文字起こしが含まれます。元ファイルは含みません。取り扱いに注意してください。案件はこの画面の利用中のみ保持され、閉じると消えます。")
 
 
 def usage(p: dict) -> None:

@@ -1,5 +1,4 @@
 """出力・JSON・デモ・公開構成の検証。"""
-import copy
 import io
 import json
 import re
@@ -171,43 +170,10 @@ def test_excel_shows_both_totals(built):
 
 # ---- JSON ----
 @pytest.mark.parametrize("demo", DEMOS)
-def test_json_roundtrip(built, demo):
-    p = built[demo]
-    q = jsonio.loads(jsonio.dumps(p))
-    assert json.dumps(q, sort_keys=True, default=str) == json.dumps(json.loads(jsonio.dumps(p)), sort_keys=True, default=str)
-    assert why.answer(q, "なぜ")["status"] in ("not_found", "ambiguous", "answered")
-
-
-def test_json_keeps_all_major_data(built):
-    q = jsonio.loads(jsonio.dumps(built["d3"]))
-    assert q["sources"][0]["units"][0]["locator"] and q["recordings"][0]["segments"][0]["speaker_status"]
-    assert q["requirements"][0]["evidence"] and q["baselines"] and q["shared_docs"] and q["history"]
-
-
-def corrupt(p, fn):
-    q = copy.deepcopy(p)
-    fn(q)
-    return jsonio.dumps(q)
-
-
-@pytest.mark.parametrize("name,fn", [
-    ("version", lambda q: q.update(format_version=999)),
-    ("app", lambda q: q.update(app="other")),
-    ("dup", lambda q: q["requirements"].append(dict(q["requirements"][0]))),
-    ("state", lambda q: q["requirements"][0].update(status="謎の状態")),
-    ("ref", lambda q: q["requirements"][0].update(related=["REQ-999"])),
-    ("evidence", lambda q: q["requirements"][0]["evidence"].append({"source_id": "SRC-999"})),
-    ("missing", lambda q: q.pop("decisions")),
-    ("domain", lambda q: q.update(domains=["x"])),
-])
-def test_invalid_json_rejected(built, name, fn):
-    with pytest.raises(jsonio.LoadError):
-        jsonio.loads(corrupt(built["d1"], fn))
-
-
-def test_broken_json_text():
-    with pytest.raises(jsonio.LoadError):
-        jsonio.loads(b"{broken")
+def test_json_output_keeps_major_data(built, demo):
+    q = json.loads(jsonio.dumps(built[demo]))
+    assert q["requirements"][0]["id"].startswith("REQ-") and q["requirements"][0]["evidence"]
+    assert q["sources"][0]["units"][0]["locator"] and q["baselines"] and q["shared_docs"] and q["history"]
 
 
 # ---- デモ ----

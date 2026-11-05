@@ -37,16 +37,16 @@ CSS = """
 .dr-stat-n{font-size:30px;font-weight:900;line-height:1.2;color:var(--ink)}
 .dr-stat-l{font-size:12.5px;color:var(--muted)}
 /* トップページ */
-.dr-hero{position:relative;overflow:hidden;background:#fff;padding:54px 0 60px;min-height:440px}
-.dr-hero-shape{position:absolute;right:0;top:0;bottom:0;width:52%;background:url("__HERO__") right center/cover no-repeat;pointer-events:none}
+.dr-hero{position:relative;overflow:hidden;background:#F3F0EA;border-radius:6px;padding:54px 44px 60px;min-height:440px}
+.dr-hero-shape{position:absolute;right:0;top:0;bottom:0;width:46%;background:url("__HERO__") right center/cover no-repeat;pointer-events:none}
 .dr-markimg{display:inline-block;width:26px;height:26px;background:url("__MARK__") center/contain no-repeat}
-.dr-hero-in{position:relative;max-width:640px}
+.dr-hero-in{position:relative;max-width:min(640px,47%)}
 .dr-mark{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink);letter-spacing:.01em}
 .dr-kana{font-size:12px;font-weight:500;color:var(--muted)}
 .dr-h1{font-size:42px;line-height:1.32;font-weight:900;margin:26px 0 0;color:var(--ink);letter-spacing:-.01em;padding:0}
 .dr-h1 span{display:inline-block}
-.dr-sub{font-size:15px;line-height:1.95;color:#3C3E44;margin:18px 0 0;max-width:600px}
-.dr-jp{font-size:13px;font-weight:700;color:#B8290A;margin-top:12px}
+.dr-sub{font-size:15px;line-height:1.95;color:#B4420A;font-weight:500;margin:18px 0 0;max-width:600px}
+.dr-jp{font-size:15px;font-weight:700;color:#B8290A;margin-top:12px}
 .dr-sec{font-size:24px;font-weight:900;margin:44px 0 4px;color:var(--ink);padding:0}
 .dr-sec-l{font-size:14px;color:var(--muted);margin:0 0 14px;line-height:1.7}
 .dr-dom{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:3px solid var(--ink)}
@@ -55,6 +55,7 @@ CSS = """
 .dr-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:14px 18px;counter-reset:s}
 .dr-step{counter-increment:s;font-size:13px;line-height:1.65;color:#3C3E44}
 .dr-step:before{content:counter(s,decimal-leading-zero);display:block;font-size:26px;font-weight:900;background:linear-gradient(90deg,var(--g1),var(--g2),var(--g3));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.2}
+.dr-step b{display:block;font-size:16px;font-weight:900;color:var(--ink);margin:2px 0}
 .dr-prev{border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .dr-prev-h{background:var(--ink);color:#fff;padding:8px 14px;font-size:12.5px;font-weight:700}
 .dr-prev table{width:100%;border-collapse:collapse;font-size:13px}
@@ -63,7 +64,8 @@ CSS = """
 .dr-tiny{font-size:12px;color:var(--muted);line-height:1.7}
 .dr-demo-n{font-size:12px;font-weight:900;color:#B8290A}
 @media (max-width:760px){
- .dr-hero{padding:28px 0 36px;min-height:0}
+ .dr-hero{padding:28px 18px 36px;min-height:0}
+ .dr-hero-in{max-width:100%}
  .dr-hero-shape{width:70%;opacity:.16}
  .dr-h1{font-size:26px}
  .dr-dom{grid-template-columns:repeat(2,1fr)}

@@ -1,7 +1,7 @@
 """データの種類・状態の定義（案件JSONの形式もここで決める）。
 
 このファイルは「何という状態があるか」だけを持ち、処理は書かない。
-画面・業務ロジック・JSON読込の検証が同じ定義を参照することで、表記ゆれを防ぐ。
+画面と業務ロジックが同じ定義を参照することで、表記ゆれを防ぐ。
 """
 from __future__ import annotations
 
@@ -77,26 +77,3 @@ COLLECTIONS = {
     "risks": "RSK", "actions": "ACT", "history": "HIS", "baselines": "BSL",
     "shared_docs": "DOC", "responses": "RES", "ai_runs": "AIR",
 }
-
-# JSON読込で値を検証する項目（一覧名, 項目名, 許される値）
-ENUM_CHECKS = [
-    ("requirements", "status", AGREEMENT_STATES),
-    ("requirements", "scope", SCOPE_CHOICES + [None]),
-    ("decisions", "state", AGREEMENT_STATES),
-    ("changes", "status", CHANGE_STATES),
-    ("changes", "classification", CHANGE_CLASSES),
-    ("conflicts", "kind", CONFLICT_KINDS),
-    ("candidates", "state", CANDIDATE_STATES),
-    ("history", "outcome", HISTORY_OUTCOMES),
-]
-
-# 別の項目を参照する欄（JSON読込で参照切れを検出する）
-REF_CHECKS = [
-    ("requirements", "related", "requirements"),
-    ("decisions", "related_requirements", "requirements"),
-    ("decisions", "related_changes", "changes"),
-    ("scenarios", "related_requirements", "requirements"),
-    ("issues", "related_requirements", "requirements"),
-    ("risks", "related_requirements", "requirements"),
-    ("changes", "related_requirements", "requirements"),
-]

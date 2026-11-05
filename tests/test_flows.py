@@ -57,6 +57,13 @@ def test_demo_reset_restores_initial_state():
     assert at.session_state["project"]["requirements"][0]["title"] != "編集"
 
 
+def test_project_json_cannot_be_uploaded():
+    at = run()
+    assert not at.get("file_uploader")
+    at = run(project=builder.build("d1", 4), page="share")
+    assert not at.get("file_uploader")
+
+
 def test_new_project_form():
     at = run()
     at.text_input[0].set_value("勤怠の更新")

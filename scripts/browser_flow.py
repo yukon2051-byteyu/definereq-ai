@@ -1,4 +1,4 @@
-"""実ブラウザでの操作確認（開発用）：資料と録画のアップロード、Word・Excel・JSONのダウンロード、再読込。
+"""実ブラウザでの操作確認（開発用）：資料と録画のアップロード、Word・Excel・JSONのダウンロード。
 
 使い方：python scripts/browser_flow.py <URL> <保存先フォルダ>
 """
@@ -81,22 +81,4 @@ with sync_playwright() as pw:
     d.value.save_as(OUT / "out.json")
     print("JSON", (OUT / "out.json").stat().st_size)
 
-    # 保存したJSONを別のセッションで開く
-    ctx2 = b.new_context(viewport={"width": 1440, "height": 1000})
-    p2 = ctx2.new_page()
-    p2.goto(URL)
-    p2.wait_for_selector(".dr-hero", timeout=60000)
-    wait(p2)
-    p2.locator('input[type="file"]').first.set_input_files(str(OUT / "out.json"))
-    wait(p2)
-    btn(p2, "読み込む")
-    print("JSON再読込", "拠点ネットワーク更新と遠隔保守" in p2.inner_text("body"))
-    # 不正なJSON
-    bad = OUT / "bad.json"
-    bad.write_text("{broken", encoding="utf-8")
-    btn(p2, "← トップへ戻る")
-    p2.locator('input[type="file"]').first.set_input_files(str(bad))
-    wait(p2)
-    btn(p2, "読み込む")
-    print("不正JSONの案内", "読み込めませんでした" in p2.inner_text("body"))
     b.close()
