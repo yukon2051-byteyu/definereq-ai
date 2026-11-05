@@ -84,7 +84,7 @@ def _explain_openai(e: Exception) -> TranscribeError:
     if isinstance(e, openai.PermissionDeniedError):
         return TranscribeError("OpenAI のキーにこの機能の権限がありません。" + detail, billed=False)
     if isinstance(e, openai.RateLimitError):
-        reason = "OpenAI の残高が不足しています。Billing でクレジットを追加してください。" if code == "insufficient_quota" else "OpenAI の利用制限に達しました。時間をおいて再度お試しください。"
+        reason = "OpenAI の残高が不足しています。Billing でクレジットを追加してください。" if code in ("insufficient_quota", "credit_balance_exhausted") else "OpenAI の利用制限に達しました。時間をおいて再度お試しください。"
         return TranscribeError(reason + detail, billed=False)
     if isinstance(e, openai.BadRequestError):
         return TranscribeError("OpenAI が要求を受け付けませんでした。" + detail, billed=False)

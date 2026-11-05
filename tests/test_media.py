@@ -132,7 +132,7 @@ def _openai_error(cls, code=None, msg="失敗"):
     return cls(msg, response=httpx.Response(status, request=req), body={"code": code, "message": msg})
 
 
-@pytest.mark.parametrize("name,code,billed,word", [("RateLimitError", "insufficient_quota", False, "残高"), ("RateLimitError", "rate", False, "利用制限"),
+@pytest.mark.parametrize("name,code,billed,word", [("RateLimitError", "insufficient_quota", False, "残高"), ("RateLimitError", "credit_balance_exhausted", False, "残高"), ("RateLimitError", "rate", False, "利用制限"),
                                                    ("AuthenticationError", None, False, "キー"), ("BadRequestError", "bad", False, "受け付けません")])
 def test_openai_errors_are_explained(name, code, billed, word):
     import openai
