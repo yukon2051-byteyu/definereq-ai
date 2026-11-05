@@ -26,10 +26,13 @@ def render() -> None:
 <h1 class="dr-h1"><span>あなたの要件定義に、</span><span>伴走するAI</span></h1>
 <div class="dr-jp">AI要件定義・変更経緯管理システム</div>
 <p class="dr-sub">{esc(LEAD)}</p>
-<div class="dr-label">業務アプリ ／ インフラ ／ ネットワーク対応 ／ 複合</div>
+<div class="dr-label">業務アプリ ／ インフラ ／ ネットワーク ／ 複合 に対応</div>
 <div class="dr-cta"><a class="dr-btn dr-btn-p" href="#dr-demo">3分でデモを見る</a><a class="dr-btn dr-btn-s" href="#dr-new">新しい案件を始める</a></div>
 <div class="dr-note">デモは登録不要・無料／AI結果は準備済みのサンプルです</div>
 </div></div>""")
+
+    st.html('<h2 class="dr-sec">利用の流れ</h2><p class="dr-sec-l">AIは候補を作り、プログラムが記録と照合を行い、人が判断します。AIの出力だけで要件や合意は確定しません。</p>')
+    st.html('<div class="dr-steps">' + "".join(f'<div class="dr-step"><b>{esc(n)}</b>{esc(t)}</div>' for n, t in FLOW) + "</div>")
 
     st.html('<h2 id="dr-demo" class="dr-sec">3件のデモを試す</h2><p class="dr-sec-l">APIキーや登録なしで、完成した案件の全画面を見られます。デモは閲覧専用で、データは全て架空です。</p>')
     cols = st.columns(3)
@@ -60,9 +63,6 @@ def render() -> None:
             if created:
                 st.session_state["ai_code"] = code.strip()  # AI実行の画面で使う（入力欄はここだけ）
                 state.open_project(created)
-
-    st.html('<h2 class="dr-sec">利用の流れ</h2><p class="dr-sec-l">AIは候補を作り、プログラムが記録と照合を行い、人が判断します。AIの出力だけで要件や合意は確定しません。</p>')
-    st.html('<div class="dr-steps">' + "".join(f'<div class="dr-step"><b>{esc(n)}</b>{esc(t)}</div>' for n, t in FLOW) + "</div>")
 
     st.html('<p class="dr-tiny" style="margin-top:36px">要件定義の完全性や正しさを保証するものではありません。人が確認・判断するための根拠と残件を示します。'
             '公開環境の無料CPUは利用がないと休止するため、開くまでに時間がかかることがあります。</p>')
