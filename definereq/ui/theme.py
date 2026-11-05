@@ -65,7 +65,7 @@ CSS = """
 @media (max-width:760px){
  .dr-hero{padding:28px 0 36px;min-height:0}
  .dr-hero-shape{width:70%;opacity:.16}
- .dr-h1{font-size:29px}
+ .dr-h1{font-size:26px}
  .dr-dom{grid-template-columns:repeat(2,1fr)}
  .dr-steps{grid-template-columns:repeat(2,1fr)}
  .dr-flow{grid-template-columns:1fr 1fr}
