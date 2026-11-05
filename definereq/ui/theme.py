@@ -160,7 +160,7 @@ __PALETTE_CSS__
 /* サイドバーのロゴ（トップへのリンク） */
 [data-testid="stSidebarHeader"]{height:auto;min-height:0;padding:6px 12px 0}
 [data-testid="stSidebar"] .st-key-nav_logo button{background:url("__MARK_DARK__") 8px center/24px 24px no-repeat transparent;padding:2px 10px 2px 42px;min-height:40px}
-[data-testid="stSidebar"] .st-key-nav_logo button:hover{background-color:#26262B}
+[data-testid="stSidebar"] .st-key-nav_logo button:hover,[data-testid="stSidebar"] .st-key-nav_logo button:focus,[data-testid="stSidebar"] .st-key-nav_logo button:active{background:url("__MARK_DARK__") 8px center/24px 24px no-repeat #26262B}
 [data-testid="stSidebar"] .st-key-nav_logo button p{font-size:17px;font-weight:900;color:#fff;letter-spacing:.01em}
 [data-testid="stSidebar"] .st-key-nav_logo{margin-bottom:8px}
 /* トップページ専用の余白。見た目の間隔は 区切り30px／説明→内容14px／カード内8px */
