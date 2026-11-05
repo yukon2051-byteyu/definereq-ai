@@ -210,6 +210,37 @@ def test_hero_has_short_lead_and_anchor_links():
     assert 'href="#dr-new"' in source and 'id="dr-new"' in source
 
 
+def _luminance(color):
+    channels = [int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    r, g, b = [c / 12.92 if c <= .03928 else ((c + .055) / 1.055) ** 2.4 for c in channels]
+    return .2126 * r + .7152 * g + .0722 * b
+
+
+def _contrast(a, b):
+    high, low = sorted((_luminance(a), _luminance(b)), reverse=True)
+    return (high + .05) / (low + .05)
+
+
+def test_flow_colors_are_readable_and_even():
+    from definereq.ui import theme
+
+    tints = [theme.mix(theme.PALETTE[n], "#FFFFFF", theme.TINT[n]) for n in theme.PALETTE]
+    for n, tint in zip(theme.PALETTE, tints):
+        assert _contrast("#2F3036", tint) >= 7, n     # 本文
+        assert _contrast(theme.DEEP[n], tint) >= 4.5, n  # 番号
+    lum = [_luminance(t) for t in tints]
+    assert max(lum) - min(lum) < .13                  # 5枚の明るさをそろえる
+
+
+def test_hero_keeps_original_colors_from_shared_palette():
+    from definereq.ui import theme
+
+    assert (theme.PALETTE["orange"], theme.PALETTE["coral"], theme.PALETTE["magenta"]) == ("#FF7A00", "#F23A1E", "#E0117F")
+    assert "__orange__" not in theme._colored(theme._HERO_SVG)
+    assert "__" not in theme.CSS.split("<style>")[0]
+    assert "--c-purple" in theme.CSS and "__PALETTE_CSS__" not in theme.CSS
+
+
 def test_why_page_example_question():
     at = run(project=builder.build("d1", 4), page="why")
     at = click(at, "なぜ再申請なのか")

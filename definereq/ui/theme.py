@@ -10,9 +10,40 @@ from __future__ import annotations
 
 import base64
 
+# 色の定義元。ヒーローの図形（SVG）とCSS変数の両方へ流し込む
+# 図形はCSS変数を読めないため、ここで一元管理する
+PALETTE = {"orange": "#FF7A00", "coral": "#F23A1E", "pink": "#EE2A6C", "magenta": "#E0117F", "purple": "#A41EF5"}
+# 工程の番号の色（淡い背景の上で読める濃さ）
+DEEP = {"orange": "#A84A00", "coral": "#B92A12", "pink": "#B3164C", "magenta": "#AE0C62", "purple": "#7E12C4"}
+# 白で薄める割合。紫は同じ割合だと暗く見えるため少し低くして、5枚の明るさをそろえる
+TINT = {"orange": .24, "coral": .22, "pink": .22, "magenta": .22, "purple": .20}
+
+
+def mix(a: str, b: str, ratio: float = .5) -> str:
+    """2色を混ぜる（ratio は a の割合）。"""
+    pa, pb = (tuple(int(c[i:i + 2], 16) for i in (1, 3, 5)) for c in (a, b))
+    return "#" + "".join(f"{round(x * ratio + y * (1 - ratio)):02X}" for x, y in zip(pa, pb))
+
+
+def palette_css() -> str:
+    """CSS変数と、5工程で一続きになる背景を作る。"""
+    names = list(PALETTE)
+    tints = [mix(PALETTE[n], "#FFFFFF", TINT[n]) for n in names]
+    lines = [":root{" + "".join(f"--c-{n}:{PALETTE[n]};--deep-{n}:{DEEP[n]};" for n in names)
+             + "".join(f"--t{i}:{t};" for i, t in enumerate(tints, 1)) + "--flow-dir:90deg}"]
+    for i, n in enumerate(names, 1):
+        start = f"--t{i}" if i == 1 else None
+        left = f"var(--t{i})" if start else mix(tints[i - 2], tints[i - 1])
+        right = f"var(--t{i})" if i == len(names) else mix(tints[i - 1], tints[i])
+        lines.append(f".dr-step:nth-child({i}){{background:linear-gradient(var(--flow-dir),{left},var(--t{i}),{right})}}")
+        lines.append(f".dr-step:nth-child({i}):before{{color:var(--deep-{n})}}")
+    return "\n".join(lines)
+
+
 CSS = """
 <style>
-:root{--ink:#161618;--muted:#5A5C63;--line:#E2E3E7;--panel:#F5F5F7;--g1:#FF7A00;--g2:#F23A1E;--g3:#E0117F}
+__PALETTE_CSS__
+:root{--ink:#161618;--muted:#5A5C63;--line:#E2E3E7;--panel:#F5F5F7;--g1:var(--c-orange);--g2:var(--c-coral);--g3:var(--c-magenta)}
 .dr-chips{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px}
 .dr-chip{display:inline-block;padding:2px 9px;border-radius:3px;font-size:12px;font-weight:700;line-height:1.7;white-space:nowrap}
 .dr-head{margin:0 0 14px;padding-left:14px;border-left:6px solid;border-image:linear-gradient(180deg,var(--g1),var(--g2),var(--g3)) 1}
@@ -58,12 +89,8 @@ CSS = """
 .dr-sec-l{font-size:14px;color:var(--muted);margin:6px 0 0;line-height:1.6}
 .dr-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;counter-reset:s}
 .dr-step{counter-increment:s;font-size:13px;line-height:1.5;color:#2F3036;padding:10px 32px 10px 30px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 50%,calc(100% - 22px) 100%,0 100%,18px 50%)}
-.dr-step:nth-child(1){background:#FFF4EA;padding-left:16px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 50%,calc(100% - 22px) 100%,0 100%)}
-.dr-step:nth-child(2){background:#FFE8D6}
-.dr-step:nth-child(3){background:#FFDBC8}
-.dr-step:nth-child(4){background:#FDCCBF}
-.dr-step:nth-child(5){background:#FAB9BE}
-.dr-step:before{content:counter(s,decimal-leading-zero);display:block;font-size:22px;font-weight:900;color:#B8290A;line-height:1.15}
+.dr-step:nth-child(1){padding-left:16px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 50%,calc(100% - 22px) 100%,0 100%)}
+.dr-step:before{content:counter(s,decimal-leading-zero);display:block;font-size:22px;font-weight:900;line-height:1.15}
 .dr-step b{display:block;font-size:15px;font-weight:900;color:var(--ink);line-height:1.4;margin:0 0 1px}
 .dr-tiny{font-size:12px;color:var(--muted);line-height:1.7}
 .dr-demo-n{font-size:12px;font-weight:900;color:#B8290A}
@@ -75,6 +102,7 @@ CSS = """
  .dr-hero-shape{display:none}
  .dr-h1{font-size:30px}
  .dr-jp{font-size:17px}
+ :root{--flow-dir:180deg}
  .dr-steps{grid-template-columns:1fr}
  .dr-step,.dr-step:nth-child(1){clip-path:none;padding:10px 14px;border-radius:4px}
  .dr-flow{grid-template-columns:1fr 1fr}
@@ -104,7 +132,7 @@ CSS = """
 # 独自の図形：根拠（細い線）から判断（太い帯）へ渡る斜めの帯。
 # st.html は SVG 要素を取り除くため、CSS の背景画像として埋め込む
 _HERO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 400" preserveAspectRatio="none">
-<defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FF7A00"/><stop offset=".55" stop-color="#F23A1E"/><stop offset="1" stop-color="#E0117F"/></linearGradient></defs>
+<defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="__orange__"/><stop offset=".55" stop-color="__coral__"/><stop offset="1" stop-color="__magenta__"/></linearGradient></defs>
 <polygon points="95,400 335,0 350,0 350,75 165,400" fill="url(#g)"/>
 <polygon points="215,400 350,165 350,285 285,400" fill="url(#g)"/>
 <polygon points="30,345 215,40 240,40 55,345" fill="#161618"/>
@@ -112,7 +140,7 @@ _HERO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 400" pre
 </svg>"""
 
 _MARK_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26">
-<defs><linearGradient id="m" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FF7A00"/><stop offset=".6" stop-color="#F23A1E"/><stop offset="1" stop-color="#E0117F"/></linearGradient></defs>
+<defs><linearGradient id="m" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="__orange__"/><stop offset=".6" stop-color="__coral__"/><stop offset="1" stop-color="__magenta__"/></linearGradient></defs>
 <polygon points="1,25 18,1 25,1 8,25" fill="url(#m)"/><polygon points="12,25 20,13 25,13 17,25" fill="#161618"/></svg>"""
 
 
@@ -120,6 +148,13 @@ def _uri(svg: str) -> str:
     return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
 
 
-CSS = CSS.replace("__HERO__", _uri(_HERO_SVG)).replace("__MARK__", _uri(_MARK_SVG))
+def _colored(svg: str) -> str:
+    for name, value in PALETTE.items():
+        svg = svg.replace(f"__{name}__", value)
+    return svg
+
+
+CSS = (CSS.replace("__PALETTE_CSS__", palette_css()).replace("__HERO__", _uri(_colored(_HERO_SVG)))
+       .replace("__MARK__", _uri(_colored(_MARK_SVG))))
 HERO_SHAPE = '<div class="dr-hero-shape"></div>'
 MARK = '<span class="dr-markimg"></span>'
