@@ -121,3 +121,28 @@ def test_speaker_is_not_auto_confirmed_and_edit_history(project):
 
 def test_subtitle_import_is_not_labeled_as_transcription():
     assert "文字起こしではない" in tr.METHOD_LABEL["subtitle"]
+
+
+def _openai_error(cls, code=None, msg="失敗"):
+    import httpx2 as httpx
+    import openai
+
+    req = httpx.Request("POST", "https://api.openai.com/v1/audio/transcriptions")
+    status = {openai.RateLimitError: 429, openai.AuthenticationError: 401, openai.BadRequestError: 400}[cls]
+    return cls(msg, response=httpx.Response(status, request=req), body={"code": code, "message": msg})
+
+
+@pytest.mark.parametrize("name,code,billed,word", [("RateLimitError", "insufficient_quota", False, "残高"), ("RateLimitError", "rate", False, "利用制限"),
+                                                   ("AuthenticationError", None, False, "キー"), ("BadRequestError", "bad", False, "受け付けません")])
+def test_openai_errors_are_explained(name, code, billed, word):
+    import openai
+
+    err = tr._explain_openai(_openai_error(getattr(openai, name), code))
+    assert word in str(err) and err.billed is billed
+
+
+def test_key_is_redacted_from_error():
+    import openai
+
+    err = tr._explain_openai(_openai_error(openai.AuthenticationError, None, "Incorrect API key provided: sk-abc123secret"))
+    assert "sk-abc123secret" not in str(err)

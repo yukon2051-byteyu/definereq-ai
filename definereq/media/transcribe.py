@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import hashlib
+import re
+import sys
 from dataclasses import dataclass
 from typing import Callable
 
@@ -56,18 +58,56 @@ def local_available() -> bool:
         return False
 
 
-def _openai_transcribe(wav_path: str, offset: float) -> list[dict]:
-    from openai import OpenAI
+class TranscribeError(Exception):
+    """利用者に理由を見せられる文字起こしのエラー。billed は課金された可能性があるか。"""
 
-    client = OpenAI(max_retries=config.AI_MAX_RETRIES)
+    def __init__(self, message: str, billed: bool = True):
+        super().__init__(message)
+        self.billed = billed
+
+
+def _redact(text: str) -> str:
+    """エラー文にキーが混ざっても画面とログへ出さない。"""
+    return re.sub(r"(sk-|Bearer\s+)\S+", "****", str(text))[:200]
+
+
+def _explain_openai(e: Exception) -> TranscribeError:
+    """OpenAI のエラーを、原因が分かる案内に変える。"""
+    import openai
+
+    code = getattr(e, "code", None)
+    status = getattr(e, "status_code", None)
+    detail = f"（{type(e).__name__} {status or ''} {code or ''}：{_redact(getattr(e, 'message', e))}）"
+    print(f"文字起こしの失敗 {detail}", file=sys.stderr, flush=True)  # 本文やキーは含まない
+    if isinstance(e, openai.AuthenticationError):
+        return TranscribeError("OpenAI のAPIキーが無効です。キーを確認してください。" + detail, billed=False)
+    if isinstance(e, openai.PermissionDeniedError):
+        return TranscribeError("OpenAI のキーにこの機能の権限がありません。" + detail, billed=False)
+    if isinstance(e, openai.RateLimitError):
+        reason = "OpenAI の残高が不足しています。Billing でクレジットを追加してください。" if code == "insufficient_quota" else "OpenAI の利用制限に達しました。時間をおいて再度お試しください。"
+        return TranscribeError(reason + detail, billed=False)
+    if isinstance(e, openai.BadRequestError):
+        return TranscribeError("OpenAI が要求を受け付けませんでした。" + detail, billed=False)
+    if isinstance(e, openai.APIConnectionError):
+        return TranscribeError("OpenAI へ接続できませんでした。時間をおいて再度お試しください。" + detail, billed=False)
+    return TranscribeError("文字起こしに失敗しました。時間をおいて再度お試しください。" + detail)
+
+
+def _openai_transcribe(wav_path: str, offset: float) -> list[dict]:
+    import openai
+
+    client = openai.OpenAI(max_retries=config.AI_MAX_RETRIES)
     model = config.transcribe_model()
-    with open(wav_path, "rb") as f:
-        if "diarize" in model:
-            r = client.audio.transcriptions.create(model=model, file=f, response_format="diarized_json",
-                                                   chunking_strategy="auto", language="ja")
-        else:
-            r = client.audio.transcriptions.create(model=model, file=f, response_format="verbose_json",
-                                                   timestamp_granularities=["segment"], language="ja")
+    try:
+        with open(wav_path, "rb") as f:
+            if "diarize" in model:
+                r = client.audio.transcriptions.create(model=model, file=f, response_format="diarized_json",
+                                                       chunking_strategy="auto", language="ja")
+            else:
+                r = client.audio.transcriptions.create(model=model, file=f, response_format="verbose_json",
+                                                       timestamp_granularities=["segment"], language="ja")
+    except openai.OpenAIError as e:
+        raise _explain_openai(e) from e
     segs = []
     for s in getattr(r, "segments", None) or []:
         segs.append({"start": float(s.start) + offset, "end": float(s.end) + offset,

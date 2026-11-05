@@ -155,6 +155,11 @@ def _transcribe_ui(p: dict) -> None:
                 rd.ledger.settle(run_id, "失敗", 0.0, error=str(e))
             st.error(str(e))
             return
+        except tr.TranscribeError as e:
+            if run_id:  # 課金の可能性がなければ0円で閉じ、あれば予約額のまま残す
+                rd.ledger.settle(run_id, "失敗", 0.0 if not e.billed else None, error=str(e))
+            st.error(str(e))
+            return
         except Exception:  # 外部APIの障害など。費用が発生した可能性があるため予約額のまま残す
             if run_id:
                 rd.ledger.settle(run_id, "失敗", None, error="文字起こしの失敗")
