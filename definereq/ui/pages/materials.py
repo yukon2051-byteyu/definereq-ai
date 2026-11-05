@@ -17,7 +17,7 @@ from ...media import transcribe as tr
 from ...schema import CONTENT_CONFIRM, SOURCE_KINDS, SPEAKER_CONFIRM, UTTERANCE_KINDS, VISIBILITY
 from ...usage import gate
 from ...usage.ledger import BudgetExceeded, LedgerUnavailable, Limits
-from ..ai_panel import access_code_input
+from ..ai_panel import current_code
 from ..components import chips, edit_block, head, ok_rerun, play_at, select_item, touch
 
 
@@ -132,7 +132,7 @@ def _transcribe_ui(p: dict) -> None:
     ready = True
     rd = None
     if choice == "openai":
-        code = access_code_input()
+        code = current_code()
         rd = gate.readiness(code if code else None)
         ready = rd.transcribe and bool(code)
         for r in rd.reasons:

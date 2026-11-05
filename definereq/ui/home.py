@@ -6,6 +6,7 @@ import streamlit as st
 from .. import project as pj
 from ..demos import builder
 from ..schema import DOMAINS
+from ..usage import gate
 from . import state
 from .components import esc, guard
 from .theme import HERO_SHAPE, MARK
@@ -47,10 +48,15 @@ def render() -> None:
         c1, c2 = st.columns(2)
         name = c1.text_input("案件名", placeholder="例：勤怠システムの更新", key="new_name")
         domains = c2.multiselect("対象分野（複合は複数選択）", list(DOMAINS), format_func=DOMAINS.get, default=["app"], key="new_dom")
-        st.caption("入力した内容はこの画面の利用中のみ保持され、閉じると消えます。")
-        if st.button("案件を作成", type="primary"):
+        code = st.text_input("AIパスワード", type="password", key="home_code")
+        valid = gate.check_code(code)
+        if code and not valid:
+            st.warning("AIパスワードが正しくありません。")
+        st.caption("案件の作成にはAIパスワードが必要です。入力後にEnterキーを押してください。入力した案件はこの画面の利用中のみ保持され、閉じると消えます。")
+        if st.button("案件を作成", type="primary", disabled=not valid, key="create_project"):
             created = guard(pj.new_project, name, domains)
             if created:
+                st.session_state["ai_code"] = code.strip()  # AI実行の画面で使う（入力欄はここだけ）
                 state.open_project(created)
 
     st.html('<h2 class="dr-sec">対応する分野</h2><p class="dr-sec-l">分野に応じて、質問・確認観点・文書の章立てが切り替わります。</p>')

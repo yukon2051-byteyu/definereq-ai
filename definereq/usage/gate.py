@@ -1,7 +1,7 @@
 """有料処理の関門。「使ってよいか」を1か所で判断する。
 
 全ての条件が揃わなければ有料処理は実行しない：
-アクセスコード・APIキー・利用記録DB・予算。どれかが欠けても無料機能には影響しない。
+AIパスワード・APIキー・利用記録DB・予算。どれかが欠けても無料機能には影響しない。
 """
 from __future__ import annotations
 
@@ -34,9 +34,9 @@ class Readiness:
 def readiness(code: str | None = None) -> Readiness:
     reasons = []
     if not config.access_codes():
-        reasons.append("アクセスコードが未設定です（DEFINEREQ_ACCESS_CODES）。")
+        reasons.append("AIパスワードが未設定です（DEFINEREQ_ACCESS_CODES）。")
     elif code is not None and not check_code(code):
-        reasons.append("アクセスコードが正しくありません。")
+        reasons.append("AIパスワードが正しくありません。")
     ledger = open_ledger()
     if ledger is None:
         reasons.append("利用記録に接続できません（USAGE_HF_DATASET と HF_TOKEN、または USAGE_DATABASE_URL）。利用量を確認できないため有料処理を停止しています。")

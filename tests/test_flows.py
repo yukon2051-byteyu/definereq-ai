@@ -92,16 +92,70 @@ def test_project_json_cannot_be_uploaded():
     assert not at.get("file_uploader")
 
 
-def test_new_project_form():
+def field(at, label):
+    return next(t for t in at.text_input if t.label == label)
+
+
+def create_button(at):
+    return next(b for b in at.button if b.label == "案件を作成")
+
+
+def test_create_disabled_until_valid_password(monkeypatch):
+    monkeypatch.setenv("DEFINEREQ_ACCESS_CODES", "correct-password")
     at = run()
-    at.text_input[0].set_value("勤怠の更新")
-    at = click(at, "案件を作成")
+    assert create_button(at).disabled
+    field(at, "AIパスワード").set_value("wrong")
+    at = at.run()
+    assert create_button(at).disabled and at.warning
+    field(at, "AIパスワード").set_value("correct-password")
+    at = at.run()
+    assert not create_button(at).disabled and not at.warning
+
+
+def test_create_disabled_when_no_password_configured():
+    assert create_button(run()).disabled
+
+
+def test_new_project_form_keeps_password_for_ai(monkeypatch):
+    monkeypatch.setenv("DEFINEREQ_ACCESS_CODES", "correct-password")
+    at = run()
+    field(at, "案件名").set_value("勤怠の更新")
+    field(at, "AIパスワード").set_value("correct-password")
+    at = at.run()
+    create_button(at).click()
+    at = at.run()
     assert at.session_state["project"]["name"] == "勤怠の更新" and not at.exception
+    assert at.session_state["ai_code"] == "correct-password"
 
 
-def test_new_project_requires_name():
-    at = click(run(), "案件を作成")
+def test_new_project_requires_name(monkeypatch):
+    monkeypatch.setenv("DEFINEREQ_ACCESS_CODES", "correct-password")
+    at = run()
+    field(at, "AIパスワード").set_value("correct-password")
+    at = at.run()
+    create_button(at).click()
+    at = at.run()
     assert at.error and "project" not in at.session_state
+
+
+@pytest.mark.parametrize("page", ["candidates", "recordings", "usage"])
+def test_password_input_exists_only_on_top(page):
+    from definereq import project as pj
+
+    at = run(project=pj.new_project("t", ["app"]), page=page)
+    assert not any("パスワード" in t.label for t in at.text_input)
+    assert any(t.label == "AIパスワード" for t in run().text_input)
+
+
+def test_ai_panel_uses_password_from_top(monkeypatch):
+    from definereq import project as pj
+
+    monkeypatch.setenv("DEFINEREQ_ACCESS_CODES", "correct-password")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy")
+    monkeypatch.setenv("DEFINEREQ_ALLOW_LOCAL_LEDGER", "1")
+    monkeypatch.setenv("DEFINEREQ_LOCAL_LEDGER", str(ROOT / "data" / "test_panel.db"))
+    at = run(project=pj.new_project("t", ["app"]), page="candidates", ai_code="correct-password")
+    assert any(not b.disabled for b in at.button if b.label == "この内容でAIを実行")
 
 
 @pytest.mark.parametrize("page", ["prep", "candidates", "refine", "nfr", "conflicts", "risks", "scenarios"])

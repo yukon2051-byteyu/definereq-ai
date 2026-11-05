@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -36,8 +37,9 @@ with sync_playwright() as pw:
 
     # 新規案件
     page.get_by_label("案件名").fill("ブラウザ確認の案件")
-    page.get_by_label("案件名").press("Tab")
-    wait(page, 800)
+    page.get_by_label("AIパスワード").fill(os.environ["BROWSER_AI_PASSWORD"])
+    page.get_by_label("AIパスワード").press("Enter")
+    wait(page, 1500)
     btn(page, "案件を作成")
     print("案件作成", "ブラウザ確認の案件" in page.inner_text("body"))
 

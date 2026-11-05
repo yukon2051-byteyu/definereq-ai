@@ -15,8 +15,9 @@ from ..usage.ledger import BudgetExceeded, LedgerUnavailable
 from .components import chip, ok_rerun, touch
 
 
-def access_code_input() -> str:
-    return st.text_input("アクセスコード", type="password", key="access_code")
+def current_code() -> str:
+    """トップページで入力したAIパスワード。入力欄はトップページだけに置く。"""
+    return st.session_state.get("ai_code", "")
 
 
 def ai_panel(p: dict, task_key: str, extra: str = "", recordings: bool = False) -> None:
@@ -36,7 +37,7 @@ def ai_panel(p: dict, task_key: str, extra: str = "", recordings: bool = False) 
         est = ai.estimate(context)
         st.caption(f"送信先：Anthropic（Claude API、モデル {config.ai_model()}）／送信量：{len(context):,}文字／費用見込み：最大 約{est:,.0f}円")
         st.caption("選んでいない資料、対象外の単位（発表者ノートの初期状態など）、内部メモは送信しません。")
-        code = access_code_input()
+        code = current_code()
         rd = gate.readiness(code if code else None)
         if len(context) > config.MAX_AI_INPUT_CHARS:
             st.warning(f"入力が長すぎます（上限 {config.MAX_AI_INPUT_CHARS:,} 文字）。対象の資料を減らしてください。")

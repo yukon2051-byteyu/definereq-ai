@@ -70,7 +70,7 @@ def per_code_minutes() -> int:
 
 
 def access_codes() -> set[str]:
-    """アクセスコード（カンマ区切り）。未設定なら有料機能は誰も使えない。"""
+    """AIパスワード（カンマ区切り）。未設定なら有料機能は誰も使えない。"""
     return {c.strip() for c in env("DEFINEREQ_ACCESS_CODES").split(",") if c.strip()}
 
 

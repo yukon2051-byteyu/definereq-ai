@@ -15,7 +15,7 @@ def current() -> dict | None:
 
 
 def _clear_widgets() -> None:
-    keep = {"project", "page", "demo_copies", "tour_index", "tour_on", "media_paths", "access_code", "flash", "last_view"}
+    keep = {"project", "page", "demo_copies", "tour_index", "tour_on", "media_paths", "ai_code", "flash", "last_view"}
     for k in list(st.session_state.keys()):
         if k not in keep:
             del st.session_state[k]

@@ -14,7 +14,7 @@ from ...project import display
 from ...schema import DOC_TYPES
 from ...usage import gate
 from ...usage.ledger import LedgerUnavailable
-from ..ai_panel import access_code_input
+from ..ai_panel import current_code
 from ..components import chip, chips, edit_block, esc, evidence_block, head, ok_rerun, select_item, touch
 
 
@@ -218,12 +218,12 @@ def usage(p: dict) -> None:
 |---|---|
 | Claude API キー | {'設定済み' if config.has_ai_key() else '未設定'} |
 | OpenAI API キー（文字起こし） | {'設定済み' if config.has_transcribe_key() else '未設定'} |
-| アクセスコード | {'設定済み' if config.access_codes() else '未設定'} |
+| AIパスワード | {'設定済み' if config.access_codes() else '未設定'} |
 | 利用記録（永続DB） | {'設定済み' if (config.usage_db_url() or config.usage_hf_dataset()) else ('手元の開発用' if config.allow_local_ledger() else '未設定')} |
 | AIモデル | {config.ai_model()} |
 | 月額のAPI予算 | {config.monthly_budget_jpy():,}円 |
 """)
-    code = access_code_input()
+    code = current_code()
     rd = gate.readiness(code if code else None)
     for r in rd.reasons:
         st.caption(r)
