@@ -331,26 +331,36 @@ from definereq.demos import guide as demo_guide  # noqa: E402
 
 
 @pytest.mark.parametrize("demo", DEMOS)
-def test_guide_cards_come_from_stage_data(demo):
-    """注目カードが、その段階の案件データから取得できる（創作・先取りの検出）。"""
+def test_guide_blocks_come_from_stage_data(demo):
+    """主役の内容が、その段階の案件データから取得できる（創作・先取りの検出）。"""
     steps = demo_guide.load(demo)
-    assert len(steps) == 8 and steps[0].get("intro") and steps[-1]["process"] == "まとめ"
-    for s in steps[1:]:
-        p = builder.build(demo, s["stage"])
-        ctx = demo_guide.Ctx(p)
-        cards = s["focus"](ctx)
-        assert 1 <= len(cards) <= 4, s["title"]
-        if s["remaining"]:
-            assert isinstance(s["remaining"](ctx), list)
-        assert len(s["title"]) <= 40 and (s["lead"] or "").count("。") <= 2
+    assert len(steps) == 8 and steps[-1]["process"] == "まとめ"
+    for s in steps:
+        ctx = demo_guide.Ctx(builder.build(demo, s["stage"]))
+        assert 1 <= len(s["main"](ctx)) <= 3, s["title"]
+        assert isinstance(s["open"](ctx), list)
+        s["more"](ctx)
+        assert len(s["title"]) <= 34
+
+
+def test_guide_layouts_match_content():
+    kinds = {b["type"] for d in DEMOS for s in demo_guide.load(d) for b in s["main"](demo_guide.Ctx(builder.build(d, s["stage"])))}
+    assert {"versus", "decision", "flow3", "timeline", "summary", "convert", "speech"} <= kinds
 
 
 def test_guide_does_not_show_future_conclusion():
-    steps = demo_guide.load("d1")
-    change = next(s for s in steps if s["process"] == "追加要望と影響")
-    p = builder.build("d1", change["stage"])
-    text = str(change["focus"](demo_guide.Ctx(p)))
-    assert "代行作成" not in text and "受付のみ" in text
+    step = next(s for s in demo_guide.load("d1") if s["process"] == "追加要望と影響")
+    text = str(step["main"](demo_guide.Ctx(builder.build("d1", step["stage"]))))
+    assert "代行作成" not in text and "まだ反映していません" in text
+
+
+def test_meeting_summary_step_keeps_method_undecided():
+    step = next(s for s in demo_guide.load("d1") if s["process"] == "会議後の整理")
+    ctx = demo_guide.Ctx(builder.build("d1", step["stage"]))
+    assert "再申請" not in str(step["main"](ctx))
+    assert "未確定" in str(step["open"](ctx))
+    assert "関係者の発言ではありません" in str(step["main"](ctx))
+    assert "5回" in str(step["more"](ctx))
 
 
 def test_guide_speech_keeps_full_text_and_status():
@@ -361,7 +371,12 @@ def test_guide_speech_keeps_full_text_and_status():
 
 
 def test_guide_past_conflict_keeps_old_version():
-    p = builder.build("d3", 4)
-    g = demo_guide.Ctx(p)
+    g = demo_guide.Ctx(builder.build("d3", 4))
     rows = g.conflict(g.chg("常時接続"))
     assert "遠隔保守" in rows[0][1] and "現地対応" not in rows[0][1] and "解消" in rows[1][1]
+
+
+def test_guide_rejects_text_not_in_records():
+    g = demo_guide.Ctx(builder.build("d1", 2))
+    with pytest.raises(KeyError):
+        g.versus(("現場", "資料にない文章"), ("経理", "直接変更は認めない"), None)

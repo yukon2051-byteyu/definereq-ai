@@ -8,7 +8,7 @@ from __future__ import annotations
 import streamlit as st
 
 from .. import project as pj
-from ..demos import builder
+from ..demos import builder, guide
 
 
 def current() -> dict | None:
@@ -72,7 +72,7 @@ def open_demo(demo_id: str, tour: bool = True, stage: int | None = None) -> None
     if p and not p.get("is_demo"):  # デモを見ても作業中の案件を失わない
         st.session_state["work_project"] = p
     st.session_state["show_home"] = False
-    stage = stage or (1 if tour else 4)
+    stage = stage or (guide.load(demo_id)[0]["stage"] if tour else 4)
     st.session_state["project"] = demo_copy(demo_id, stage)
     st.session_state["tour_on"] = tour
     st.session_state["tour_index"] = 0

@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import streamlit as st
-import streamlit.components.v1 as components
 
+from .. import project as pj
 from ..demos.builder import STAGES
 from ..schema import DOMAINS
 from . import guide, state
@@ -47,6 +47,9 @@ def sidebar(p: dict) -> None:
             state.go_home()
         if not p.get("is_demo"):
             save_controls(p, "save_side")
+        if p.get("demo") and st.session_state.get("tour_on"):
+            guide.sidebar(p)  # 案内中は工程の一覧だけにする
+            return
         current = st.session_state.get("page", "overview")
 
         def nav(key: str, label: str) -> None:
@@ -96,7 +99,8 @@ def scroll_top_on_change(p: dict, key: str) -> None:
         # st.html のスクリプトは初回しか実行されないため、毎回読み直される埋め込み枠から親の画面を操作する
         script = ("const d=window.parent.document;const t=()=>{d.querySelector('[data-testid=stMain]')?.scrollTo(0,0);window.parent.scrollTo(0,0)};"
                   "t();setTimeout(t,150);setTimeout(t,500)")
-        components.html(f"<script>/*{marker}*/{script}</script>", height=0)
+        # 目印は読み込んだJSONの値を含むため、ハッシュにしてからスクリプトへ入れる
+        st.iframe(f"<script>/*{pj.fingerprint(marker)}*/{script}</script>", height=1)
 
 
 def next_step(key: str) -> None:

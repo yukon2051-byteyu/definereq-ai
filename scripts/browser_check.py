@@ -62,7 +62,7 @@ with sync_playwright() as pw:
     page.get_by_role("button", name="次へ").first.click()
     wait(page)
     page.screenshot(path=OUT / "tour2.png")
-    click(page, "案内を閉じる")
+    click(page, "全機能のメニューを見る")
     for name, label in (("overview", "概要・残件"), ("reqs", "要件"), ("decisions", "決定・合意"), ("why", "なぜこの仕様か"), ("share", "共有資料・出力")):
         click(page, label)
         page.screenshot(path=OUT / f"{name}.png")

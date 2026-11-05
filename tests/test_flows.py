@@ -29,7 +29,7 @@ def click(at, label):
 def test_demo_opens_from_home_without_keys():
     at = click(run(), "3分の案内で見る")
     assert not at.exception and at.session_state["project"]["is_demo"]
-    assert at.session_state["project"]["demo"]["stage"] == 1 and at.session_state["tour_on"]
+    assert at.session_state["project"]["demo"]["stage"] == 2 and at.session_state["tour_on"]
 
 
 def by_key(at, key):
@@ -49,6 +49,22 @@ def test_guide_walks_every_step_and_back(demo):
         assert at.session_state["project"]["demo"]["stage"] == steps[i]["stage"]
         at = by_key(at, "tour_next").click().run()
     assert at.session_state["tour_index"] == len(steps) - 1 and not at.exception
+
+
+def test_scroll_script_does_not_embed_project_values():
+    source = (ROOT / "definereq" / "ui" / "shell.py").read_text(encoding="utf-8")
+    assert "{pj.fingerprint(marker)}" in source and "/*{marker}*/" not in source
+
+
+def test_guide_sidebar_shows_steps_only():
+    at = run()
+    by_key(at, "tour_d1").click()
+    at = at.run()
+    keys = {b.key for b in at.sidebar.button}
+    assert "tour_go_0" in keys and "tour_close" in keys and "nav_requirements" not in keys
+    assert by_key(at, "tour_go_0").proto.type == "primary"
+    at = by_key(at, "tour_go_4").click().run()
+    assert at.session_state["tour_index"] == 4 and by_key(at, "tour_go_4").proto.type == "primary"
 
 
 def test_detail_and_back_keep_the_step():
@@ -76,7 +92,7 @@ def test_demo_card_has_single_entry_and_tour_can_be_closed():
     at = run()
     assert not any(b.label == "全画面を見る" for b in at.button)
     at = click(at, "3分の案内で見る")
-    at = click(at, "案内を閉じる")
+    at = click(at, "全機能のメニューを見る")
     assert at.session_state["tour_on"] is False and not at.exception
     assert at.session_state["project"]["is_demo"]
 

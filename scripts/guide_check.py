@@ -12,7 +12,7 @@ from playwright.sync_api import sync_playwright
 URL, OUT = sys.argv[1], Path(sys.argv[2])
 OUT.mkdir(parents=True, exist_ok=True)
 sys.stdout.reconfigure(encoding="utf-8")
-JS = """()=>{const q=s=>document.querySelector(s);const h=q('.dr-g-h').getBoundingClientRect();const f=q('.dr-g-card');
+JS = """()=>{const q=s=>document.querySelector(s);const h=q('.dr-g-h').getBoundingClientRect();const f=q('.dr-key,.dr-f-text,.dr-t');
 return {title:q('.dr-g-h').innerText,prog:q('.dr-g-prog b').innerText,headTop:Math.round(h.top),firstCardTop:f?Math.round(f.getBoundingClientRect().top):null,
 vh:innerHeight,overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,err:document.querySelectorAll('[data-testid=stException],[data-testid=stAlertContentError]').length}}"""
 
@@ -31,7 +31,7 @@ with sync_playwright() as pw:
                 g.wait_for_timeout(1800)
                 r = g.evaluate(JS)
                 print(size, f"d{n + 1}", r["prog"], "|", r["title"], "| 見出し", r["headTop"], "カード", r["firstCardTop"], "はみ出し", r["overflow"], "エラー", r["err"])
-                if size == "pc" or i in (0, 3):
+                if size == "pc" or i in (0, 2, 3, 6):
                     g.screenshot(path=OUT / f"{size}_d{n + 1}_{i}.png")
                 nxt = g.get_by_role("button", name="次へ：")
                 if nxt.count() == 0:
