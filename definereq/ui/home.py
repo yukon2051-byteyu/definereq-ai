@@ -31,7 +31,7 @@ def _sections() -> None:
     # ヒーローのボタンはページ内リンク。再実行が起きないため、入力中の内容は消えない
     st.html(f"""<div class="dr-hero">{HERO_SHAPE}<div class="dr-hero-in">
 <div class="dr-mark">{MARK}<span>DefineReq_AI</span></div>
-<h1 class="dr-h1"><span>あなたの要件定義に、</span><span>伴走するAI</span></h1>
+<h1 class="dr-h1"><span>あなたの要件定義に、</span><span>伴走する<b class="dr-ai">AI</b>を</span></h1>
 <div class="dr-jp">AI要件定義・変更経緯管理システム</div>
 <p class="dr-sub">{esc(LEAD)}</p>
 <div class="dr-label">業務アプリ ／ インフラ ／ ネットワーク ／ 複合 に対応</div>
