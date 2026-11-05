@@ -77,9 +77,6 @@ def open_demo(demo_id: str, tour: bool = True, stage: int | None = None) -> None
     st.session_state["tour_on"] = tour
     st.session_state["tour_index"] = 0
     st.session_state["page"] = "overview"
-    if tour:
-        step = next(d for d in builder.catalog() if d["id"] == demo_id)["tour"][0]
-        st.session_state["page"] = step["page"]
     st.rerun()
 
 

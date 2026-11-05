@@ -32,14 +32,37 @@ def test_demo_opens_from_home_without_keys():
     assert at.session_state["project"]["demo"]["stage"] == 1 and at.session_state["tour_on"]
 
 
-def test_tour_walks_to_the_end_across_stages():
-    at = click(run(), "3分の案内で見る")
-    stages = set()
-    for _ in range(len(builder.catalog()[0]["tour"]) - 1):
-        at = click(at, "次へ")
-        assert not at.exception and not at.error
-        stages.add(at.session_state["project"]["demo"]["stage"])
-    assert {2, 3, 4} <= stages
+def by_key(at, key):
+    return next(b for b in at.button if b.key == key)
+
+
+@pytest.mark.parametrize("demo", ["d1", "d2", "d3"])
+def test_guide_walks_every_step_and_back(demo):
+    from definereq.demos import guide
+
+    at = run()
+    by_key(at, f"tour_{demo}").click()
+    at = at.run()
+    steps = guide.load(demo)
+    for i in range(len(steps) - 1):
+        assert not at.exception and not at.error, i
+        assert at.session_state["project"]["demo"]["stage"] == steps[i]["stage"]
+        at = by_key(at, "tour_next").click().run()
+    assert at.session_state["tour_index"] == len(steps) - 1 and not at.exception
+
+
+def test_detail_and_back_keep_the_step():
+    at = run()
+    by_key(at, "tour_d1").click()
+    at = at.run()
+    for _ in range(3):
+        at = by_key(at, "tour_next").click().run()
+    stage = at.session_state["project"]["demo"]["stage"]
+    at = by_key(at, "tour_detail").click().run()
+    assert at.session_state["tour_on"] is False and at.session_state["page"] == "recordings"
+    at = by_key(at, "tour_back").click().run()
+    assert at.session_state["tour_on"] is True and at.session_state["tour_index"] == 3
+    assert at.session_state["project"]["demo"]["stage"] == stage
 
 
 def test_each_session_has_separate_copy():

@@ -12,7 +12,7 @@ from ...project import PROFILE_FIELDS, display
 from ...schema import CERTAINTY, DOMAINS, QUESTION_STATES
 from .. import state
 from ..ai_panel import ai_panel, ai_runs_list
-from ..components import edit_block, esc, guard, head, ok_rerun, select_item, touch
+from ..components import definition, edit_block, esc, guard, head, ok_rerun, select_item, touch
 
 
 def overview(p: dict) -> None:
@@ -63,20 +63,25 @@ def overview(p: dict) -> None:
 def profile(p: dict) -> None:
     head("案件情報・関係者", "確認済み・本人申告・仮説・未確認を区別して記録します。担当者や期限をAIが設定することはありません。", "準備")
     st.subheader("対象分野")
-    domains = st.multiselect("分野（複合は複数選択）", list(DOMAINS), default=p["domains"], format_func=DOMAINS.get, key="pf_domains")
-    traits_all = config.checkpoints()["traits"]
-    suggested = checks.suggest_traits(p)
-    traits = st.multiselect("業務・システムの特徴（深掘りする観点）", list(traits_all), default=p.get("traits", []), format_func=lambda k: traits_all[k]["label"], key="pf_traits")
-    missing = [traits_all[k]["label"] for k in suggested if k not in p.get("traits", [])]
-    if missing:
-        st.caption("本文から提案された特徴（採否は人が決めます）：" + "、".join(missing))
-    if st.button("分野と特徴を保存") and domains:
-        p["domains"], p["traits"] = domains, traits
-        touch(p)
-        ok_rerun("保存しました")
+    if p.get("is_demo"):
+        st.write("、".join(DOMAINS[d] for d in p["domains"]))
+    with edit_block("dom"):
+        domains = st.multiselect("分野（複合は複数選択）", list(DOMAINS), default=p["domains"], format_func=DOMAINS.get, key="pf_domains")
+        traits_all = config.checkpoints()["traits"]
+        suggested = checks.suggest_traits(p)
+        traits = st.multiselect("業務・システムの特徴（深掘りする観点）", list(traits_all), default=p.get("traits", []), format_func=lambda k: traits_all[k]["label"], key="pf_traits")
+        missing = [traits_all[k]["label"] for k in suggested if k not in p.get("traits", [])]
+        if missing:
+            st.caption("本文から提案された特徴（採否は人が決めます）：" + "、".join(missing))
+        if st.button("分野と特徴を保存") and domains:
+            p["domains"], p["traits"] = domains, traits
+            touch(p)
+            ok_rerun("保存しました")
 
     st.subheader("案件の情報")
-    with st.form("profile"):
+    if p.get("is_demo"):
+        definition([(label, p["profile"][key]["value"]) for key, label in PROFILE_FIELDS.items()])
+    with edit_block("profile"), st.form("profile"):
         new = {}
         for key, label in PROFILE_FIELDS.items():
             cur = p["profile"][key]
@@ -119,7 +124,11 @@ def prep(p: dict) -> None:
     pr = p["prep"]
     carryover_panel(p)
     tabs = st.tabs(["理解と議題", "質問", "分野別の確認観点"])
-    with tabs[0], st.form("prep_form"):
+    if p.get("is_demo"):
+        with tabs[0]:
+            definition([("現時点の理解", pr.get("understanding")), ("会議の目的", pr.get("purpose")), ("不足情報", pr.get("gaps")), ("必要な資料・計測", pr.get("materials")),
+                        ("議題", pr.get("agenda")), ("今回決めたいこと", pr.get("decide_today"))])
+    with tabs[0], edit_block("prepf"), st.form("prep_form"):
         understanding = st.text_area("現時点の理解", value=pr.get("understanding") or "")
         purpose = st.text_input("会議の目的", value=pr.get("purpose") or "")
         c1, c2 = st.columns(2)

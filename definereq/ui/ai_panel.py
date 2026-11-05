@@ -22,10 +22,10 @@ def current_code() -> str:
 
 def ai_panel(p: dict, task_key: str, extra: str = "", recordings: bool = False) -> None:
     task = ai.TASKS[task_key]
+    if p.get("is_demo"):
+        st.caption("デモではAIを実行できません。準備済みのAI候補を表示しています。")
+        return
     with st.expander(f"AIで候補を作る：{task.label}"):
-        if p.get("is_demo"):
-            st.info("デモでは有料APIを使いません。下の「AI結果の記録」に、事前に用意した結果を表示しています。自由な入力に対して新しいAI結果は作れません。")
-            return
         sources = [s for s in p["sources"] if not s.get("superseded_by")]
         chosen = st.multiselect("送信する資料", [s["id"] for s in sources], default=[s["id"] for s in sources],
                                 format_func=lambda i: next(s["name"] for s in sources if s["id"] == i), key=f"ai_src_{task_key}")
@@ -71,7 +71,7 @@ def ai_runs_list(p: dict, task_key: str) -> None:
     runs = [r for r in p["ai_runs"] if r["task"] == task_key]
     if not runs:
         return
-    st.markdown("**AI結果の記録**")
+    st.markdown("**準備済みのAI候補**" if p.get("is_demo") else "**AI結果の記録**")
     for r in runs:
         status = ai.run_status(p, r)
         st.html(f"<div>{chip(r['id'], 'plain')} {chip(r['source'], 'info')} {chip(status)} {chip(str(r['items']) + '件', 'plain')}</div>")

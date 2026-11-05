@@ -165,16 +165,17 @@ def changes(p: dict) -> None:
         evidence_block(p, e, f"chg_{c['id']}_{i}")
     add_evidence_form(p, c, f"chg_{c['id']}")
     k = c["id"]
-    c1, c2 = st.columns(2)
-    cls = c1.selectbox("分類", CHANGE_CLASSES, index=CHANGE_CLASSES.index(c["classification"]), key=f"cl_{k}")
-    status = c2.selectbox("状態", CHANGE_STATES, index=CHANGE_STATES.index(c["status"]), key=f"cs_{k}")
-    if st.button("分類と状態を保存", key=f"cb_{k}"):
-        if status == "反映済み" and c["status"] != "反映済み":
-            st.error("反映は下の「判断に基づいて反映する」から行ってください。")
-        else:
-            c.update(classification=cls, status=status)
-            touch(p)
-            ok_rerun("保存しました")
+    with edit_block(f"chg{k}"):
+        c1, c2 = st.columns(2)
+        cls = c1.selectbox("分類", CHANGE_CLASSES, index=CHANGE_CLASSES.index(c["classification"]), key=f"cl_{k}")
+        status = c2.selectbox("状態", CHANGE_STATES, index=CHANGE_STATES.index(c["status"]), key=f"cs_{k}")
+        if st.button("分類と状態を保存", key=f"cb_{k}"):
+            if status == "反映済み" and c["status"] != "反映済み":
+                st.error("反映は下の「判断に基づいて反映する」から行ってください。")
+            else:
+                c.update(classification=cls, status=status)
+                touch(p)
+                ok_rerun("保存しました")
 
     st.subheader("影響の調査")
     st.caption("AI候補と確認済みの関連を区別します。")
@@ -264,13 +265,16 @@ def conflicts(p: dict) -> None:
                     st.caption(f"{side['id']}{side['current_version']}：{side['current_text']}" + ("（変更あり）" if side["changed"] else "（変更なし）"))
                 st.caption(view["summary"])
             k = c["id"]
-            c1, c2 = st.columns([1, 1])
-            kind = c1.selectbox("区分", CONFLICT_KINDS, index=CONFLICT_KINDS.index(c["kind"]), key=f"ck_{k}")
-            state = c2.selectbox("状態", CONFLICT_STATES, index=CONFLICT_STATES.index(c["state"]), key=f"cs2_{k}")
-            app = st.text_input("適用範囲・例外の確認結果", c.get("applicability") or "", key=f"ca_{k}")
+            with edit_block(f"cf{k}"):
+                c1, c2 = st.columns([1, 1])
+                kind = c1.selectbox("区分", CONFLICT_KINDS, index=CONFLICT_KINDS.index(c["kind"]), key=f"ck_{k}")
+                state = c2.selectbox("状態", CONFLICT_STATES, index=CONFLICT_STATES.index(c["state"]), key=f"cs2_{k}")
+                app = st.text_input("適用範囲・例外の確認結果", c.get("applicability") or "", key=f"ca_{k}")
+            if c.get("applicability") and p.get("is_demo"):
+                st.caption(f"適用範囲の確認：{c['applicability']}")
             if c.get("resolution"):
                 st.caption(f"解消：{c['resolution']}")
-            if st.button("保存", key=f"cb2_{k}"):
+            if not p.get("is_demo") and st.button("保存", key=f"cb2_{k}"):
                 c.update(kind=kind, state=state, applicability=app or None)
                 touch(p)
                 ok_rerun("保存しました")

@@ -14,7 +14,10 @@ from ..components import add_evidence_form, chip, chips, edit_block, evidence_bl
 
 def candidates(p: dict) -> None:
     head("会議後の整理", "AIの候補を人が確認し、採用・修正・却下を決めます。候補のままでは要件や合意になりません。", "整理")
-    flow([("入力", "選択した資料・発言"), ("AI候補", "要点・要望・決定候補など"), ("人の判断", "採用／修正／却下"), ("結果", "根拠付きの要件・論点")])
+    if not p.get("is_demo"):
+        flow([("入力", "選択した資料・発言"), ("AI候補", "要点・要望・決定候補など"), ("人の判断", "採用／修正／却下"), ("結果", "根拠付きの要件・論点")])
+    else:
+        st.caption("準備済みのAI候補と、担当者が採用・却下した結果を確認できます。")
     ai_panel(p, "extract")
     ai_runs_list(p, "extract")
     with edit_block("cand_mtg"):

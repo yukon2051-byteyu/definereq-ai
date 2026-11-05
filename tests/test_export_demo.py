@@ -311,7 +311,6 @@ def test_demo_runs_without_keys_or_network(monkeypatch):
 
 def test_tour_covers_all_stages():
     for d in builder.catalog():
-        assert 6 <= len(d["tour"]) <= 9
         assert {s["stage"] for s in d["tour"]} == {1, 2, 3, 4}
 
 
@@ -325,3 +324,44 @@ def test_sources_contain_no_real_secrets_or_keys():
 def test_backlog_consistent_in_demo(built):
     b = checks.backlog(built["d2"])
     assert b["unique_total"] <= b["category_total"]
+
+
+# ---- 3分の案内 ----
+from definereq.demos import guide as demo_guide  # noqa: E402
+
+
+@pytest.mark.parametrize("demo", DEMOS)
+def test_guide_cards_come_from_stage_data(demo):
+    """注目カードが、その段階の案件データから取得できる（創作・先取りの検出）。"""
+    steps = demo_guide.load(demo)
+    assert len(steps) == 8 and steps[0].get("intro") and steps[-1]["process"] == "まとめ"
+    for s in steps[1:]:
+        p = builder.build(demo, s["stage"])
+        ctx = demo_guide.Ctx(p)
+        cards = s["focus"](ctx)
+        assert 1 <= len(cards) <= 4, s["title"]
+        if s["remaining"]:
+            assert isinstance(s["remaining"](ctx), list)
+        assert len(s["title"]) <= 40 and (s["lead"] or "").count("。") <= 2
+
+
+def test_guide_does_not_show_future_conclusion():
+    steps = demo_guide.load("d1")
+    change = next(s for s in steps if s["process"] == "追加要望と影響")
+    p = builder.build("d1", change["stage"])
+    text = str(change["focus"](demo_guide.Ctx(p)))
+    assert "代行作成" not in text and "受付のみ" in text
+
+
+def test_guide_speech_keeps_full_text_and_status():
+    p = builder.build("d1", 2)
+    c = demo_guide.Ctx(p).speech("金額の訂正は再申請で進めます")
+    seg = p["recordings"][0]["segments"][-1]
+    assert c["text"] == seg["text"] and c["speaker_status"] == "未確認" and c["time"]
+
+
+def test_guide_past_conflict_keeps_old_version():
+    p = builder.build("d3", 4)
+    g = demo_guide.Ctx(p)
+    rows = g.conflict(g.chg("常時接続"))
+    assert "遠隔保守" in rows[0][1] and "現地対応" not in rows[0][1] and "解消" in rows[1][1]

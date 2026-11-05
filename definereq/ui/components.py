@@ -11,6 +11,7 @@ import streamlit as st
 from .. import config
 from .. import project as pj
 from ..logic import evidence as ev
+from ..project import display
 from ..schema import NA
 
 esc = html.escape
@@ -112,6 +113,12 @@ def save_controls(p: dict, key: str) -> None:
     made = st.session_state.get("save_time")
     when = f"保存用ファイルの作成：{made[:16].replace('T', ' ')}" if made else "保存用ファイルはまだ作成していません"
     st.caption(when + ("／作成後の変更あり" if state.is_dirty(p) else "／作成後の変更なし"))
+
+
+def definition(rows: list[tuple[str, object]]) -> None:
+    """閲覧用の定義リスト。"""
+    body = "".join(f"<dt>{esc(str(k))}</dt><dd>{esc(display(v))}</dd>" for k, v in rows)
+    st.html(f'<dl class="dr-dl">{body}</dl>')
 
 
 def edit_block(name: str):

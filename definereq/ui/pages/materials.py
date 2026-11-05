@@ -75,11 +75,14 @@ def sources(p: dict) -> None:
                 registry.set_unit_target(p, src["id"], {row["_id"]}, bool(row["対象"]))
             touch(p)
             ok_rerun("保存しました")
-    note = st.text_area("人の補足（図の構造など。原文とは別に記録します）", value=src.get("supplement") or "", key=f"sup_{src['id']}")
-    if st.button("補足を保存", key=f"sup_b_{src['id']}"):
-        src["supplement"] = note or None
-        touch(p)
-        ok_rerun("保存しました")
+    if p.get("is_demo"):
+        st.markdown(f"**人の補足**：{src.get('supplement') or 'なし'}")
+    with edit_block("sup"):
+        note = st.text_area("人の補足（図の構造など。原文とは別に記録します）", value=src.get("supplement") or "", key=f"sup_{src['id']}")
+        if st.button("補足を保存", key=f"sup_b_{src['id']}"):
+            src["supplement"] = note or None
+            touch(p)
+            ok_rerun("保存しました")
 
 
 def _save_upload(up) -> str:
@@ -220,6 +223,13 @@ def recordings(p: dict) -> None:
             seg["inaudible"], seg["target"] = bool(row["聞き取り不能"]), bool(row["対象"])
         touch(p)
         ok_rerun("保存しました（自動の原文と修正履歴は残ります）")
+    with st.expander("全発言を全文で読む"):
+        for segment in rec["segments"]:
+            who = segment.get("speaker") or segment.get("speaker_label") or "話者未確認"
+            st.markdown(f"**{format_time(segment['start'])} {who}**（{segment.get('kind') or '未分類'}・話者{segment['speaker_status']}）")
+            st.write(segment["text"])
+    if not rec.get("video_file") and rec["id"] not in st.session_state.get("media_paths", {}):
+        st.caption("この記録には再生できる動画がありません。")
     seg = st.selectbox("発言を聞き直す", rec["segments"], format_func=lambda s: f"{format_time(s['start'])} {s['text'][:40]}", key="seg_play")
     if seg:
         play_at(rec, seg["start"], f"seg_{seg['id']}")

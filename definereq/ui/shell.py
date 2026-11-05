@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import streamlit as st
+import streamlit.components.v1 as components
 
-from ..demos.builder import STAGES, catalog
+from ..demos.builder import STAGES
 from ..schema import DOMAINS
-from . import state
+from . import guide, state
 from .readonly import HIDE_CSS
-from .components import esc, flow, save_controls, show_flash
+from .components import esc, save_controls, show_flash
 from .pages import decide, materials, organize, prepare, trace
 
 # 通常は主要な工程だけを表示し、詳しい機能は「詳細の機能」に収める
@@ -85,43 +86,15 @@ def stage_control(p: dict) -> None:
         state.set_stage(choice)
 
 
-def tour(p: dict) -> None:
-    """約3分の案内。手順ごとに入力→AI候補→人の判断→結果のつながりを示す。"""
-    d = p.get("demo")
-    if not d or not st.session_state.get("tour_on"):
-        return
-    steps = next(x for x in catalog() if x["id"] == d["id"])["tour"]
-    i = min(st.session_state.get("tour_index", 0), len(steps) - 1)
-    s = steps[i]
-    with st.container(border=True):
-        st.markdown(f"**案内 {i + 1}/{len(steps)}　{s['title']}**")
-        st.progress((i + 1) / len(steps))
-        flow([("入力", s["input"]), ("AI候補", s["ai"]), ("人の判断", s["human"]), ("結果", s["result"])])
-        c1, c2, c3 = st.columns([1, 1, 2])
-        if c1.button("前へ", disabled=i == 0, width="stretch", key="tour_prev"):
-            _jump(steps, i - 1)
-        if i + 1 < len(steps):
-            if c2.button("次へ", type="primary", width="stretch", key="tour_next"):
-                _jump(steps, i + 1)
-        elif c2.button("案内を終わる", type="primary", width="stretch", key="tour_end"):
-            st.session_state["tour_on"] = False
-            st.rerun()
-        if c3.button("案内を閉じる", width="stretch", key="tour_close"):
-            st.session_state["tour_on"] = False
-            st.rerun()
-
-
-def _jump(steps: list[dict], i: int) -> None:
-    st.session_state["tour_index"] = i
-    state.set_stage(steps[i]["stage"], steps[i]["page"])
-
-
 def scroll_top_on_change(p: dict, key: str) -> None:
     """画面や段階が変わったら先頭へ戻す（案内パネルが画面外に隠れないように）。"""
-    marker = f"{p['id']}:{key}:{(p.get('demo') or {}).get('stage')}"
+    marker = f"{p['id']}:{key}:{(p.get('demo') or {}).get('stage')}:{st.session_state.get('tour_on')}:{st.session_state.get('tour_index')}"
     if st.session_state.get("last_view") != marker:
         st.session_state["last_view"] = marker
-        st.html("<script>document.querySelector('[data-testid=\"stMain\"]')?.scrollTo(0, 0)</script>", unsafe_allow_javascript=True)
+        # st.html のスクリプトは初回しか実行されないため、毎回読み直される埋め込み枠から親の画面を操作する
+        script = ("const d=window.parent.document;const t=()=>{d.querySelector('[data-testid=stMain]')?.scrollTo(0,0);window.parent.scrollTo(0,0)};"
+                  "t();setTimeout(t,150);setTimeout(t,500)")
+        components.html(f"<script>/*{marker}*/{script}</script>", height=0)
 
 
 def next_step(key: str) -> None:
@@ -136,6 +109,14 @@ def next_step(key: str) -> None:
         state.goto(target)
 
 
+def demo_bar(p: dict) -> None:
+    """全画面の閲覧で、閲覧専用であることと案内への戻り道を示す。"""
+    c1, c2 = st.columns([5, 1])
+    c1.caption("閲覧専用のデモです。編集はできません。編集は「あなたの案件で試す」から行えます。")
+    if c2.button("案内へ戻る", key="tour_back", width="stretch"):
+        guide.back_to_guide(p)
+
+
 def render(p: dict) -> None:
     show_flash()
     if p.get("is_demo"):
@@ -143,9 +124,13 @@ def render(p: dict) -> None:
     sidebar(p)
     key = st.session_state.get("page", "overview")
     scroll_top_on_change(p, key)
+    if p.get("demo") and st.session_state.get("tour_on"):
+        guide.render(p)
+        return
     label = "デモの機能対応表" if key == "demo_map" else PAGES.get(key, PAGES["overview"])[0]
     context_bar(p, label)
-    tour(p)
+    if p.get("demo"):
+        demo_bar(p)
     stage_control(p)
     if key == "demo_map":
         trace.demo_map(p)
