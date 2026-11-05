@@ -1,0 +1,6 @@
+# バイナリは改行変換しない（デモ資料の破損を防ぐ）
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.mp4 binary
