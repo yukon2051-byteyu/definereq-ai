@@ -201,6 +201,15 @@ def test_requirement_filter_with_no_match_shows_message():
     assert not at.exception and any("該当する項目はありません" in c.value for c in at.caption)
 
 
+def test_hero_has_short_lead_and_anchor_links():
+    from definereq.ui import home
+
+    source = (ROOT / "definereq" / "ui" / "home.py").read_text(encoding="utf-8")
+    assert len(home.LEAD) < 80
+    assert 'href="#dr-demo"' in source and 'id="dr-demo"' in source
+    assert 'href="#dr-new"' in source and 'id="dr-new"' in source
+
+
 def test_why_page_example_question():
     at = run(project=builder.build("d1", 4), page="why")
     at = click(at, "なぜ再申請なのか")

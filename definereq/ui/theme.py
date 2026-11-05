@@ -37,16 +37,24 @@ CSS = """
 .dr-stat-n{font-size:30px;font-weight:900;line-height:1.2;color:var(--ink)}
 .dr-stat-l{font-size:12.5px;color:var(--muted)}
 /* トップページ */
-.dr-hero{position:relative;overflow:hidden;background:#F3F0EA;border-radius:6px;padding:54px 44px 60px;min-height:440px}
-.dr-hero-shape{position:absolute;right:0;top:0;bottom:0;width:34%;background:url("__HERO__") right center/cover no-repeat;pointer-events:none}
+.dr-hero{position:relative;overflow:hidden;background:#F3F0EA;border-radius:6px;padding:34px 44px 30px}
+.dr-hero-shape{position:absolute;right:0;top:0;bottom:0;width:27%;background:url("__HERO__") right center/100% 100% no-repeat;pointer-events:none}
 .dr-markimg{display:inline-block;width:26px;height:26px;background:url("__MARK__") center/contain no-repeat}
-.dr-hero-in{position:relative;max-width:min(740px,66%)}
+.dr-hero-in{position:relative;max-width:68%}
 .dr-mark{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink);letter-spacing:.01em}
-.dr-h1{font-size:42px;line-height:1.32;font-weight:900;margin:26px 0 0;color:var(--ink);letter-spacing:-.01em;padding:0}
+.dr-h1{font-size:clamp(34px,3.3vw,46px);line-height:1.28;font-weight:900;margin:26px 0 0;color:var(--ink);letter-spacing:-.01em;padding:0}
 .dr-h1 span{display:inline-block}
-.dr-sub{font-size:15px;line-height:1.95;color:#B4420A;font-weight:500;margin:6px 0 0}
-.dr-jp{font-size:17px;font-weight:900;color:#B8290A;margin-top:12px}
-.dr-sec{font-size:24px;font-weight:900;margin:24px 0 4px;color:var(--ink);padding:0}
+.dr-sub{font-size:16px;line-height:1.75;color:#3C3E44;margin:8px 0 0}
+.dr-label{font-size:13px;font-weight:700;color:var(--muted);margin-top:8px}
+.dr-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.dr-btn{display:inline-block;padding:11px 22px;border-radius:4px;font-size:15px;font-weight:700;text-decoration:none;line-height:1.3}
+.dr-btn-p,.dr-btn-p:visited{background:#D9330F;color:#fff}
+.dr-btn-p:hover{background:#B8290A;color:#fff}
+.dr-btn-s,.dr-btn-s:visited{background:#fff;color:var(--ink);border:1px solid #CFCDC6}
+.dr-btn-s:hover{border-color:#D9330F;color:#B8290A}
+.dr-note{font-size:12.5px;color:var(--muted);margin-top:10px}
+.dr-jp{font-size:18px;font-weight:900;color:#B8290A;margin-top:12px}
+.dr-sec{font-size:24px;font-weight:900;margin:24px 0 4px;color:var(--ink);padding:0;scroll-margin-top:16px}
 .dr-sec-l{font-size:14px;color:var(--muted);margin:0 0 14px;line-height:1.7}
 .dr-dom{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .dr-dom div{padding:16px 16px 18px;border-radius:6px;font-size:13px;line-height:1.7;color:#4A4C52}
@@ -67,10 +75,13 @@ CSS = """
 .dr-tiny{font-size:12px;color:var(--muted);line-height:1.7}
 .dr-demo-n{font-size:12px;font-weight:900;color:#B8290A}
 @media (max-width:760px){
- .dr-hero{padding:28px 18px 36px;min-height:0}
+ .dr-hero{padding:24px 18px 24px}
  .dr-hero-in{max-width:100%}
- .dr-hero-shape{width:70%;opacity:.16}
- .dr-h1{font-size:26px}
+ .dr-cta{flex-direction:column}
+ .dr-btn{text-align:center}
+ .dr-hero-shape{display:none}
+ .dr-h1{font-size:30px}
+ .dr-jp{font-size:17px}
  .dr-dom{grid-template-columns:repeat(2,1fr)}
  .dr-steps{grid-template-columns:1fr}
  .dr-step,.dr-step:nth-child(1){clip-path:none;padding:12px 16px;border-radius:4px}
@@ -93,12 +104,12 @@ CSS = """
 
 # 独自の図形：根拠（細い線）から判断（太い帯）へ渡る斜めの帯。
 # st.html は SVG 要素を取り除くため、CSS の背景画像として埋め込む
-_HERO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 760" preserveAspectRatio="xMaxYMid slice">
+_HERO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 400" preserveAspectRatio="none">
 <defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#FF7A00"/><stop offset=".55" stop-color="#F23A1E"/><stop offset="1" stop-color="#E0117F"/></linearGradient></defs>
-<polygon points="330,760 700,250 700,520 520,760" fill="url(#g)"/>
-<polygon points="120,760 700,-40 700,120 300,760" fill="url(#g)" opacity=".92"/>
-<polygon points="20,620 360,150 400,150 60,620" fill="#161618"/>
-<polygon points="0,470 240,140 256,140 16,470" fill="#E2E3E7"/>
+<polygon points="95,400 335,0 350,0 350,75 165,400" fill="url(#g)"/>
+<polygon points="215,400 350,165 350,285 285,400" fill="url(#g)"/>
+<polygon points="30,345 215,40 240,40 55,345" fill="#161618"/>
+<polygon points="5,215 118,30 130,30 17,215" fill="#E2E3E7"/>
 </svg>"""
 
 _MARK_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26">

@@ -11,25 +11,28 @@ from . import state
 from .components import esc, guard
 from .theme import HERO_SHAPE, MARK
 
-LEAD = ("事前情報からヒアリングを準備し、Web会議の録画や議事録から要望・決定・未決事項を整理します。"
-        "業務アプリ、インフラ、ネットワークの要件について、見落とし、仕様の矛盾、追加要望の影響を確認し、"
-        "関係者との認識合わせ、要件定義書の作成、仕様変更の経緯の追跡まで支援します。")
+LEAD = "会議前の質問準備から、録画・議事録の要件整理、追加要望の影響確認まで。判断の根拠と変更の経緯をつなぎ、要件定義書の作成を支援します。"
 FLOW = [("準備", "案件の分野・要望・資料を登録し、不足情報と質問を整理"),
         ("整理", "録画・議事録・資料から、要望・決定・未決事項を抽出"),
-        ("判断", "例外・非機能・矛盾・意見の違いを確認し、関係者が要件を確定"),
-        ("共有", "確認資料と要件定義書を出力"),
+        ("判断", "例外・非機能の見落とし、矛盾、意見の違いを確認し、関係者が要件を確定"),
+        ("共有", "確認資料で認識を合わせ、要件定義書を出力"),
         ("追跡", "追加要望の影響を調べて記録し、「なぜこの仕様か」を根拠付きで確認")]
 DOM_NOTE = {"app": "業務・機能・データ・画面・連携", "infra": "性能・容量・可用性・復旧・運用", "network": "接続・通信・分離・認証・障害"}
 
 
 def render() -> None:
+    # ヒーローのボタンはページ内リンク。再実行が起きないため、入力中の内容は消えない
     st.html(f"""<div class="dr-hero">{HERO_SHAPE}<div class="dr-hero-in">
 <div class="dr-mark">{MARK}<span>DefineReq_AI</span></div>
 <h1 class="dr-h1"><span>あなたの要件定義に、</span><span>伴走するAI</span></h1>
 <div class="dr-jp">AI要件定義・変更経緯管理システム</div>
-<p class="dr-sub">{esc(LEAD)}</p></div></div>""")
+<p class="dr-sub">{esc(LEAD)}</p>
+<div class="dr-label">業務アプリ ／ インフラ ／ ネットワーク対応</div>
+<div class="dr-cta"><a class="dr-btn dr-btn-p" href="#dr-demo">3分でデモを見る</a><a class="dr-btn dr-btn-s" href="#dr-new">新しい案件を始める</a></div>
+<div class="dr-note">デモは登録不要・無料／AI結果は準備済みのサンプルです</div>
+</div></div>""")
 
-    st.html('<h2 class="dr-sec">3件のデモを試す</h2><p class="dr-sec-l">APIキーや登録なしで、完成した案件の全画面を見られます。デモは閲覧専用で、データは全て架空です。</p>')
+    st.html('<h2 id="dr-demo" class="dr-sec">3件のデモを試す</h2><p class="dr-sec-l">APIキーや登録なしで、完成した案件の全画面を見られます。デモは閲覧専用で、データは全て架空です。</p>')
     cols = st.columns(3)
     for i, (col, d) in enumerate(zip(cols, builder.catalog()), 1):
         with col, st.container(border=True, height="stretch"):
@@ -43,7 +46,7 @@ def render() -> None:
             if st.button("全画面を見る", key=f"free_{d['id']}", width="stretch"):
                 state.open_demo(d["id"], tour=False)
 
-    st.html('<h2 class="dr-sec">あなたの案件で試す</h2>')
+    st.html('<h2 id="dr-new" class="dr-sec">あなたの案件で試す</h2>')
     with st.container(border=True):
         c1, c2 = st.columns(2)
         name = c1.text_input("案件名", placeholder="例：勤怠システムの更新", key="new_name")
