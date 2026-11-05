@@ -56,13 +56,6 @@ CSS = """
 .dr-jp{font-size:18px;font-weight:900;color:#B8290A;margin-top:12px}
 .dr-sec{font-size:24px;font-weight:900;margin:24px 0 4px;color:var(--ink);padding:0;scroll-margin-top:16px}
 .dr-sec-l{font-size:14px;color:var(--muted);margin:0 0 14px;line-height:1.7}
-.dr-dom{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.dr-dom div{padding:16px 16px 18px;border-radius:6px;font-size:13px;line-height:1.7;color:#4A4C52}
-.dr-dom div:nth-child(1){background:#DFECFA}
-.dr-dom div:nth-child(2){background:#E1F3E4}
-.dr-dom div:nth-child(3){background:#FBF5D2}
-.dr-dom div:nth-child(4){background:#ECEBF5}
-.dr-dom b{display:block;font-size:17px;font-weight:900;color:var(--ink);margin-bottom:2px}
 .dr-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;counter-reset:s}
 .dr-step{counter-increment:s;font-size:13px;line-height:1.65;color:#2F3036;padding:16px 34px 18px 30px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 50%,calc(100% - 22px) 100%,0 100%,18px 50%)}
 .dr-step:nth-child(1){background:#FFF4EA;padding-left:16px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 50%,calc(100% - 22px) 100%,0 100%)}
@@ -82,7 +75,6 @@ CSS = """
  .dr-hero-shape{display:none}
  .dr-h1{font-size:30px}
  .dr-jp{font-size:17px}
- .dr-dom{grid-template-columns:repeat(2,1fr)}
  .dr-steps{grid-template-columns:1fr}
  .dr-step,.dr-step:nth-child(1){clip-path:none;padding:12px 16px;border-radius:4px}
  .dr-flow{grid-template-columns:1fr 1fr}

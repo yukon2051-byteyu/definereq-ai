@@ -17,7 +17,6 @@ FLOW = [("準備", "案件の分野・要望・資料を登録し、不足情報
         ("判断", "例外・非機能の見落とし、矛盾、意見の違いを確認し、関係者が要件を確定"),
         ("共有", "確認資料で認識を合わせ、要件定義書を出力"),
         ("追跡", "追加要望の影響を調べて記録し、「なぜこの仕様か」を根拠付きで確認")]
-DOM_NOTE = {"app": "業務・機能・データ・画面・連携", "infra": "性能・容量・可用性・復旧・運用", "network": "接続・通信・分離・認証・障害"}
 
 
 def render() -> None:
@@ -27,7 +26,7 @@ def render() -> None:
 <h1 class="dr-h1"><span>あなたの要件定義に、</span><span>伴走するAI</span></h1>
 <div class="dr-jp">AI要件定義・変更経緯管理システム</div>
 <p class="dr-sub">{esc(LEAD)}</p>
-<div class="dr-label">業務アプリ ／ インフラ ／ ネットワーク対応</div>
+<div class="dr-label">業務アプリ ／ インフラ ／ ネットワーク対応 ／ 複合</div>
 <div class="dr-cta"><a class="dr-btn dr-btn-p" href="#dr-demo">3分でデモを見る</a><a class="dr-btn dr-btn-s" href="#dr-new">新しい案件を始める</a></div>
 <div class="dr-note">デモは登録不要・無料／AI結果は準備済みのサンプルです</div>
 </div></div>""")
@@ -61,10 +60,6 @@ def render() -> None:
             if created:
                 st.session_state["ai_code"] = code.strip()  # AI実行の画面で使う（入力欄はここだけ）
                 state.open_project(created)
-
-    st.html('<h2 class="dr-sec">対応する分野</h2><p class="dr-sec-l">分野に応じて、質問・確認観点・文書の章立てが切り替わります。</p>')
-    dom = "".join(f"<div><b>{esc(DOMAINS[k])}</b>{esc(DOM_NOTE[k])}</div>" for k in DOMAINS)
-    st.html(f'<div class="dr-dom">{dom}<div><b>複合</b>共通と分野別を分け、重複をまとめる</div></div>')
 
     st.html('<h2 class="dr-sec">利用の流れ</h2><p class="dr-sec-l">AIは候補を作り、プログラムが記録と照合を行い、人が判断します。AIの出力だけで要件や合意は確定しません。</p>')
     st.html('<div class="dr-steps">' + "".join(f'<div class="dr-step"><b>{esc(n)}</b>{esc(t)}</div>' for n, t in FLOW) + "</div>")
