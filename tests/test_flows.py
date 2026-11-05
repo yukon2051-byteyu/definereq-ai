@@ -266,6 +266,28 @@ def test_hero_keeps_original_colors_from_shared_palette():
     assert "--c-purple" in theme.CSS and "__PALETTE_CSS__" not in theme.CSS
 
 
+@pytest.mark.parametrize("demo", [True, False])
+def test_sidebar_logo_links_to_top(demo):
+    from definereq import project as pj
+
+    p = builder.build("d1", 4) if demo else pj.new_project("t", ["app"])
+    at = run(project=p, page="overview")
+    assert not at.exception
+    next(b for b in at.button if b.key == "nav_logo").click()
+    at = at.run()
+    assert not at.exception
+    assert at.get("file_uploader"), "トップ画面が表示される"
+    if not demo:
+        assert at.session_state["project"]["name"] == "t", "作業中の案件を保持する"
+
+
+def test_dark_logo_is_visible_on_black_sidebar():
+    from definereq.ui import theme
+
+    assert 'fill="#FFFFFF"' in theme._MARK_DARK_SVG and "#161618" not in theme._MARK_DARK_SVG
+    assert "__MARK_DARK__" not in theme.CSS
+
+
 def test_why_page_example_question():
     at = run(project=builder.build("d1", 4), page="why")
     at = click(at, "なぜ再申請なのか")

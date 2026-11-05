@@ -157,6 +157,12 @@ __PALETTE_CSS__
 [data-testid="stSidebar"] .stButton button:hover{background:#26262B;color:#fff}
 [data-testid="stSidebar"] .stButton button[kind="primary"]{background:#fff;color:#161618}
 [data-testid="stSidebar"] .stButton button[kind="primary"] p{font-weight:700;color:#161618}
+/* サイドバーのロゴ（トップへのリンク） */
+[data-testid="stSidebarHeader"]{height:auto;min-height:0;padding:6px 12px 0}
+[data-testid="stSidebar"] .st-key-nav_logo button{background:url("__MARK_DARK__") 8px center/24px 24px no-repeat transparent;padding:2px 10px 2px 42px;min-height:40px}
+[data-testid="stSidebar"] .st-key-nav_logo button:hover{background-color:#26262B}
+[data-testid="stSidebar"] .st-key-nav_logo button p{font-size:17px;font-weight:900;color:#fff;letter-spacing:.01em}
+[data-testid="stSidebar"] .st-key-nav_logo{margin-bottom:8px}
 /* トップページ専用の余白。見た目の間隔は 区切り30px／説明→内容14px／カード内8px */
 .st-key-home{gap:14px}
 .stMainBlockContainer:has(.st-key-home){padding-bottom:32px}
@@ -181,6 +187,9 @@ _MARK_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26">
 <defs><linearGradient id="m" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="__orange__"/><stop offset=".6" stop-color="__coral__"/><stop offset="1" stop-color="__magenta__"/></linearGradient></defs>
 <polygon points="1,25 18,1 25,1 8,25" fill="url(#m)"/><polygon points="12,25 20,13 25,13 17,25" fill="#161618"/></svg>"""
 
+# 黒いサイドバー用：黒い線だけ白にする
+_MARK_DARK_SVG = _MARK_SVG.replace('fill="#161618"', 'fill="#FFFFFF"')
+
 
 def _uri(svg: str) -> str:
     return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
@@ -193,6 +202,6 @@ def _colored(svg: str) -> str:
 
 
 CSS = (CSS.replace("__PALETTE_CSS__", palette_css()).replace("__HERO__", _uri(_colored(_HERO_SVG)))
-       .replace("__MARK__", _uri(_colored(_MARK_SVG))))
+       .replace("__MARK__", _uri(_colored(_MARK_SVG))).replace("__MARK_DARK__", _uri(_colored(_MARK_DARK_SVG))))
 HERO_SHAPE = '<div class="dr-hero-shape"></div>'
 MARK = '<span class="dr-markimg"></span>'

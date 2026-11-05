@@ -39,6 +39,8 @@ NEXT = {"overview": ("残件のもとになる要件を確認します", "requir
 
 def sidebar(p: dict) -> None:
     with st.sidebar:
+        if st.button("DefineReq_AI", key="nav_logo", width="stretch"):
+            state.go_home()
         st.markdown(f"**{p['name']}**")
         st.caption("・".join(DOMAINS[d] for d in p["domains"]))
         if st.button("← トップへ戻る", key="nav_home"):
