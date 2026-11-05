@@ -7,3 +7,6 @@ data/
 .env
 .streamlit/secrets.toml
 .DS_Store
+
+# 依頼の指示書（公開しない）
+DefineReq_AI.txt
