@@ -9,6 +9,7 @@ import re
 
 from .. import config
 from .. import project as pj
+from . import evidence as ev
 from ..schema import NA
 
 
@@ -190,7 +191,36 @@ def registered_conflict_keys(p: dict) -> set[str]:
 def adopt_conflict(p: dict, cand: dict) -> dict:
     return pj.add(p, "conflicts", {"kind": cand["kind"], "a": cand["a"], "b": cand["b"], "note": cand["note"],
                                    "applicability": None, "state": "未確認", "scan_key": cand.get("key"),
-                                   "evidence": [], "origin": "プログラム検出"})
+                                   "evidence": [], "origin": "プログラム検出", "detected_at": pj.now_iso(),
+                                   "detected": {cand["a"]: _target_text(p, cand["a"]), cand["b"]: _target_text(p, cand["b"])}})
+
+
+def _target_text(p: dict, item_id: str) -> dict:
+    """検出時点の版と文章を残す。後で要件が変わっても、当時の指摘を説明できるようにする。"""
+    found = pj.find_any(p, item_id)
+    if not found:
+        return {"version": None, "text": "（登録なし）"}
+    col, item = found
+    if col == "requirements":
+        return {"version": item["version"], "text": f"{item['title']}：{item['body']}"}
+    return {"version": None, "text": item.get("content", "")}
+
+
+def conflict_view(p: dict, c: dict) -> dict:
+    """当時の指摘と現在の内容を分けて返す。"""
+    sides = []
+    for item_id in (c["a"], c["b"]):
+        then = (c.get("detected") or {}).get(item_id) or {"version": None, "text": "（検出時の記録なし）"}
+        now = _target_text(p, item_id)
+        version = (lambda v: f" v{v}" if v else "")
+        sides.append({"id": item_id, "detected_version": version(then["version"]), "detected_text": then["text"],
+                      "current_version": version(now["version"]), "current_text": now["text"], "changed": then["text"] != now["text"]})
+    if c["state"] in ("解消", "矛盾なしと確認"):
+        reason = c.get("resolution") or c.get("applicability") or "理由の記録がありません"
+        summary = f"現在は{c['state']}：{reason}"
+    else:
+        summary = "現在も確認が必要です。"
+    return {"sides": sides, "summary": summary}
 
 
 # ---- 影響（登録された関係からたどれる範囲）----
@@ -267,6 +297,9 @@ def backlog(p: dict) -> dict:
     for d in p["decisions"]:
         if d["state"] in ("提案", "確認待ち", "保留"):
             push("再確認待ち", d["id"], f"{d['topic']}（{d['state']}）", "判断者の確認を記録する", d.get("decider"), None, "decisions")
+    for d in p["decisions"]:
+        if d["state"] == "合意済み" and any(ev.unconfirmed_speech(p, e) for e in d.get("evidence", [])):
+            push("再確認待ち", d["id"], f"{d['topic']}（未確認の発言を根拠に含む）", "発言の話者と内容を確認する", d.get("decider"), None, "decisions")
     unique = {i["target"] for items in cats.values() for i in items}
     return {"categories": cats, "counts": {k: len(v) for k, v in cats.items()},
             "category_total": sum(len(v) for v in cats.values()), "unique_total": len(unique)}

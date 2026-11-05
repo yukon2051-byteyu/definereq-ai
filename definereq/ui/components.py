@@ -59,6 +59,8 @@ def flow(steps: list[tuple[str, str]]) -> None:
 def evidence_block(p: dict, e: dict, key: str = "") -> None:
     state = ev.recheck(p, e)
     tag = chip("引用を確認済み", "ok") if state["verified"] else chip("本文で確認できません", "bad")
+    if ev.unconfirmed_speech(p, e):
+        tag += chip("話者・内容が未確認", "warn")
     if state.get("stale"):
         tag += chip("新しい版あり", "warn")
     st.html(f'<div class="dr-ev"><div class="dr-ev-q">「{esc(str(e.get("quote")))}」</div>'
@@ -100,8 +102,15 @@ def tri_text(label: str, value, key: str, area: bool = False):
     return widget(f"{label}の内容", value="" if value in (None, NA) else str(value), key=f"{key}_t") or None
 
 
+def edit_block(name: str):
+    """編集の部品をまとめる入れ物。デモでは表示しない。"""
+    return st.container(key=f"edit-{name}")
+
+
 def add_evidence_form(p: dict, item: dict, key: str) -> None:
     """人が根拠を追加する。引用は本文に実在するかを確認して記録する。"""
+    if p.get("is_demo"):
+        return
     sources = [(s["id"], s["name"]) for s in p["sources"] if not s.get("superseded_by")] + [(r["id"], r["name"]) for r in p["recordings"]]
     if not sources:
         st.caption("根拠に使う資料や録画がまだありません。")

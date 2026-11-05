@@ -12,7 +12,7 @@ from ...project import PROFILE_FIELDS, display
 from ...schema import CERTAINTY, DOMAINS, QUESTION_STATES
 from .. import state
 from ..ai_panel import ai_panel, ai_runs_list
-from ..components import chips, esc, flow, head, ok_rerun, touch
+from ..components import edit_block, esc, head, ok_rerun, touch
 
 
 def overview(p: dict) -> None:
@@ -45,7 +45,7 @@ def overview(p: dict) -> None:
     if na["actions"]:
         st.dataframe(pd.DataFrame([{"ID": a["id"], "内容": a["content"], "担当": display(a.get("owner")), "期限": display(a.get("due")), "状態": a["state"]}
                                    for a in na["actions"]]), hide_index=True, width="stretch")
-    with st.form("add_action", clear_on_submit=True):
+    with edit_block("action"), st.form("add_action", clear_on_submit=True):
         c1, c2, c3 = st.columns([3, 1, 1])
         text = c1.text_input("行動を追加")
         owner = c2.text_input("担当（未設定可）")
@@ -94,7 +94,7 @@ def profile(p: dict) -> None:
                         "確かさ": s["certainty"], "備考": s.get("note")} for s in p["stakeholders"]],
                       columns=["ID", "氏名・役割", "所属", "立場", "判断・確認できる範囲", "確かさ", "備考"])
     st.dataframe(df, hide_index=True, width="stretch")
-    with st.form("add_stk", clear_on_submit=True):
+    with edit_block("stk"), st.form("add_stk", clear_on_submit=True):
         c = st.columns(4)
         name, org, pos, auth = c[0].text_input("氏名・役割"), c[1].text_input("所属"), c[2].text_input("立場"), c[3].text_input("判断・確認できる範囲")
         cert = st.selectbox("確かさ", CERTAINTY, index=3)
@@ -105,7 +105,7 @@ def profile(p: dict) -> None:
 
     st.subheader("用語集")
     st.dataframe(pd.DataFrame([{"用語": g["term"], "意味": g["meaning"]} for g in p["glossary"]], columns=["用語", "意味"]), hide_index=True, width="stretch")
-    with st.form("add_term", clear_on_submit=True):
+    with edit_block("term"), st.form("add_term", clear_on_submit=True):
         c1, c2 = st.columns([1, 3])
         term, meaning = c1.text_input("用語"), c2.text_input("意味")
         if st.form_submit_button("用語を追加") and term.strip():
@@ -149,16 +149,17 @@ def prep(p: dict) -> None:
                     q.update(text=row["質問"], priority=row["優先"], why=row["優先する理由"], ask=row["確認相手"], status=row["状態"], answer=row["回答"] or None)
                 touch(p)
                 ok_rerun("保存しました")
-        cands = [q for q in checks.prep_questions(p) if q["perspective_id"] not in {x.get("perspective_id") for x in qs}]
-        st.markdown(f"**追加できる質問候補　{len(cands)}件**（確認観点の設定から作成。AIは使っていません）")
-        chosen = st.multiselect("追加する質問", range(len(cands)), format_func=lambda i: f"［{cands[i]['category']}］{cands[i]['text']}", key="add_q")
-        if st.button("選んだ質問を追加") and chosen:
-            for i in chosen:
-                c = cands[i]
-                pj.add(p, "questions", {"text": c["text"], "why": c["why"], "ask": c.get("ask"), "priority": None, "status": "未質問",
-                                        "answer": None, "perspective_id": c["perspective_id"], "evidence": []})
-            touch(p)
-            ok_rerun("追加しました")
+        with edit_block("addq"):
+            cands = [q for q in checks.prep_questions(p) if q["perspective_id"] not in {x.get("perspective_id") for x in qs}]
+            st.markdown(f"**追加できる質問候補　{len(cands)}件**（確認観点の設定から作成。AIは使っていません）")
+            chosen = st.multiselect("追加する質問", range(len(cands)), format_func=lambda i: f"［{cands[i]['category']}］{cands[i]['text']}", key="add_q")
+            if st.button("選んだ質問を追加") and chosen:
+                for i in chosen:
+                    c = cands[i]
+                    pj.add(p, "questions", {"text": c["text"], "why": c["why"], "ask": c.get("ask"), "priority": None, "status": "未質問",
+                                            "answer": None, "perspective_id": c["perspective_id"], "evidence": []})
+                touch(p)
+                ok_rerun("追加しました")
         ai_panel(p, "prep")
         ai_runs_list(p, "prep")
     with tabs[2]:
@@ -169,21 +170,3 @@ def prep(p: dict) -> None:
         st.dataframe(pd.DataFrame([{"分野": "・".join("共通" if d == "common" else DOMAINS[d] for d in i["domains"]), "分類": i["category"], "確認すること": i["question"],
                                     "確認する理由": i["why"], "確認相手の例": i.get("ask"), "事前に用意": i.get("prep")} for i in items]), hide_index=True, width="stretch")
         st.caption("観点は config/checkpoints.toml で追加・変更できます。すべてを必須入力にはしていません。")
-
-
-def stage_bar(p: dict) -> None:
-    """デモの段階の切替。"""
-    d = p.get("demo")
-    if not d:
-        return
-    label = f"デモ：段階「{STAGES[d['stage']]}」"
-    st.html(f'<div class="dr-bar"><b>{esc(label)}</b><span>架空データ・料金なし</span>'
-            + ("<span>作業コピーを編集済み</span>" if d.get("edited") else "") + "</div>")
-
-
-def domain_chips(p: dict) -> None:
-    chips(*[DOMAINS[d] for d in p["domains"]])
-
-
-def show_flow_example() -> None:
-    flow([("入力", "資料・発言"), ("AI候補", "質問・要件の候補"), ("人の判断", "採用・修正・却下"), ("結果", "根拠付きの要件")])

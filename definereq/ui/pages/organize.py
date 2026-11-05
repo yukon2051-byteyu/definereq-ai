@@ -9,7 +9,7 @@ from ...logic import checks
 from ...project import display, field_state
 from ...schema import AGREEMENT_STATES, CANDIDATE_KINDS, DOMAINS, MEASURE_KINDS, MEASURE_STATUS, PRIORITIES, REQ_KINDS, SCOPE_CHOICES
 from ..ai_panel import ai_panel, ai_runs_list
-from ..components import add_evidence_form, chip, chips, evidence_block, flow, guard, head, ok_rerun, people, select_item, touch, tri_text
+from ..components import add_evidence_form, chip, chips, edit_block, evidence_block, flow, guard, head, ok_rerun, people, select_item, touch, tri_text
 
 
 def candidates(p: dict) -> None:
@@ -66,7 +66,7 @@ def requirements(p: dict) -> None:
     fq = c2.text_input("検索", key="rq_q")
     rows = [r for r in rows if (not fs or r["状態"] in fs) and (not fq or fq in r["名称"] or fq in r["ID"])]
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
-    with st.expander("要件を追加する"):
+    with edit_block("addreq"), st.expander("要件を追加する"):
         with st.form("add_req", clear_on_submit=True):
             title = st.text_input("名称")
             body = st.text_area("本文")
@@ -80,7 +80,12 @@ def requirements(p: dict) -> None:
     chips(r["status"], r.get("scope") or "未設定")
     if r.get("merged_into") or r.get("replaced_by") or r.get("split_from"):
         st.caption("系譜：" + " → ".join(pj.lineage(p, r["id"])))
-    tab = st.tabs(["内容", "根拠", "編集", "版の履歴", "関係"])
+    if p.get("is_demo"):  # 閲覧専用では編集と関係のタブを出さない
+        shown = st.tabs(["内容", "根拠", "版の履歴"])
+        hidden = st.container(key="edit-req")
+        tab = [shown[0], shown[1], hidden, shown[2], hidden]
+    else:
+        tab = st.tabs(["内容", "根拠", "編集", "版の履歴", "関係"])
     with tab[0]:
         st.markdown(f"**{r['title']}**")
         st.write(r["body"])
@@ -88,6 +93,8 @@ def requirements(p: dict) -> None:
                            ("exceptions", "例外・境界"), ("data_io", "データ・入出力・通信"), ("nonfunctional", "非機能"), ("open_items", "未決")):
             st.caption(f"{label}：{display(r.get(key))}")
         st.caption(f"判断者：{display(r.get('decider'))}／確認相手：{display(r.get('confirm_with'))}／期限：{display(r.get('due'))}")
+        if r.get("related"):
+            st.caption("関連する要件：" + "、".join(r["related"]))
         if r.get("internal_note"):
             st.info(f"内部メモ（社外資料へ自動掲載しません）：{r['internal_note']}")
     with tab[1]:
@@ -247,7 +254,7 @@ def scenarios(p: dict) -> None:
             st.caption(f"終了：{display(s.get('end'))}／失敗・例外：{display(s.get('failure'))}／関連要件：{'、'.join(s.get('related_requirements', [])) or '未設定'}")
     if p["scenarios"]:
         st.dataframe(pd.DataFrame([{"ID": s["id"], "名称": s["title"], "種類": s.get("kind"), "関連要件": "、".join(s.get("related_requirements", []))} for s in p["scenarios"]]), hide_index=True, width="stretch")
-    with st.expander("シナリオを追加する"), st.form("add_sc", clear_on_submit=True):
+    with edit_block("addsc"), st.expander("シナリオを追加する"), st.form("add_sc", clear_on_submit=True):
         title = st.text_input("名称")
         kind = st.selectbox("種類", ["通常", "例外"])
         start = st.text_input("開始条件")

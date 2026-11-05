@@ -15,7 +15,7 @@ from ...schema import DOC_TYPES
 from ...usage import gate
 from ...usage.ledger import LedgerUnavailable
 from ..ai_panel import access_code_input
-from ..components import chip, chips, esc, evidence_block, head, ok_rerun, select_item, touch
+from ..components import chip, chips, edit_block, esc, evidence_block, head, ok_rerun, select_item, touch
 
 
 def trail(p: dict) -> None:
@@ -50,7 +50,7 @@ def trail(p: dict) -> None:
                        f"記録日時：{(h.get('recorded_at') or '')[:16].replace('T', ' ')}／判断者：{display(h.get('decider'))}／確認者：{display(h.get('confirmer'))}")
             for i, e in enumerate(h.get("evidence") or []):
                 evidence_block(p, e, f"his_{h['id']}_{i}")
-    with st.expander("履歴を訂正する（元の記録は残ります）"):
+    with edit_block("cor"), st.expander("履歴を訂正する（元の記録は残ります）"):
         hid = st.selectbox("訂正する履歴", [h["id"] for h in p["history"]], key="cor_id", index=None)
         new_reason = st.text_input("訂正後の理由", key="cor_r")
         new_date = st.text_input("訂正後の判断日（変更しない場合は空欄）", key="cor_d")
@@ -110,6 +110,8 @@ def why(p: dict) -> None:
             st.write(f"採用：{d['adopted'] or '未定'}")
             if d.get("reason"):
                 st.write(f"この判断の理由：{d['reason']}")
+            if d.get("confirmation"):
+                st.caption(f"確認の記録：{d['confirmation']}")
             for o in d["options"]:
                 if not o["adopted"]:
                     st.caption(f"比較した案：{o['label']}／不採用の理由：{o['rejected_reason'] or whylogic.NO_REASON}")
@@ -165,9 +167,12 @@ def share_page(p: dict) -> None:
                         st.dataframe(pd.DataFrame(s.table["rows"], columns=s.table["columns"]), hide_index=True, width="stretch")
                     else:
                         st.caption("（該当する項目はありません）")
-        if st.button("この内容でWordを作成する", type="primary"):
+        if st.button("この内容でWordを作成する", type="primary", key="share_word"):
             title = DOC_TYPES[doc_type]
-            doc = share.register_doc(p, opt, title)
+            if p.get("is_demo"):  # 閲覧専用では発行の記録を増やさない
+                doc = {"id": "DEMO", "version": 1, "issued_at": pj.now_iso()}
+            else:
+                doc = share.register_doc(p, opt, title)
             st.session_state["word"] = {"data": wordx.render(p, opt, doc["id"], doc["version"], doc["issued_at"]), "name": wordx.filename(p, doc_type, doc["version"]), "id": doc["id"]}
             touch(p)
         w = st.session_state.get("word")
@@ -177,7 +182,7 @@ def share_page(p: dict) -> None:
         st.markdown("**発行済みの資料**")
         st.dataframe(pd.DataFrame([{"ID": d["id"], "名称": d["title"], "版": d["version"], "発行日時": d["issued_at"][:16].replace("T", " "), "範囲": d["scope_note"], "送付": "送付済み" if d["sent"] else "未送付"} for d in p["shared_docs"]],
                                   columns=["ID", "名称", "版", "発行日時", "範囲", "送付"]), hide_index=True, width="stretch")
-        if p["shared_docs"]:
+        if p["shared_docs"] and not p.get("is_demo"):
             c1, c2 = st.columns([3, 1])
             sent_id = c1.selectbox("送付の記録", [d["id"] for d in p["shared_docs"]], format_func=lambda i: pj.label_of(p, i), key="sent_sel")
             if c2.button("送付済みにする", key="sent_b"):
@@ -189,7 +194,7 @@ def share_page(p: dict) -> None:
         st.dataframe(pd.DataFrame([{"ID": r["id"], "資料": r["doc_id"], "版": r["doc_version"], "項目": r["item_id"], "回答": r["content"], "回答者": display(r.get("respondent")), "回答日": display(r.get("answered_on"))} for r in p["responses"]],
                                   columns=["ID", "資料", "版", "項目", "回答", "回答者", "回答日"]), hide_index=True, width="stretch")
         if p["shared_docs"]:
-            with st.form("add_res", clear_on_submit=True):
+            with edit_block("res"), st.form("add_res", clear_on_submit=True):
                 doc = st.selectbox("資料", [d["id"] for d in p["shared_docs"]])
                 item = st.text_input("項目ID（例：REQ-001）")
                 content = st.text_area("回答")

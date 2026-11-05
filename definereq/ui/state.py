@@ -1,7 +1,7 @@
 """画面の状態（利用者ごとに分離）。
 
 st.session_state は接続ごとに別々なので、利用者間でデータは混ざらない。
-デモは段階ごとに作業コピーを持ち、編集しても固定の元データは変わらない。
+デモは閲覧専用で、段階ごとに作り直した案件を表示する。
 """
 from __future__ import annotations
 
@@ -61,18 +61,6 @@ def set_stage(stage: int, page: str | None = None) -> None:
     st.session_state["project"] = demo_copy(p["demo"]["id"], stage)
     if page:
         st.session_state["page"] = page
-    st.rerun()
-
-
-def reset_demo() -> None:
-    """デモの作業コピーを破棄して初期状態に戻す。"""
-    p = current()
-    copies = st.session_state.get("demo_copies", {})
-    for key in [k for k in copies if k.startswith(p["demo"]["id"] + ":")]:
-        del copies[key]
-    stage = p["demo"]["stage"]
-    st.session_state["project"] = demo_copy(p["demo"]["id"], stage)
-    _clear_widgets()
     st.rerun()
 
 

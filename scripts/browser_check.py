@@ -40,7 +40,7 @@ with sync_playwright() as pw:
     print("mobile home overflow", overflow(page))
     page.screenshot(path=OUT / "m_home.png")
     page.screenshot(path=OUT / "m_home_full.png", full_page=True)
-    click(page, "自由に操作する")
+    click(page, "全画面を見る")
     print("mobile demo overflow", overflow(page))
     page.screenshot(path=OUT / "m_demo.png", full_page=True)
     ctx.close()
@@ -61,8 +61,8 @@ with sync_playwright() as pw:
     print("tour panel top", page.get_by_text("案内 1/").first.bounding_box()["y"])
     click(page, "次へ")
     page.screenshot(path=OUT / "tour2.png")
-    click(page, "案内を閉じて自由に操作する")
-    for name, label in (("overview", "概要・残件"), ("reqs", "要件"), ("issues", "意見調整"), ("why", "なぜこの仕様か"), ("trail", "仕様の変遷"), ("share", "共有資料・出力")):
+    click(page, "案内を閉じて全画面を見る")
+    for name, label in (("overview", "概要・残件"), ("reqs", "要件"), ("decisions", "決定・合意"), ("why", "なぜこの仕様か"), ("share", "共有資料・出力")):
         click(page, label)
         page.screenshot(path=OUT / f"{name}.png")
     print("page errors", errors[:5])

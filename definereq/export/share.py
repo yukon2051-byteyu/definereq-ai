@@ -171,7 +171,7 @@ def build_change(p: dict, opt: Options) -> list[Section]:
         Section("変更前後", table={"columns": ["要件", "変更前", "変更後"], "rows": before_after, "widths": [1.6, 7, 7]}),
         Section("影響", paragraphs=[f"未調査の領域：{'、'.join(a for a in schema.IMPACT_AREAS if a not in chg['surveyed_areas']) or 'なし'}"],
                 table={"columns": ["領域", "対象", "内容", "根拠の区分"], "rows": [[i["area"], display(i.get("target")), i["note"], i["basis"]] for i in chg["impacts"]], "widths": [2, 2, 8.5, 3]}),
-        Section("矛盾の確認", table={"columns": ["ID", "区分", "対象A", "対象B", "内容", "状態"], "rows": conflicts, "widths": [1.5, 2.5, 3, 3, 4.5, 1.5]}),
+        Section("矛盾の確認", table={"columns": ["ID", "区分", "対象A", "対象B", "当時の指摘", "状態"], "rows": conflicts, "widths": [1.5, 2.5, 3, 3, 4.5, 1.5]}),
         Section("選択肢", table={"columns": ["案", "利点", "懸念", "結果・不採用の理由"], "rows": options_rows, "widths": [4, 4, 4, 4]}),
         Section("ご判断いただく事項", table={"columns": ["確認ID", "質問", "確認相手", "回答欄"], "rows": [[f"確認-{chg['id']}", "上記の内容で進めてよいかご判断ください。", display(chg.get("requester")), ""]], "widths": [2, 7, 2.5, 4]}),
         Section("結論", paragraphs=[conclusion]),

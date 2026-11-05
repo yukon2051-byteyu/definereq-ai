@@ -1,4 +1,4 @@
-"""トップページ。プレビューは実際のデモ案件のデータから作る（架空の実績は載せない）。"""
+"""トップページ（架空の実績は載せない）。"""
 from __future__ import annotations
 
 import streamlit as st
@@ -7,7 +7,7 @@ from .. import project as pj
 from ..demos import builder
 from ..schema import DOMAINS
 from . import state
-from .components import chip, esc, guard
+from .components import esc, guard
 from .theme import HERO_SHAPE, MARK
 
 LEAD = ("事前情報からヒアリングを準備し、Web会議の録画や議事録から要望・決定・未決事項を整理します。"
@@ -23,12 +23,12 @@ DOM_NOTE = {"app": "業務・機能・データ・画面・連携", "infra": "�
 
 def render() -> None:
     st.html(f"""<div class="dr-hero">{HERO_SHAPE}<div class="dr-hero-in">
-<div class="dr-mark">{MARK}<span>DefineReq_AI</span> <span class="dr-kana">ディファインレック・エーアイ</span></div>
+<div class="dr-mark">{MARK}<span>DefineReq_AI</span></div>
 <h1 class="dr-h1"><span>あなたの要件定義に、</span><span>伴走するAI</span></h1>
 <div class="dr-jp">AI要件定義・変更経緯管理システム</div>
 <p class="dr-sub">{esc(LEAD)}</p></div></div>""")
 
-    st.html('<h2 class="dr-sec">3件のデモを試す</h2><p class="dr-sec-l">APIキーや登録なしで、全機能を操作できます。データは全て架空です。AIの結果は事前に用意したもので、料金は発生しません。</p>')
+    st.html('<h2 class="dr-sec">3件のデモを試す</h2><p class="dr-sec-l">APIキーや登録なしで、完成した案件の全画面を見られます。デモは閲覧専用で、データは全て架空です。</p>')
     cols = st.columns(3)
     for i, (col, d) in enumerate(zip(cols, builder.catalog()), 1):
         with col, st.container(border=True, height="stretch"):
@@ -39,7 +39,7 @@ def render() -> None:
             st.space("stretch")  # 文章の行数が違っても、ボタンと下端の線を揃える
             if st.button("3分の案内で見る", key=f"tour_{d['id']}", type="primary", width="stretch"):
                 state.open_demo(d["id"], tour=True)
-            if st.button("自由に操作する", key=f"free_{d['id']}", width="stretch"):
+            if st.button("全画面を見る", key=f"free_{d['id']}", width="stretch"):
                 state.open_demo(d["id"], tour=False)
 
     st.html('<h2 class="dr-sec">あなたの案件で試す</h2>')
@@ -60,18 +60,5 @@ def render() -> None:
     st.html('<h2 class="dr-sec">利用の流れ</h2><p class="dr-sec-l">AIは候補を作り、プログラムが記録と照合を行い、人が判断します。AIの出力だけで要件や合意は確定しません。</p>')
     st.html('<div class="dr-steps">' + "".join(f'<div class="dr-step"><b>{esc(n)}</b>{esc(t)}</div>' for n, t in FLOW) + "</div>")
 
-    st.html('<h2 class="dr-sec">画面の例</h2><p class="dr-sec-l">下の表は、デモ1「申請・承認アプリの刷新」の実データから表示しています。</p>')
-    st.html(_preview())
     st.html('<p class="dr-tiny" style="margin-top:36px">要件定義の完全性や正しさを保証するものではありません。人が確認・判断するための根拠と残件を示します。'
             '公開環境の無料CPUは利用がないと休止するため、開くまでに時間がかかることがあります。</p>')
-
-
-@st.cache_data(show_spinner=False)
-def _preview() -> str:
-    p = builder.build("d1", 4)
-    rows = ""
-    for r in p["requirements"][:5]:
-        rows += (f"<tr><td>{esc(r['id'])}</td><td>{esc(r['title'])}</td><td>{chip(r['scope'] or '未設定')}</td>"
-                 f"<td>{chip(r['status'])}</td><td>{len(r['evidence'])}件</td></tr>")
-    return (f'<div class="dr-prev"><div class="dr-prev-h">要件一覧　{esc(p["name"])}</div><table><thead><tr><th>ID</th><th>要件</th><th>範囲</th>'
-            f"<th>状態</th><th>根拠</th></tr></thead><tbody>{rows}</tbody></table></div>")

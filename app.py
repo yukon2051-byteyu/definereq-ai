@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import streamlit as st
 
-from definereq.ui import home, shell, state
+from definereq.ui import home, readonly, shell, state
 from definereq.ui.theme import CSS
 
 st.set_page_config(page_title="DefineReq_AI", page_icon="📐", layout="wide",
                    initial_sidebar_state="auto" if state.current() else "collapsed")
 st.html(CSS)
+readonly.install()
 
 project = state.current()
 try:

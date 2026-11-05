@@ -18,12 +18,12 @@ from ...schema import CONTENT_CONFIRM, SOURCE_KINDS, SPEAKER_CONFIRM, UTTERANCE_
 from ...usage import gate
 from ...usage.ledger import BudgetExceeded, LedgerUnavailable, Limits
 from ..ai_panel import access_code_input
-from ..components import chips, head, ok_rerun, play_at, select_item, touch
+from ..components import chips, edit_block, head, ok_rerun, play_at, select_item, touch
 
 
 def sources(p: dict) -> None:
     head("資料", "利用の許可がある資料だけを登録してください。構成資料に認証情報が含まれていないことを確認してください。", "資料")
-    with st.expander("資料を追加する", expanded=not p["sources"]):
+    with edit_block("src"), st.expander("資料を追加する", expanded=not p["sources"]):
         c1, c2 = st.columns(2)
         kind = c1.selectbox("資料の種類", SOURCE_KINDS, key="src_kind")
         vis = c2.selectbox("公開範囲", VISIBILITY, key="src_vis")
@@ -176,7 +176,7 @@ def _transcribe_ui(p: dict) -> None:
 
 def recordings(p: dict) -> None:
     head("録画・発言", "発言ごとに話者と内容を確認します。AIが話者を確定することはありません。発言を全員の合意として扱いません。", "資料")
-    with st.expander("録画・字幕を追加する", expanded=not p["recordings"]):
+    with edit_block("rec"), st.expander("録画・字幕を追加する", expanded=not p["recordings"]):
         if p.get("is_demo"):
             st.caption("デモでも録画の検証は実行できますが、文字起こしの実行は準備済みの結果を利用します。")
         _transcribe_ui(p)

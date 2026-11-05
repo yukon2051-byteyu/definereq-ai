@@ -372,3 +372,74 @@ def test_why_unagreed_decision_is_not_used_as_reason(project):
     ag.new_decision(project, "遠隔保守", [{"id": "A", "label": "案"}], rationale="提案の理由", related_requirements=[r["id"]], state="提案")
     a = why.answer(project, "なぜ遠隔保守なのか")
     assert a["reason"] == why.NO_REASON and a["not_agreed"]
+
+
+# ---- 未確認の情報だけで合意しない ----
+def _speech(project, status):
+    from definereq.media import transcribe as tr
+
+    rec = tr.register_recording(project, "m", [{"start": 0, "end": 1, "text": "方式を決めます"}], "local", None, 1, 0, 1)
+    rec["segments"][0]["speaker_status"] = status
+    rec["segments"][0]["content_status"] = "確認済み"
+    return ev.make(project, rec["id"], "方式を決めます")
+
+
+def test_cannot_agree_only_on_unconfirmed_speech(project):
+    d = ag.new_decision(project, "論点", [{"id": "A", "label": "案"}], adopted="A", decider="部長", decided_on="2026-09-01",
+                        evidence=[_speech(project, "未確認")])
+    with pytest.raises(ValueError, match="未確認"):
+        ag.set_state(project, d["id"], "合意済み", "human")
+
+
+def test_can_agree_with_confirmed_speech(project):
+    d = ag.new_decision(project, "論点", [{"id": "A", "label": "案"}], adopted="A", decider="部長", decided_on="2026-09-01",
+                        evidence=[_speech(project, "確認済み")])
+    assert ag.set_state(project, d["id"], "合意済み", "human")["state"] == "合意済み"
+
+
+def test_cannot_agree_on_unverified_quote_only(project):
+    s = registry.ingest_paste(project, "メモ", "本文")
+    d = ag.new_decision(project, "論点", [{"id": "A", "label": "案"}], adopted="A", decider="部長", decided_on="2026-09-01",
+                        evidence=[ev.make(project, s["id"], "存在しない引用")])
+    with pytest.raises(ValueError):
+        ag.set_state(project, d["id"], "合意済み", "human")
+
+
+def test_speaker_unconfirmed_after_agreement_goes_to_backlog(project):
+    from definereq.media import transcribe as tr
+
+    e = _speech(project, "確認済み")
+    d = ag.new_decision(project, "論点", [{"id": "A", "label": "案"}], adopted="A", decider="部長", decided_on="2026-09-01", evidence=[e])
+    ag.set_state(project, d["id"], "合意済み", "human")
+    tr.edit_segment(project["recordings"][0], "S0001", speaker_status="未確認")
+    assert any(i["target"] == d["id"] for i in checks.backlog(project)["categories"]["再確認待ち"])
+
+
+def test_demo1_agreed_decisions_do_not_rest_on_unconfirmed_speech():
+    p = builder.build("d1", 4)
+    for d in p["decisions"]:
+        if d["state"] == "合意済み":
+            assert not any(ev.unconfirmed_speech(p, e) for e in d["evidence"]), d["id"]
+    assert next(d for d in p["decisions"] if d["adopted"] == "C").get("confirmation")
+
+
+# ---- 当時の指摘と現在 ----
+def test_conflict_keeps_detected_text_and_shows_current(project):
+    a = add_req(project, title="外部接続", body="外部からの接続は禁止する")
+    b = add_req(project, title="保守", body="遠隔保守を行う")
+    c = checks.adopt_conflict(project, checks.scan_conflicts(project)["candidates"][0])
+    pj.update_requirement(project, b["id"], {"title": "保守は現地対応", "body": "現地で対応する"}, reason="判断")
+    c.update(state="解消", resolution="現地対応を採用")
+    view = checks.conflict_view(project, c)
+    side = next(s for s in view["sides"] if s["id"] == b["id"])
+    assert "遠隔保守" in side["detected_text"] and side["detected_version"] == " v1"
+    assert "現地対応" in side["current_text"] and side["current_version"] == " v2" and side["changed"]
+    assert next(s for s in view["sides"] if s["id"] == a["id"])["changed"] is False
+    assert "解消" in view["summary"]
+
+
+def test_demo3_conflict_separates_past_and_present():
+    p = builder.build("d3", 4)
+    c = next(x for x in p["conflicts"] if x["state"] == "矛盾なしと確認")
+    side = next(s for s in checks.conflict_view(p, c)["sides"] if s["changed"])
+    assert "遠隔保守" in side["detected_text"] and "現地対応" in side["current_text"]

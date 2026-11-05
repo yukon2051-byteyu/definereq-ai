@@ -43,18 +43,46 @@ def test_tour_walks_to_the_end_across_stages():
 
 
 def test_each_session_has_separate_copy():
-    a = click(run(), "自由に操作する")
-    b = click(run(), "自由に操作する")
+    a = click(run(), "全画面を見る")
+    b = click(run(), "全画面を見る")
     a.session_state["project"]["requirements"][0]["title"] = "Aだけの編集"
     assert b.session_state["project"]["requirements"][0]["title"] != "Aだけの編集"
 
 
-def test_demo_reset_restores_initial_state():
-    at = click(run(), "自由に操作する")
-    at.session_state["project"]["requirements"][0]["title"] = "編集"
-    at.session_state["project"]["demo"]["edited"] = True
-    at = click(at.run(), "デモを初期状態に戻す")
-    assert at.session_state["project"]["requirements"][0]["title"] != "編集"
+def test_demo_is_read_only_on_every_page():
+    from definereq.ui.shell import PAGES
+
+    for page in PAGES:
+        at = run(project=builder.build("d1", 4), page=page)
+        assert not at.exception, page
+        allowed = {"nav", "tour", "go", "ex", "next", "share"}
+        for b in at.button:
+            assert b.disabled or (b.key or "").split("_")[0] in allowed, (page, b.label, b.key)
+        assert all(t.disabled for t in at.text_area), page
+        assert not at.get("file_uploader"), page
+        assert all(t.disabled for t in at.text_input if t.key not in ("why_q", "rq_q")), page
+
+
+def test_new_project_is_editable():
+    from definereq import project as pj
+
+    at = run(project=pj.new_project("t", ["app"]), page="prep")
+    assert not all(t.disabled for t in at.text_area)
+
+
+def test_menu_shows_main_steps_and_details():
+    from definereq.ui.shell import DETAILS, GROUPS, NEXT, PAGES
+
+    assert sum(len(i) for _, i in GROUPS) <= 10 and DETAILS
+    assert set(NEXT) == set(PAGES)
+    assert all(t in PAGES for _, t in NEXT.values())
+
+
+def test_next_step_button_moves_page():
+    at = run(project=builder.build("d1", 4), page="prep")
+    next(b for b in at.button if b.key == "next_prep").click()
+    at = at.run()
+    assert at.session_state["page"] == "sources" and not at.exception
 
 
 def test_project_json_cannot_be_uploaded():

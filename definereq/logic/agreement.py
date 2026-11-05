@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from .. import project as pj
 from .. import schema
+from . import evidence as ev
 
 RECORD_NOTICE = "この記録は利用者が入力したものです。本人確認や電子署名ではありません。"
 
@@ -36,6 +37,9 @@ def set_state(p: dict, dec_id: str, state: str, actor_kind: str, actor: str = "�
                    if not dec.get(key)]
         if missing:
             raise ValueError(f"合意の記録には {'・'.join(missing)} が必要です。")
+        evidence = dec.get("evidence") or []
+        if evidence and not any(e.get("verified") and not ev.unconfirmed_speech(p, e) for e in evidence):
+            raise ValueError("根拠が未確認の情報だけです。話者や内容を確認するか、確認できる根拠を追加してください。")
     if state == "保留" and not dec.get("hold_reason"):
         raise ValueError("保留の理由を入力してください。")
     dec["state_log"].append({"at": pj.now_iso(), "from": dec["state"], "to": state, "by": actor})

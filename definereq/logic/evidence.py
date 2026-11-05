@@ -48,6 +48,15 @@ def make(p: dict, source_id: str, quote: str, unit_id: str | None = None) -> dic
             "locator": "位置不明", "verified": False}
 
 
+def unconfirmed_speech(p: dict, ev: dict) -> bool:
+    """根拠が、話者または内容の確認が済んでいない発言かどうか。"""
+    if not str(ev.get("source_id", "")).startswith("REC"):
+        return False
+    rec = pj.get(p, "recordings", ev["source_id"])
+    seg = next((s for s in (rec or {}).get("segments", []) if s["id"] == ev.get("unit_id")), None)
+    return seg is None or seg["speaker_status"] != "確認済み" or seg["content_status"] != "確認済み"
+
+
 def source_name(p: dict, source_id: str) -> str:
     item = pj.get(p, "recordings" if source_id.startswith("REC") else "sources", source_id)
     return item["name"] if item else f"{source_id}（登録なし）"

@@ -84,7 +84,7 @@ def _decision_view(p: dict, d: dict) -> dict:
         "id": d["id"], "topic": d["topic"], "state": d["state"], "date": d.get("decided_on"),
         "decider": d.get("decider"), "confirmer": d.get("confirmer"),
         "adopted": adopted["label"] if adopted else None,
-        "reason": d.get("rationale"), "hold_reason": d.get("hold_reason"),
+        "reason": d.get("rationale"), "hold_reason": d.get("hold_reason"), "confirmation": d.get("confirmation"),
         "options": [{"label": o["label"], "pros": o.get("pros"), "cons": o.get("cons"),
                      "rejected_reason": d.get("rejected_reasons", {}).get(o["id"]),
                      "adopted": o["id"] == d.get("adopted")} for o in d.get("options", [])],

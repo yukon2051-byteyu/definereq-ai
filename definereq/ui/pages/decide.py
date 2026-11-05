@@ -13,13 +13,13 @@ from ...project import display
 from ...schema import (AGREEMENT_STATES, OPINION_NATURE, CHANGE_CLASSES, CHANGE_STATES, CONFLICT_KINDS, CONFLICT_STATES, IMPACT_AREAS, IMPACT_BASIS,
                        ISSUE_STATES, RISK_NATURE, RISK_STATES)
 from ..ai_panel import ai_panel, ai_runs_list
-from ..components import add_evidence_form, chip, chips, esc, evidence_block, guard, head, ok_rerun, people, select_item, touch
+from ..components import add_evidence_form, chip, chips, edit_block, esc, evidence_block, guard, head, ok_rerun, people, select_item, touch
 
 
 def issues(p: dict) -> None:
     head("意見調整", "発言者ごとの立場と根拠を分け、共通の目的と対立する条件を整理します。採否は人が判断します。", "調整")
     st.dataframe(pd.DataFrame([{"ID": i["id"], "論点": i["topic"], "状態": i["state"], "判断者": display(i.get("decider"))} for i in p["issues"]], columns=["ID", "論点", "状態", "判断者"]), hide_index=True, width="stretch")
-    with st.expander("論点を追加する"), st.form("add_issue", clear_on_submit=True):
+    with edit_block("addis"), st.expander("論点を追加する"), st.form("add_issue", clear_on_submit=True):
         topic = st.text_input("論点")
         if st.form_submit_button("追加") and topic.strip():
             pj.add(p, "issues", {"topic": topic.strip(), "opinions": [], "common_goal": None, "conflict_condition": None, "options": [], "decider": None, "ask": None,
@@ -36,7 +36,7 @@ def issues(p: dict) -> None:
         st.write(o["text"])
         if o.get("evidence"):
             evidence_block(p, o["evidence"], f"op_{it['id']}_{o['who']}")
-    with st.form(f"op_{it['id']}", clear_on_submit=True):
+    with edit_block("op"), st.form(f"op_{it['id']}", clear_on_submit=True):
         c1, c2 = st.columns([1, 1])
         who = c1.text_input("発言者・立場")
         nature = c2.selectbox("性質", OPINION_NATURE)
@@ -58,7 +58,7 @@ def issues(p: dict) -> None:
         st.markdown("**追加の質問**")
         for q in it["extra_questions"]:
             st.write("・" + q)
-    with st.form(f"is_{it['id']}"):
+    with edit_block("is"), st.form(f"is_{it['id']}"):
         state = st.selectbox("状態", ISSUE_STATES, index=ISSUE_STATES.index(it["state"]))
         goal = st.text_input("共通の目的", it.get("common_goal") or "")
         cond = st.text_input("対立する条件", it.get("conflict_condition") or "")
@@ -79,7 +79,7 @@ def decisions(p: dict) -> None:
     st.info(ag.RECORD_NOTICE)
     st.dataframe(pd.DataFrame([{"ID": d["id"], "論点": d["topic"], "状態": d["state"], "判断者": display(d.get("decider")), "判断日": display(d.get("decided_on"))} for d in p["decisions"]],
                               columns=["ID", "論点", "状態", "判断者", "判断日"]), hide_index=True, width="stretch")
-    with st.expander("判断を追加する"), st.form("add_dec", clear_on_submit=True):
+    with edit_block("adddc"), st.expander("判断を追加する"), st.form("add_dec", clear_on_submit=True):
         topic = st.text_input("論点")
         options = st.text_area("選択肢（1行に1件）")
         reqs = st.multiselect("関連する要件", [r["id"] for r in p["requirements"]], format_func=lambda i: pj.label_of(p, i))
@@ -98,13 +98,17 @@ def decisions(p: dict) -> None:
     if d.get("hold_reason"):
         st.markdown(f"**保留の理由**：{d['hold_reason']}")
     st.caption(f"判断者：{display(d.get('decider'))}／確認者：{display(d.get('confirmer'))}／判断日：{display(d.get('decided_on'))}／関連要件：{'、'.join(d.get('related_requirements', [])) or '未設定'}／関連変更：{'、'.join(d.get('related_changes', [])) or 'なし'}")
+    if d.get("confirmation"):
+        st.info(f"確認の記録：{d['confirmation']}")
     for i, e in enumerate(d.get("evidence", [])):
         evidence_block(p, e, f"dec_{d['id']}_{i}")
+    if d["state"] == "合意済み" and any(ev.unconfirmed_speech(p, e) for e in d.get("evidence", [])):
+        st.warning("話者・内容が未確認の発言を根拠に含みます。発言の確認を行ってください。")
     add_evidence_form(p, d, f"dec_{d['id']}")
     k = f"dc_{d['id']}_{d['state']}"
     labels = {o["id"]: o["label"] for o in d["options"]}
     names = ["", *people(p)]
-    with st.form(k):
+    with edit_block("dc"), st.form(k):
         adopted = st.selectbox("採用案", [None, *labels], index=[None, *labels].index(d.get("adopted")) if d.get("adopted") in [None, *labels] else 0, format_func=lambda v: labels.get(v, "未定"))
         reason = st.text_area("採用理由", d.get("rationale") or "")
         pros = {}
@@ -137,7 +141,7 @@ def changes(p: dict) -> None:
     head("追加要望と影響", "受付だけでは要件は変わりません。影響を調査し、合意済みの判断を結び付けて初めて反映できます。", "変更")
     st.dataframe(pd.DataFrame([{"ID": c["id"], "内容": c["content"], "要望者": display(c.get("requester")), "受付日": display(c.get("requested_at")), "分類": c["classification"], "状態": c["status"]} for c in p["changes"]],
                               columns=["ID", "内容", "要望者", "受付日", "分類", "状態"]), hide_index=True, width="stretch")
-    with st.expander("追加要望を受け付ける"), st.form("add_chg", clear_on_submit=True):
+    with edit_block("addch"), st.expander("追加要望を受け付ける"), st.form("add_chg", clear_on_submit=True):
         content = st.text_area("要望の内容")
         c1, c2, c3 = st.columns(3)
         who, when, desired = c1.text_input("要望者"), c2.text_input("受付日（不明なら空欄）"), c3.text_input("希望時期")
@@ -181,7 +185,7 @@ def changes(p: dict) -> None:
                 ag.add_impact(p, k, imp["area"], imp["target"], imp["note"], imp["basis"])
         touch(p)
         ok_rerun("取り込みました")
-    with st.form(f"imp_{k}", clear_on_submit=True):
+    with edit_block("imp"), st.form(f"imp_{k}", clear_on_submit=True):
         c1, c2, c3 = st.columns(3)
         area = c1.selectbox("領域", IMPACT_AREAS)
         basis = c2.selectbox("根拠の区分", IMPACT_BASIS)
@@ -194,6 +198,8 @@ def changes(p: dict) -> None:
     ai_panel(p, "impact", extra=f"追加要望：{c['content']}")
     ai_runs_list(p, "impact")
 
+    if p.get("is_demo") and c["status"] != "反映済み":
+        return
     st.subheader("判断に基づいて反映する")
     related = [d for d in p["decisions"] if k in d.get("related_changes", [])]
     if c["status"] == "反映済み":
@@ -241,8 +247,18 @@ def conflicts(p: dict) -> None:
     for c in p["conflicts"]:
         with st.container(border=True):
             st.html(f"<div>{chip(c['id'], 'plain')} {chip(c['kind'])} {chip(c['state'])}</div>")
-            st.write(f"{pj.label_of(p, c['a'])}　／　{pj.label_of(p, c['b'])}")
-            st.caption(c["note"])
+            view = checks.conflict_view(p, c)
+            left, right = st.columns(2)
+            with left:
+                st.markdown("**当時の指摘**")
+                for side in view["sides"]:
+                    st.caption(f"{side['id']}{side['detected_version']}：{side['detected_text']}")
+                st.caption(c["note"])
+            with right:
+                st.markdown("**現在**")
+                for side in view["sides"]:
+                    st.caption(f"{side['id']}{side['current_version']}：{side['current_text']}" + ("（変更あり）" if side["changed"] else "（変更なし）"))
+                st.caption(view["summary"])
             k = c["id"]
             c1, c2 = st.columns([1, 1])
             kind = c1.selectbox("区分", CONFLICT_KINDS, index=CONFLICT_KINDS.index(c["kind"]), key=f"ck_{k}")
@@ -272,7 +288,7 @@ def risks(p: dict) -> None:
     for r in p["risks"]:
         for i, e in enumerate(r.get("evidence", [])):
             evidence_block(p, e, f"rk_{r['id']}_{i}")
-    with st.expander("リスクを追加する"), st.form("add_risk", clear_on_submit=True):
+    with edit_block("addrk"), st.expander("リスクを追加する"), st.form("add_risk", clear_on_submit=True):
         content = st.text_input("内容")
         nature = st.selectbox("性質", RISK_NATURE)
         if st.form_submit_button("追加") and content.strip():
@@ -286,7 +302,7 @@ def risks(p: dict) -> None:
 
 def baseline(p: dict) -> None:
     head("基準版と再確認", "合意版を保存し、検討中の変更と比較します。根拠・要件・判断・受入条件が変わると、関連項目と共有資料を再確認対象にします。", "変更")
-    with st.form("add_bl", clear_on_submit=True):
+    with edit_block("bl"), st.form("add_bl", clear_on_submit=True):
         label = st.text_input("基準版の名称")
         if st.form_submit_button("現在の合意済み項目を基準版として保存") and label.strip():
             bl.create(p, label.strip())
