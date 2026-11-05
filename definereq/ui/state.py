@@ -66,7 +66,7 @@ def demo_copy(demo_id: str, stage: int) -> dict:
     return copies[key]
 
 
-def open_demo(demo_id: str, tour: bool = False, stage: int | None = None) -> None:
+def open_demo(demo_id: str, tour: bool = True, stage: int | None = None) -> None:
     _clear_widgets()
     p = current()
     if p and not p.get("is_demo"):  # デモを見ても作業中の案件を失わない

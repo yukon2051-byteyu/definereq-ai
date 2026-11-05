@@ -235,7 +235,7 @@ def test_create_blocked_until_discard_confirmed(monkeypatch):
 def test_demo_does_not_lose_work_in_progress():
     p = first_session()
     at = app(project=p, show_home=True)
-    next(b for b in at.button if b.key == "free_d1").click()
+    next(b for b in at.button if b.key == "tour_d1").click()
     at = at.run()
     assert at.session_state["project"]["is_demo"]
     next(b for b in at.button if b.key == "nav_home").click()

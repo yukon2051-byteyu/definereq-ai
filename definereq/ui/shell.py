@@ -106,7 +106,7 @@ def tour(p: dict) -> None:
         elif c2.button("案内を終わる", type="primary", width="stretch", key="tour_end"):
             st.session_state["tour_on"] = False
             st.rerun()
-        if c3.button("案内を閉じて全画面を見る", width="stretch", key="tour_close"):
+        if c3.button("案内を閉じる", width="stretch", key="tour_close"):
             st.session_state["tour_on"] = False
             st.rerun()
 

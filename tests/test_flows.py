@@ -43,10 +43,19 @@ def test_tour_walks_to_the_end_across_stages():
 
 
 def test_each_session_has_separate_copy():
-    a = click(run(), "全画面を見る")
-    b = click(run(), "全画面を見る")
-    a.session_state["project"]["requirements"][0]["title"] = "Aだけの編集"
-    assert b.session_state["project"]["requirements"][0]["title"] != "Aだけの編集"
+    a = click(run(), "3分の案内で見る")
+    b = click(run(), "3分の案内で見る")
+    a.session_state["project"]["sources"][0]["name"] = "Aだけの編集"
+    assert b.session_state["project"]["sources"][0]["name"] != "Aだけの編集"
+
+
+def test_demo_card_has_single_entry_and_tour_can_be_closed():
+    at = run()
+    assert not any(b.label == "全画面を見る" for b in at.button)
+    at = click(at, "3分の案内で見る")
+    at = click(at, "案内を閉じる")
+    assert at.session_state["tour_on"] is False and not at.exception
+    assert at.session_state["project"]["is_demo"]
 
 
 def test_demo_is_read_only_on_every_page():

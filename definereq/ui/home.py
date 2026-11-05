@@ -42,7 +42,7 @@ def _sections() -> None:
     st.html('<h2 class="dr-sec">利用の流れ</h2><p class="dr-sec-l">AIは候補を作り、プログラムが記録と照合を行い、人が判断します。AIの出力だけで要件や合意は確定しません。</p>')
     st.html('<div class="dr-steps">' + "".join(f'<div class="dr-step"><b>{esc(n)}</b>{esc(t)}</div>' for n, t in FLOW) + "</div>")
 
-    st.html('<h2 id="dr-demo" class="dr-sec">3件のデモを試す</h2><p class="dr-sec-l">APIキーや登録なしで、完成した案件の全画面を見られます。デモは閲覧専用で、データは全て架空です。</p>')
+    st.html('<h2 id="dr-demo" class="dr-sec">3件のデモを試す</h2><p class="dr-sec-l">APIキーや登録なしで、案内に沿って見られます。案内を閉じると、全画面を自由に見られます。デモは閲覧専用で、データは全て架空です。</p>')
     cols = st.columns(3)
     for i, (col, d) in enumerate(zip(cols, builder.catalog()), 1):
         with col, st.container(border=True, height="stretch"):
@@ -53,8 +53,6 @@ def _sections() -> None:
             st.space("stretch")  # 文章の行数が違っても、ボタンと下端の線を揃える
             if st.button("3分の案内で見る", key=f"tour_{d['id']}", type="primary", width="stretch"):
                 state.open_demo(d["id"], tour=True)
-            if st.button("全画面を見る", key=f"free_{d['id']}", width="stretch"):
-                state.open_demo(d["id"], tour=False)
 
     st.html('<h2 id="dr-new" class="dr-sec">あなたの案件で試す</h2>')
     switch_ok = _current_work()
