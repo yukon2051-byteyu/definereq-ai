@@ -75,7 +75,9 @@ __PALETTE_CSS__
 .dr-mark{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink);letter-spacing:.01em}
 .dr-h1{font-size:clamp(34px,3.3vw,46px);line-height:1.28;font-weight:900;margin:26px 0 0;color:var(--ink);letter-spacing:-.01em;padding:0}
 .dr-h1 span{display:inline-block}
-.dr-ai{font-size:1.14em;font-weight:900;color:#F75511}
+.dr-ai{font-size:1.14em;font-weight:900;color:#EB2A44;position:relative;top:1mm}
+.dr-comma{font-style:normal}
+@media (min-width:761px){.dr-h1 span{white-space:nowrap}.dr-comma{margin-right:-.312em}}
 .dr-sub{font-size:16px;line-height:1.75;color:#3C3E44;margin:8px 0 0}
 .dr-label{font-size:13px;font-weight:700;color:var(--muted);margin-top:8px}
 .dr-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
