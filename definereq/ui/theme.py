@@ -130,7 +130,7 @@ __PALETTE_CSS__
 .dr-btn-s,.dr-btn-s:visited{background:#fff;color:var(--ink);border:1px solid #CFCDC6}
 .dr-btn-s:hover{border-color:#D9330F;color:#B8290A}
 .dr-note{font-size:12.5px;color:var(--muted);margin-top:10px}
-.dr-jp{font-size:18px;font-weight:900;color:#B8290A;margin-top:12px}
+.dr-jp{font-size:18px;font-weight:900;color:#F03629;margin-top:12px}
 .dr-sec{font-size:24px;font-weight:900;line-height:1.3;margin:16px 0 0;color:var(--ink);padding:0;scroll-margin-top:16px}
 .dr-sec-l{font-size:14px;color:var(--muted);margin:6px 0 0;line-height:1.6}
 .dr-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;counter-reset:s}
