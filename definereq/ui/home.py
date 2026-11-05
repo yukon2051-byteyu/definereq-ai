@@ -61,7 +61,7 @@ def _sections() -> None:
         valid = gate.check_code(code)
         if code and not valid:
             st.warning("AIパスワードが正しくありません。")
-        st.caption("案件の作成と再開にはAIパスワードが必要です。入力後にEnterキーを押してください。入力した案件はこの画面の利用中のみ保持されるため、続きを行うときはJSONで保存してください。")
+        st.caption("案件の作成と再開にはAIパスワードが必要です。入力後にEnterキーを押してください。入力した案件はアプリ利用中のみ保持されるため、続きを行うときはJSONで保存してください。")
         left, right = st.columns(2)
         with left:
             st.markdown("**新しい案件を始める**")

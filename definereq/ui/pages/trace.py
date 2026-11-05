@@ -213,7 +213,7 @@ def share_page(p: dict) -> None:
             st.download_button("案件JSONをダウンロード", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json")
         else:
             save_controls(p, "save_share")
-        st.caption("JSONには資料の本文と文字起こしが含まれます。元ファイルは含みません。取り扱いに注意してください。案件はこの画面の利用中のみ保持されます。続きを行うときは、トップの「保存した案件から再開する」で読み込みます。")
+        st.caption("JSONには資料の本文と文字起こしが含まれます。元ファイルは含みません。取り扱いに注意してください。案件はアプリ利用中のみ保持されます。続きを行うときは、トップの「保存した案件から再開する」で読み込みます。")
 
 
 def usage(p: dict) -> None:
