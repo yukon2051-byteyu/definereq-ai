@@ -1,0 +1,38 @@
+# 画面の共通設定。色の役割は docs/デザイン調査.md に記録
+[theme]
+base = "light"
+primaryColor = "#D9330F"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F5F5F7"
+textColor = "#161618"
+borderColor = "#E2E3E7"
+showWidgetBorder = true
+linkColor = "#B8290A"
+greenColor = "#1C7A4D"
+orangeColor = "#A85B00"
+redColor = "#B3261E"
+blueColor = "#2A5DB0"
+grayColor = "#5A5C63"
+# 日本語の表示を統一する（読めない場合は端末の標準フォント）
+font = "Noto Sans JP:https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap, sans-serif"
+baseFontSize = 15
+baseRadius = "0.25rem"
+headingFontWeights = [900, 700, 700, 700, 700, 700]
+headingFontSizes = ["1.8rem", "1.35rem", "1.1rem", "1rem", "0.95rem", "0.9rem"]
+
+[theme.sidebar]
+backgroundColor = "#161618"
+secondaryBackgroundColor = "#26262B"
+textColor = "#F5F5F7"
+borderColor = "#3A3A41"
+
+[client]
+toolbarMode = "minimal"
+
+[server]
+fileWatcherType = "none"
+runOnSave = false
+maxUploadSize = 200
+
+[browser]
+gatherUsageStats = false

@@ -1,0 +1,3 @@
+# 手元のPCでローカル文字起こしも使う場合（初回にモデルを自動ダウンロード。公開環境には入れない）
+-r requirements.txt
+faster-whisper

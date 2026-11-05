@@ -1,0 +1,464 @@
+# 分野別の確認観点（DefineReq_AI）
+# ここを編集すると、質問・確認観点・文書の章立てが切り替わる（プログラムの変更は不要）
+#   topic : 同じ話題の目印。複合案件では topic が同じ観点を1つにまとめる（重複抑制）
+#   ask   : 確認相手の「役割」の例。担当者や期限を決めるものではない
+#   prep  : 会議前に用意してほしい資料・計測
+
+[domains.app]
+label = "業務アプリ"
+chapters = ["業務", "機能", "データ", "画面・帳票", "連携"]
+[domains.infra]
+label = "インフラ"
+chapters = ["性能", "容量", "可用性", "復旧", "運用", "配置制約"]
+[domains.network]
+label = "ネットワーク"
+chapters = ["接続", "通信", "性能", "分離", "認証", "障害", "運用"]
+
+# ---- 共通 ----
+[[perspectives]]
+id = "C01"
+domain = "common"
+topic = "purpose"
+category = "目的"
+question = "この取り組みで解決したい業務上の問題と、成功とみなす状態は何ですか。"
+why = "目的が曖昧なまま要件を詰めると、優先順位を判断できないため。"
+ask = "依頼部門の責任者"
+[[perspectives]]
+id = "C02"
+domain = "common"
+topic = "scope"
+category = "範囲"
+question = "今回の対象と対象外はどこまでですか。担当範囲の境界はどこですか。"
+why = "追加要望が範囲内かどうかを判断する基準になるため。"
+ask = "プロジェクト責任者"
+[[perspectives]]
+id = "C03"
+domain = "common"
+topic = "constraint"
+category = "制約"
+question = "時期・予算・社内規程など、動かせない制約はありますか。根拠の資料はありますか。"
+why = "制約を要望と混同すると、実現方式の検討を誤るため。"
+ask = "プロジェクト責任者"
+[[perspectives]]
+id = "C04"
+domain = "common"
+topic = "decider"
+category = "判断者"
+question = "論点ごとに、誰が判断し、誰が確認しますか。"
+why = "発言しただけでは合意にならないため、判断者を明らかにする。"
+ask = "プロジェクト責任者"
+
+# ---- 業務アプリ ----
+[[perspectives]]
+id = "A01"
+domain = "app"
+topic = "actors"
+category = "業務"
+question = "業務に関わる役割と、それぞれの開始条件・終了条件は何ですか。"
+why = "役割ごとの通常の流れがシナリオの基礎になるため。"
+ask = "業務担当者"
+prep = "現行の業務手順書"
+[[perspectives]]
+id = "A02"
+domain = "app"
+topic = "exception"
+category = "業務"
+question = "例外処理（差し戻し、訂正、取消、代理）はどのくらい発生し、今はどう処理していますか。"
+why = "例外処理の漏れは運用開始後の手作業に直結するため。"
+ask = "業務担当者"
+[[perspectives]]
+id = "A03"
+domain = "app"
+topic = "data"
+category = "データ"
+question = "扱うデータの必須項目、重複時の扱い、訂正・削除のルールは何ですか。"
+why = "データのルールは画面・連携・履歴の前提になるため。"
+ask = "業務担当者"
+prep = "現行の帳票・Excel"
+[[perspectives]]
+id = "A04"
+domain = "app"
+topic = "screen"
+category = "画面・帳票"
+question = "必要な一覧・入力・帳票と、利用者が判断に使う情報は何ですか。"
+why = "画面の必要性を業務の判断から確認するため。"
+ask = "業務担当者"
+[[perspectives]]
+id = "A05"
+domain = "app"
+topic = "integration"
+category = "連携"
+question = "連携する他システムと、受け渡す形式・頻度・失敗時の扱いは何ですか。"
+why = "連携の失敗と再処理の責任が未決になりやすいため。"
+ask = "連携先の担当者"
+[[perspectives]]
+id = "A06"
+domain = "app"
+topic = "permission"
+category = "権限"
+question = "役割ごとの閲覧・更新・承認の権限と、操作履歴の要否は何ですか。"
+why = "権限の例外が内部統制の論点になりやすいため。"
+ask = "管理部門"
+
+# ---- インフラ ----
+[[perspectives]]
+id = "I01"
+domain = "infra"
+topic = "workload"
+category = "性能"
+question = "支える業務、利用者数、同時利用数、利用時間帯はどうなっていますか。実測値か見込みかも教えてください。"
+why = "人数だけでは必要な性能を決められないため。"
+ask = "基盤担当者"
+prep = "アクセス数・処理時間の実測"
+[[perspectives]]
+id = "I02"
+domain = "infra"
+topic = "capacity"
+category = "容量"
+question = "現状の処理量・データ量・増加の見込みと、CPU・メモリ・ストレージの現状値は何ですか。根拠は何ですか。"
+why = "現状値と根拠がなければ容量を見積もれないため。"
+ask = "基盤担当者"
+prep = "リソース使用率の記録"
+[[perspectives]]
+id = "I03"
+domain = "infra"
+topic = "availability"
+category = "可用性"
+question = "許容できる停止時間はどのくらいですか。計画停止と障害時で分けて教えてください。"
+why = "停止時間・復旧時間・許容データ損失は別の指標であるため。"
+ask = "業務責任者"
+[[perspectives]]
+id = "I04"
+domain = "infra"
+topic = "recovery"
+category = "復旧"
+question = "目標復旧時間（RTO）と許容データ損失（RPO）はどのくらいですか。復旧の確認はしていますか。"
+why = "バックアップがあるだけでは復旧できる根拠にならないため。"
+ask = "業務責任者"
+prep = "バックアップ設定と復旧手順・復旧試験の記録"
+[[perspectives]]
+id = "I05"
+domain = "infra"
+topic = "placement"
+category = "配置制約"
+question = "配置場所、クラウド利用、データの保管場所に制約はありますか。根拠は何ですか。"
+why = "配置の制約は実現方式の候補を限定するため。"
+ask = "情報システム部門"
+[[perspectives]]
+id = "I06"
+domain = "infra"
+topic = "security"
+category = "セキュリティ"
+question = "認証、権限、暗号化、ログの保管についての条件は何ですか。"
+why = "社内規程で決まっている場合があるため。"
+ask = "セキュリティ担当者"
+prep = "社内のセキュリティ規程"
+[[perspectives]]
+id = "I07"
+domain = "infra"
+topic = "operation"
+category = "運用"
+question = "監視、通知、保守、問い合わせの体制と、更新・パッチ・サポート期間の扱いは何ですか。"
+why = "運用負担と責任分界が後から論点になりやすいため。"
+ask = "運用担当者"
+prep = "現行の運用手順書"
+[[perspectives]]
+id = "I08"
+domain = "infra"
+topic = "migration"
+category = "移行"
+question = "移行の順序、並行運用、切替、切戻しの条件は何ですか。"
+why = "無停止の希望と移行作業が矛盾しやすいため。"
+ask = "基盤担当者"
+[[perspectives]]
+id = "I09"
+domain = "infra"
+topic = "responsibility"
+category = "責任分界"
+question = "機器・クラウド・アプリ・運用の責任はそれぞれ誰が持ちますか。"
+why = "障害時の連絡先と対応範囲を決めるため。"
+ask = "プロジェクト責任者"
+[[perspectives]]
+id = "I10"
+domain = "infra"
+topic = "cost"
+category = "費用制約"
+question = "費用の上限や、初期費用・月額費用の制約はありますか。"
+why = "費用を創作せず、人が示した制約だけを記録するため。"
+ask = "予算責任者"
+
+# ---- ネットワーク ----
+[[perspectives]]
+id = "N01"
+domain = "network"
+topic = "sites"
+category = "接続"
+question = "拠点、端末、利用者、接続対象は何ですか。一覧はありますか。"
+why = "接続対象の抜けは工事と設定の抜けに直結するため。"
+ask = "ネットワーク担当者"
+prep = "拠点・端末の一覧"
+[[perspectives]]
+id = "N02"
+domain = "network"
+topic = "flows"
+category = "通信"
+question = "通信元・通信先・方向・用途は何ですか。"
+why = "用途の確認されていない通信を許可しないため。"
+ask = "ネットワーク担当者"
+prep = "通信一覧"
+[[perspectives]]
+id = "N03"
+domain = "network"
+topic = "traffic"
+category = "性能"
+question = "通信量、ピーク、増加の見込みは何ですか。測定した期間と方法を教えてください。"
+why = "資料や人数だけでは実効速度や回線品質を実測済みと扱えないため。"
+ask = "ネットワーク担当者"
+prep = "通信量の計測結果"
+[[perspectives]]
+id = "N04"
+domain = "network"
+topic = "quality"
+category = "性能"
+question = "帯域・遅延・損失について、業務上の条件と根拠は何ですか。"
+why = "「速い」を測定できる条件にするため。"
+ask = "業務担当者"
+[[perspectives]]
+id = "N05"
+domain = "network"
+topic = "external"
+category = "外部接続"
+question = "外部接続、インターネット、クラウド、拠点間通信の扱いと、禁止事項は何ですか。根拠は何ですか。"
+why = "禁止事項の適用範囲と例外を確認するため。"
+ask = "セキュリティ担当者"
+[[perspectives]]
+id = "N06"
+domain = "network"
+topic = "segment"
+category = "分離"
+question = "分離の単位と、分離の間で許可する接続は何ですか。"
+why = "不明なポートやプロトコルを創作せず、必要な接続を確認するため。"
+ask = "セキュリティ担当者"
+[[perspectives]]
+id = "N07"
+domain = "network"
+topic = "security"
+category = "認証"
+question = "認証、アクセス制御、暗号化の条件は何ですか。認証に失敗したときの扱いは何ですか。"
+why = "認証基盤の障害時に業務が止まる場合があるため。"
+ask = "セキュリティ担当者"
+[[perspectives]]
+id = "N08"
+domain = "network"
+topic = "failover"
+category = "障害"
+question = "障害時の代替経路、切替の条件、切替にかかる時間の条件は何ですか。測定したことはありますか。"
+why = "二重化があるだけでは切替時間の条件を満たす根拠にならないため。"
+ask = "ネットワーク担当者"
+prep = "障害履歴・切替試験の記録"
+[[perspectives]]
+id = "N09"
+domain = "network"
+topic = "dependency"
+category = "依存"
+question = "DNS・DHCP・IP管理など、依存するサービスと担当は何ですか。"
+why = "依存先の停止が全体の停止になる場合があるため。"
+ask = "ネットワーク担当者"
+[[perspectives]]
+id = "N10"
+domain = "network"
+topic = "operation"
+category = "運用"
+question = "監視、ログ、保守の体制と、回線・機器・作業の責任分界は何ですか。"
+why = "障害時の切り分けと連絡先を決めるため。"
+ask = "運用担当者"
+[[perspectives]]
+id = "N11"
+domain = "network"
+topic = "migration"
+category = "工事"
+question = "工事の時間帯、停止の条件、切戻しの判断基準は何ですか。"
+why = "拠点の業務時間と工事時間の調整が必要なため。"
+ask = "拠点の責任者"
+
+# ---- 業務・システムの特徴で深掘りする観点 ----
+[traits.approval]
+label = "承認"
+keywords = ["承認", "決裁", "差し戻し", "申請"]
+questions = ["承認者は誰で、条件は何ですか。", "代理承認はできますか。条件と記録は何ですか。", "差し戻し後はどこからやり直しますか。"]
+[traits.data]
+label = "データ"
+keywords = ["データ", "集計", "マスタ", "訂正", "履歴"]
+questions = ["必須項目は何ですか。", "重複の判定と扱いは何ですか。", "訂正・削除の履歴は残しますか。"]
+[traits.integration]
+label = "連携"
+keywords = ["連携", "取込", "API", "ファイル連携"]
+questions = ["形式と頻度は何ですか。", "失敗したとき誰が再処理しますか。", "責任分界はどこですか。"]
+[traits.deadline]
+label = "期限"
+keywords = ["締切", "期限", "締め", "未提出", "遅延"]
+questions = ["締切と休日の扱いは何ですか。", "遅延・未提出のときどうしますか。"]
+[traits.confidential]
+label = "機密情報"
+keywords = ["機密", "個人情報", "権限", "社外秘"]
+questions = ["閲覧権限は誰にありますか。", "送信・保存の制限はありますか。", "操作履歴は必要ですか。"]
+[traits.platform]
+label = "基盤"
+keywords = ["クラウド", "サーバ", "容量", "バックアップ", "復旧"]
+questions = ["処理量と容量はどのくらいですか。", "停止はどこまで許容できますか。", "復旧と運用の担当は誰ですか。"]
+[traits.comms]
+label = "通信"
+keywords = ["回線", "拠点", "遠隔", "VPN", "通信"]
+questions = ["通信元・通信先と用途は何ですか。", "性能の条件は何ですか。", "分離と障害時の扱いは何ですか。"]
+
+# ---- 非機能の確認項目（要件ごとではなく案件全体で確認）----
+[[nfr]]
+id = "performance"
+label = "性能"
+domains = ["app", "infra", "network"]
+question = "応答時間・処理時間の条件と測定条件は何ですか。"
+[[nfr]]
+id = "throughput"
+label = "処理量"
+domains = ["app", "infra", "network"]
+question = "処理件数・データ量・ピークはどのくらいですか。"
+[[nfr]]
+id = "availability"
+label = "可用性"
+domains = ["infra", "network"]
+question = "稼働時間帯と許容停止時間は何ですか。"
+[[nfr]]
+id = "failure"
+label = "障害時の扱い"
+domains = ["app", "infra", "network"]
+question = "障害時の業務の代替手段は何ですか。"
+[[nfr]]
+id = "backup"
+label = "バックアップ"
+domains = ["infra"]
+question = "対象・世代・頻度は何ですか。"
+[[nfr]]
+id = "recovery"
+label = "復旧"
+domains = ["infra", "network"]
+question = "目標復旧時間・許容データ損失・復旧確認の方法は何ですか。"
+[[nfr]]
+id = "auth"
+label = "認証"
+domains = ["app", "infra", "network"]
+question = "認証方式の条件は何ですか。"
+[[nfr]]
+id = "authz"
+label = "権限"
+domains = ["app", "infra"]
+question = "役割別の権限は何ですか。"
+[[nfr]]
+id = "audit"
+label = "履歴"
+domains = ["app", "infra", "network"]
+question = "どの操作の履歴を、どのくらい残しますか。"
+[[nfr]]
+id = "retention"
+label = "保存"
+domains = ["app", "infra"]
+question = "保存期間と削除の条件は何ですか。"
+[[nfr]]
+id = "operation"
+label = "運用"
+domains = ["app", "infra", "network"]
+question = "日常の運用作業と担当は何ですか。"
+[[nfr]]
+id = "monitoring"
+label = "監視"
+domains = ["infra", "network"]
+question = "監視の対象と通知先は何ですか。"
+[[nfr]]
+id = "maintenance"
+label = "保守"
+domains = ["app", "infra", "network"]
+question = "保守の範囲・時間帯・連絡先は何ですか。"
+[[nfr]]
+id = "migration"
+label = "移行"
+domains = ["app", "infra", "network"]
+question = "移行の手順・切替・切戻しの条件は何ですか。"
+[[nfr]]
+id = "environment"
+label = "環境"
+domains = ["app", "infra"]
+question = "利用端末・ブラウザ・検証環境の条件は何ですか。"
+[[nfr]]
+id = "training"
+label = "教育"
+domains = ["app"]
+question = "利用者への教育と手順書は必要ですか。"
+
+# ---- 曖昧な表現（具体化の入口）----
+[[vague]]
+word = "速"
+asks = ["どの操作の、何秒以内ですか。", "測定条件（件数・時間帯・端末・拠点）は何ですか。", "満たせない場合の例外はありますか。"]
+[[vague]]
+word = "すぐ"
+asks = ["いつまでに、何が完了していればよいですか。", "測定の開始点と終了点はどこですか。"]
+[[vague]]
+word = "止めない"
+asks = ["計画停止は許容しますか。", "障害時に許容できる停止時間はどのくらいですか。", "対象の業務・時間帯はどこですか。"]
+[[vague]]
+word = "止まりにく"
+asks = ["障害時に許容できる停止時間はどのくらいですか。", "どの障害を想定しますか。", "切替時間の条件はありますか。"]
+[[vague]]
+word = "無停止"
+asks = ["計画停止も含みますか。", "移行・保守のときも対象ですか。"]
+[[vague]]
+word = "失いたくない"
+asks = ["どの時点まで戻せればよいですか（許容データ損失）。", "対象のデータはどれですか。", "復旧を確認する方法は何ですか。"]
+[[vague]]
+word = "十分"
+asks = ["何に対して十分ですか。", "判定に使う数値と測定条件は何ですか。"]
+[[vague]]
+word = "簡単"
+asks = ["誰が、どの操作を、どのくらいの時間でできればよいですか。", "教育や手順書は前提にしますか。"]
+[[vague]]
+word = "なるべく"
+asks = ["どの場合に例外を認めますか。", "判断するのは誰ですか。"]
+[[vague]]
+word = "柔軟"
+asks = ["具体的にどの変更ができればよいですか。", "変更するのは誰ですか。"]
+[[vague]]
+word = "適切"
+asks = ["判定の基準は何ですか。", "判断するのは誰ですか。"]
+
+# ---- 矛盾候補の検出パターン（プログラムで検出。適用範囲は人が確認する）----
+[[conflict_patterns]]
+id = "immutable_vs_edit"
+a = "(変更|修正|訂正)(不可|できない|を認めない)"
+b = "(変更|修正|訂正)(可能|できる|を認める|したい)"
+note = "変更不可と変更可能が併存しています。対象の状態（承認前・承認後）と例外を確認してください。"
+[[conflict_patterns]]
+id = "nonstop_vs_cutover"
+a = "(無停止|止めない|止めたくない|停止(は|を)?(認めない|不可))"
+b = "(切替|切り替え|移行|メンテナンス|保守|パッチ).{0,20}(停止|止め)|(停止|止め).{0,20}(切替|切り替え|移行|メンテナンス|保守)"
+note = "無停止の希望と、停止を伴う可能性のある作業が併存しています。計画停止を含むか確認してください。"
+[[conflict_patterns]]
+id = "noexternal_vs_remote"
+a = "外部(から)?(の)?(接続|通信).{0,10}(禁止|不可|認めない)"
+b = "(遠隔保守|リモート保守|遠隔(から)?(の)?(接続|作業)|リモート(接続|作業))"
+note = "外部接続の禁止と遠隔保守が併存しています。禁止の適用範囲と例外手続きの有無を確認してください。"
+[[conflict_patterns]]
+id = "nodataloss_vs_backup"
+a = "(データ|情報).{0,12}(損失|消失|失).{0,8}(不可|ない|認めない|たくない)"
+b = "バックアップ.{0,12}(日次|毎日|1日1回|週次|週1)|(日次|毎日|1日1回|週次|週1).{0,12}バックアップ"
+note = "データ損失を認めない希望と、定期バックアップの間隔が併存しています。許容データ損失を確認してください。"
+[[conflict_patterns]]
+id = "freeze_vs_recalc"
+a = "(締め後|確定後|締切後).{0,16}(固定|変更不可|変更しない|変更できない)"
+b = "再集計"
+note = "締め後の固定と再集計が併存しています。訂正の扱いと版の管理を確認してください。"
+
+# ---- 過大評価の注意（二重化・バックアップ等があるだけで達成としない）----
+[[overclaim]]
+pattern = "(二重化|冗長化|冗長構成)"
+note = "二重化の記載だけでは、切替時間や停止時間の条件を満たす根拠になりません。条件と確認方法を設定してください。"
+[[overclaim]]
+pattern = "バックアップ"
+note = "バックアップの記載だけでは、復旧時間や許容データ損失の条件を満たす根拠になりません。復旧の確認方法を設定してください。"

@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+data
+tests
+docs
+scripts
+DefineReq_AI.txt
+.env
+.streamlit/secrets.toml
+*.db

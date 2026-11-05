@@ -1,0 +1,8 @@
+# 開発とテストにのみ使う（公開環境には入れない）
+-r requirements.txt
+pytest==9.2.0
+playwright
+reportlab==5.1.0
+pillow==13.0.0
+pgserver==0.1.4
+psutil
