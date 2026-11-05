@@ -15,6 +15,7 @@ from definereq.demos import builder
 from definereq.export import excelx, jsonio, share, wordx
 from definereq.logic import checks, why
 from definereq.logic import evidence as ev
+from definereq.schema import COLLECTIONS
 
 ROOT = Path(__file__).resolve().parent.parent
 DEMOS = ["d1", "d2", "d3"]
@@ -170,10 +171,42 @@ def test_excel_shows_both_totals(built):
 
 # ---- JSON ----
 @pytest.mark.parametrize("demo", DEMOS)
-def test_json_output_keeps_major_data(built, demo):
-    q = json.loads(jsonio.dumps(built[demo]))
-    assert q["requirements"][0]["id"].startswith("REQ-") and q["requirements"][0]["evidence"]
-    assert q["sources"][0]["units"][0]["locator"] and q["baselines"] and q["shared_docs"] and q["history"]
+def test_json_roundtrip_keeps_all_data(built, demo):
+    p = built[demo]
+    q = jsonio.loads(jsonio.dumps(p))
+    for key in list(COLLECTIONS) + ["profile", "prep", "nfr_status", "domains", "traits"]:
+        assert q[key] == json.loads(json.dumps(p[key], default=str)), key
+
+
+def corrupt(p, fn):
+    q = json.loads(jsonio.dumps(p))
+    fn(q)
+    return json.dumps(q).encode()
+
+
+@pytest.mark.parametrize("name,fn", [
+    ("app", lambda q: q.update(app="other")),
+    ("dup", lambda q: q["requirements"].append(dict(q["requirements"][0]))),
+    ("state", lambda q: q["requirements"][0].update(status="謎の状態")),
+    ("ref", lambda q: q["requirements"][0].update(related=["REQ-999"])),
+    ("evidence", lambda q: q["requirements"][0]["evidence"].append({"source_id": "SRC-999"})),
+    ("missing", lambda q: q.pop("decisions")),
+    ("domain", lambda q: q.update(domains=["x"])),
+    ("name", lambda q: q.update(name="")),
+])
+def test_invalid_json_rejected(built, name, fn):
+    with pytest.raises(jsonio.LoadError):
+        jsonio.loads(corrupt(built["d1"], fn))
+
+
+def test_broken_json_text():
+    with pytest.raises(jsonio.LoadError):
+        jsonio.loads(b"{broken")
+
+
+def test_demo_json_resumes_as_normal_project(built):
+    q = jsonio.loads(jsonio.dumps(built["d1"]))
+    assert q["is_demo"] is False and q["demo"] is None and q["from_demo"] is True
 
 
 # ---- デモ ----

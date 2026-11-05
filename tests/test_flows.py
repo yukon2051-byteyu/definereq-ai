@@ -73,7 +73,7 @@ def test_new_project_is_editable():
 def test_menu_shows_main_steps_and_details():
     from definereq.ui.shell import DETAILS, GROUPS, NEXT, PAGES
 
-    assert sum(len(i) for _, i in GROUPS) <= 10 and DETAILS
+    assert sum(len(i) for _, i in GROUPS) <= 11 and DETAILS
     assert set(NEXT) == set(PAGES)
     assert all(t in PAGES for _, t in NEXT.values())
 
@@ -83,13 +83,6 @@ def test_next_step_button_moves_page():
     next(b for b in at.button if b.key == "next_prep").click()
     at = at.run()
     assert at.session_state["page"] == "sources" and not at.exception
-
-
-def test_project_json_cannot_be_uploaded():
-    at = run()
-    assert not at.get("file_uploader")
-    at = run(project=builder.build("d1", 4), page="share")
-    assert not at.get("file_uploader")
 
 
 def field(at, label):

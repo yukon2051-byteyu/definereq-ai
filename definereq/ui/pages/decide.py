@@ -7,13 +7,13 @@ import streamlit as st
 from ... import project as pj
 from ...logic import agreement as ag
 from ...logic import baseline as bl
-from ...logic import checks
+from ...logic import checks, continuity
 from ...logic import evidence as ev
 from ...project import display
 from ...schema import (AGREEMENT_STATES, OPINION_NATURE, CHANGE_CLASSES, CHANGE_STATES, CONFLICT_KINDS, CONFLICT_STATES, IMPACT_AREAS, IMPACT_BASIS,
                        ISSUE_STATES, RISK_NATURE, RISK_STATES)
 from ..ai_panel import ai_panel, ai_runs_list
-from ..components import add_evidence_form, chip, chips, edit_block, esc, evidence_block, guard, head, ok_rerun, people, select_item, touch
+from ..components import add_evidence_form, chip, chips, edit_block, esc, evidence_block, guard, head, meeting_select, ok_rerun, people, select_item, touch
 
 
 def issues(p: dict) -> None:
@@ -97,6 +97,7 @@ def decisions(p: dict) -> None:
     st.markdown(f"**採用理由**：{d.get('rationale') or '理由の記録がありません'}")
     if d.get("hold_reason"):
         st.markdown(f"**保留の理由**：{d['hold_reason']}")
+    st.caption(f"会議：{continuity.label(p, d.get('meeting_id'))}")
     st.caption(f"判断者：{display(d.get('decider'))}／確認者：{display(d.get('confirmer'))}／判断日：{display(d.get('decided_on'))}／関連要件：{'、'.join(d.get('related_requirements', [])) or '未設定'}／関連変更：{'、'.join(d.get('related_changes', [])) or 'なし'}")
     if d.get("confirmation"):
         st.info(f"確認の記録：{d['confirmation']}")
@@ -124,7 +125,9 @@ def decisions(p: dict) -> None:
         confirmer = c2.selectbox("確認者", names, index=names.index(d["confirmer"]) if d.get("confirmer") in names else 0)
         date = c3.text_input("判断日（YYYY-MM-DD）", d.get("decided_on") or "")
         state = st.selectbox("状態", AGREEMENT_STATES, index=AGREEMENT_STATES.index(d["state"]))
+        meeting = meeting_select(p, f"{k}_mtg", d.get("meeting_id"))
         if st.form_submit_button("記録する", type="primary"):
+            d["meeting_id"] = meeting
             for o in d["options"]:
                 o["pros"], o["cons"] = pros[o["id"]] or None, cons[o["id"]] or None
             d.update(adopted=adopted, rationale=reason or None, rejected_reasons={a: b for a, b in rej.items() if b}, hold_reason=hold or None,
@@ -147,8 +150,9 @@ def changes(p: dict) -> None:
         who, when, desired = c1.text_input("要望者"), c2.text_input("受付日（不明なら空欄）"), c3.text_input("希望時期")
         bg = st.text_input("背景")
         reqs = st.multiselect("関連しそうな要件", [r["id"] for r in p["requirements"]], format_func=lambda i: pj.label_of(p, i))
+        meeting = meeting_select(p, "chg_mtg")
         if st.form_submit_button("受け付ける") and content.strip():
-            ag.receive_change(p, content.strip(), who or None, bg or None, None, desired or None, when or None, reqs)
+            ag.receive_change(p, content.strip(), who or None, bg or None, None, desired or None, when or None, reqs, meeting)
             touch(p)
             ok_rerun("受け付けました（要件は変更していません）")
     c = select_item(p["changes"], lambda x: f"{x['id']} {x['content'][:40]}", "ch_sel", "追加要望はまだありません。")

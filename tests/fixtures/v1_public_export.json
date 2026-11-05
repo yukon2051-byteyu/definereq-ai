@@ -1,0 +1,2262 @@
+{
+ "app": "DefineReq_AI",
+ "format_version": 1,
+ "id": "PRJ-194db7f3",
+ "name": "拠点ネットワーク更新と遠隔保守",
+ "domains": [
+  "network"
+ ],
+ "traits": [
+  "comms",
+  "confidential"
+ ],
+ "created_at": "2026-11-05T10:55:16+09:00",
+ "updated_at": "2026-11-05T10:55:22+09:00",
+ "is_demo": true,
+ "demo": {
+  "id": "d3",
+  "stage": 4,
+  "edited": true
+ },
+ "profile": {
+  "background": {
+   "value": "大阪拠点のネットワーク更新を検討している。",
+   "certainty": "本人申告"
+  },
+  "purpose": {
+   "value": "受発注の業務が止まりにくい通信環境にする。",
+   "certainty": "本人申告"
+  },
+  "problem": {
+   "value": "朝の時間帯に画面が遅くなると現場が申告している（通信量は未計測）。",
+   "certainty": "仮説"
+  },
+  "outcome": {
+   "value": null,
+   "certainty": "未確認"
+  },
+  "current": {
+   "value": "拠点間は主回線1本で接続している。",
+   "certainty": "確認済み"
+  },
+  "request": {
+   "value": "回線を速く、止まりにくくしてほしい。保守会社から遠隔保守の提案がある。",
+   "certainty": "本人申告"
+  },
+  "scope_in": {
+   "value": "大阪拠点と本社の間の通信",
+   "certainty": "本人申告"
+  },
+  "scope_out": {
+   "value": null,
+   "certainty": "未確認"
+  },
+  "constraints": {
+   "value": "社外から社内ネットワークへの外部接続は規程で禁止。",
+   "certainty": "本人申告"
+  },
+  "timeline": {
+   "value": null,
+   "certainty": "未確認"
+  },
+  "budget": {
+   "value": null,
+   "certainty": "未確認"
+  }
+ },
+ "prep": {
+  "understanding": "回線の速度と止まりにくさの要望があるが、通信量と切替時間は未計測である。遠隔保守は外部接続の禁止に関わる。",
+  "gaps": [
+   "通信量",
+   "ピークの時間帯",
+   "切替時間",
+   "停止の許容時間"
+  ],
+  "materials": [
+   "通信量の計測結果",
+   "障害履歴"
+  ],
+  "purpose": "業務の条件と、遠隔保守の扱いを確認する。",
+  "agenda": [
+   "通信の用途",
+   "障害時の業務",
+   "遠隔保守の提案"
+  ],
+  "decide_today": [
+   "計測する項目"
+  ]
+ },
+ "nfr_status": {
+  "performance": {
+   "state": "未確認",
+   "note": "3秒以内の要望。実測なし"
+  },
+  "availability": {
+   "state": "未確認",
+   "note": "30分までの停止。切替時間は未計測"
+  },
+  "audit": {
+   "state": "確認済み",
+   "note": "規程でログの保存を確認"
+  },
+  "monitoring": {
+   "state": "未確認",
+   "note": null
+  }
+ },
+ "scope_notes": [],
+ "activity": [
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "案件を作成しました（デモ）"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "資料 SRC-001「d3_通信一覧.xlsx」v1 を登録しました"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "資料 SRC-002「d3_構成説明.pptx」v1 を登録しました"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "資料 SRC-003「d3_情報セキュリティ規程抜粋.txt」v1 を登録しました"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "録画 REC-001「拠点ネットワーク定例（録画）」の文字起こしを登録しました（prepared）"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "資料 SRC-004「第2回定例メモ」v1 を登録しました"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "判断 DEC-001 を「確認待ち」にしました（デモ担当者）"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "基準版 BSL-001「第2回定例後の版」を保存しました"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "資料 SRC-005「保守会社からの要望」v1 を登録しました"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "追加要望 CHG-001 を受け付けました（要件は変更していません）"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "資料 SRC-006「第3回定例メモ」v1 を登録しました"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "判断 DEC-001 を「合意済み」にしました（デモ担当者）"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "REQ-006 を v2 に更新しました（デモ担当者）"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "追加要望 CHG-001 を判断 DEC-001 に基づき反映しました（デモ担当者）"
+  },
+  {
+   "at": "2026-11-05T10:55:16+09:00",
+   "message": "REQ-006 の状態を「合意済み」にしました（デモ担当者）"
+  }
+ ],
+ "seq": {
+  "stakeholders": 4,
+  "glossary": 1,
+  "sources": 6,
+  "questions": 8,
+  "ai_runs": 4,
+  "candidates": 7,
+  "recordings": 1,
+  "requirements": 9,
+  "issues": 1,
+  "decisions": 1,
+  "scenarios": 4,
+  "risks": 2,
+  "actions": 2,
+  "baselines": 1,
+  "shared_docs": 4,
+  "changes": 1,
+  "conflicts": 3,
+  "history": 2
+ },
+ "stakeholders": [
+  {
+   "name": "中村",
+   "org": "情報システム課",
+   "position": "担当",
+   "authority": "要件の取りまとめ",
+   "certainty": "確認済み",
+   "note": null,
+   "id": "STK-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "name": "小林",
+   "org": "大阪拠点",
+   "position": "拠点長",
+   "authority": "業務条件の判断",
+   "certainty": "確認済み",
+   "note": null,
+   "id": "STK-002",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "name": "岡田",
+   "org": "保守会社",
+   "position": "保守担当",
+   "authority": "保守の提案（判断権限なし）",
+   "certainty": "本人申告",
+   "note": null,
+   "id": "STK-003",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "name": "森",
+   "org": "情報セキュリティ",
+   "position": "責任者",
+   "authority": "例外の承認",
+   "certainty": "未確認",
+   "note": "第2回から参加予定",
+   "id": "STK-004",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "glossary": [
+  {
+   "term": "切戻し",
+   "meaning": "切替に失敗したときに元の状態へ戻すこと",
+   "id": "TRM-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "sources": [
+  {
+   "name": "d3_通信一覧.xlsx",
+   "kind": "構成・運用",
+   "version": 1,
+   "occurred_at": "2026-09-01",
+   "registered_at": "2026-11-05T10:55:16+09:00",
+   "origin": "デモ用サンプル（架空）",
+   "visibility": "社内のみ",
+   "file_kind": "xlsx",
+   "units": [
+    {
+     "id": "U0001",
+     "locator": "シート「通信一覧」 A1:H1",
+     "text": "通信ID / 通信元 / 通信先 / 方向 / 用途 / 時間帯 / ポート / 状態",
+     "target": true
+    },
+    {
+     "id": "U0002",
+     "locator": "シート「通信一覧」 A2:H2",
+     "text": "F01 / 大阪拠点の端末 / 本社の受発注サーバー / 拠点→本社 / 受発注 / 平日8時から18時 / 未確認 / 利用中",
+     "target": true
+    },
+    {
+     "id": "U0003",
+     "locator": "シート「通信一覧」 A3:H3",
+     "text": "F02 / 大阪拠点の端末 / 本社のファイルサーバー / 拠点→本社 / 図面の参照 / 平日 / 未確認 / 利用中",
+     "target": true
+    },
+    {
+     "id": "U0004",
+     "locator": "シート「通信一覧」 A4:H4",
+     "text": "F03 / 保守会社 / 大阪拠点のネットワーク機器 / 外部→拠点 / 遠隔保守（提案） / 未確認 / 未確認 / 提案のみ",
+     "target": true
+    },
+    {
+     "id": "U0005",
+     "locator": "シート「拠点」 A1:D1",
+     "text": "拠点 / 利用者数 / 用途 / 計測",
+     "target": true
+    },
+    {
+     "id": "U0006",
+     "locator": "シート「拠点」 A2:D2",
+     "text": "大阪拠点 / 60 / 受発注・図面参照 / 通信量は未計測",
+     "target": true
+    }
+   ],
+   "warnings": [],
+   "extra": {},
+   "supplement": null,
+   "superseded_by": null,
+   "replaces": null,
+   "id": "SRC-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "name": "d3_構成説明.pptx",
+   "kind": "構成・運用",
+   "version": 1,
+   "occurred_at": "2026-09-01",
+   "registered_at": "2026-11-05T10:55:16+09:00",
+   "origin": "デモ用サンプル（架空）",
+   "visibility": "社内のみ",
+   "file_kind": "pptx",
+   "units": [
+    {
+     "id": "U0001",
+     "locator": "スライド1「大阪拠点の構成（架空）」 Title 1",
+     "text": "大阪拠点の構成（架空）",
+     "target": true,
+     "group": "slide1"
+    },
+    {
+     "id": "U0002",
+     "locator": "スライド1「大阪拠点の構成（架空）」 Rectangle 2",
+     "text": "大阪拠点",
+     "target": true,
+     "group": "slide1"
+    },
+    {
+     "id": "U0003",
+     "locator": "スライド1「大阪拠点の構成（架空）」 Rectangle 3",
+     "text": "本社",
+     "target": true,
+     "group": "slide1"
+    },
+    {
+     "id": "U0004",
+     "locator": "スライド1「大阪拠点の構成（架空）」 Rectangle 4",
+     "text": "保守会社",
+     "target": true,
+     "group": "slide1"
+    },
+    {
+     "id": "U0005",
+     "locator": "スライド1「大阪拠点の構成（架空）」 TextBox 7",
+     "text": "拠点間は主回線1本で接続している。代替回線はない。",
+     "target": true,
+     "group": "slide1"
+    },
+    {
+     "id": "U0006",
+     "locator": "スライド1「大阪拠点の構成（架空）」 発表者ノート",
+     "text": "社内メモ：回線の契約更新は来年3月。",
+     "target": false,
+     "group": "slide1"
+    }
+   ],
+   "warnings": [
+    "スライド1：図形・矢印「Connector 5」、図形・矢印「Connector 6」 は文字以外の内容を理解していません。人が補足してください。"
+   ],
+   "extra": {
+    "slides": [
+     {
+      "no": 1,
+      "title": "大阪拠点の構成（架空）",
+      "units": 6,
+      "not_understood": [
+       "図形・矢印「Connector 5」",
+       "図形・矢印「Connector 6」"
+      ],
+      "has_notes": true
+     }
+    ]
+   },
+   "supplement": "図の線は、大阪拠点と本社、本社と保守会社の接続を示す想定（人の補足。未確認）。",
+   "superseded_by": null,
+   "replaces": null,
+   "id": "SRC-002",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "name": "d3_情報セキュリティ規程抜粋.txt",
+   "kind": "制約",
+   "version": 1,
+   "occurred_at": "2026-04-01",
+   "registered_at": "2026-11-05T10:55:16+09:00",
+   "origin": "デモ用サンプル（架空）",
+   "visibility": "社内のみ",
+   "file_kind": "text",
+   "units": [
+    {
+     "id": "U0001",
+     "locator": "1行目",
+     "text": "情報セキュリティ規程 抜粋（架空）",
+     "target": true
+    },
+    {
+     "id": "U0002",
+     "locator": "2行目",
+     "text": "第12条 社外から社内ネットワークへの外部接続は禁止する。",
+     "target": true
+    },
+    {
+     "id": "U0003",
+     "locator": "3行目",
+     "text": "第13条 業務上必要な場合は、情報セキュリティ責任者の事前承認により例外を認めることがある。",
+     "target": true
+    },
+    {
+     "id": "U0004",
+     "locator": "4行目",
+     "text": "第14条 例外の接続は、接続者、時間、作業内容のログを保存する。",
+     "target": true
+    }
+   ],
+   "warnings": [],
+   "extra": {},
+   "supplement": null,
+   "superseded_by": null,
+   "replaces": null,
+   "id": "SRC-003",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "name": "第2回定例メモ",
+   "kind": "議事録",
+   "version": 1,
+   "occurred_at": "2026-09-24",
+   "registered_at": "2026-11-05T10:55:16+09:00",
+   "origin": "文章貼り付け",
+   "visibility": "関係者限定",
+   "file_kind": "text",
+   "units": [
+    {
+     "id": "U0001",
+     "locator": "1行目",
+     "text": "小林：受発注の停止は30分までなら紙の伝票で対応できる。",
+     "target": true
+    },
+    {
+     "id": "U0002",
+     "locator": "2行目",
+     "text": "小林：朝9時の受発注の画面は3秒以内で開いてほしい。",
+     "target": true
+    },
+    {
+     "id": "U0003",
+     "locator": "3行目",
+     "text": "中村：通信量の計測は10月に1週間行う。",
+     "target": true
+    },
+    {
+     "id": "U0004",
+     "locator": "4行目",
+     "text": "森：外部接続の例外は、接続者、時間、作業内容のログがそろう場合に検討できる。",
+     "target": true
+    },
+    {
+     "id": "U0005",
+     "locator": "5行目",
+     "text": "岡田：回線が切れた場合の代替回線の切替時間はまだ測定していない。",
+     "target": true
+    }
+   ],
+   "warnings": [],
+   "extra": {},
+   "supplement": null,
+   "superseded_by": null,
+   "replaces": null,
+   "id": "SRC-004",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "name": "保守会社からの要望",
+   "kind": "要望",
+   "version": 1,
+   "occurred_at": "2026-10-05",
+   "registered_at": "2026-11-05T10:55:16+09:00",
+   "origin": "文章貼り付け",
+   "visibility": "関係者限定",
+   "file_kind": "text",
+   "units": [
+    {
+     "id": "U0001",
+     "locator": "1行目",
+     "text": "保守会社から：障害時に備えて、常時接続の遠隔保守を設定させてほしい。",
+     "target": true
+    }
+   ],
+   "warnings": [],
+   "extra": {},
+   "supplement": null,
+   "superseded_by": null,
+   "replaces": null,
+   "id": "SRC-005",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "name": "第3回定例メモ",
+   "kind": "議事録",
+   "version": 1,
+   "occurred_at": "2026-10-12",
+   "registered_at": "2026-11-05T10:55:16+09:00",
+   "origin": "文章貼り付け",
+   "visibility": "関係者限定",
+   "file_kind": "text",
+   "units": [
+    {
+     "id": "U0001",
+     "locator": "1行目",
+     "text": "森：常時接続は認めない。",
+     "target": true
+    },
+    {
+     "id": "U0002",
+     "locator": "2行目",
+     "text": "森：今回は現地対応とし、時間限定の接続は次回以降に検討する。規程の例外の条件がそろっていないためだ。",
+     "target": true
+    },
+    {
+     "id": "U0003",
+     "locator": "3行目",
+     "text": "小林：現地対応でも紙の伝票で30分はしのげるので受け入れる。",
+     "target": true
+    }
+   ],
+   "warnings": [],
+   "extra": {},
+   "supplement": null,
+   "superseded_by": null,
+   "replaces": null,
+   "id": "SRC-006",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "recordings": [
+  {
+   "name": "拠点ネットワーク定例（録画）",
+   "version": 1,
+   "meeting_date": "2026-09-10",
+   "duration": 60.335,
+   "range_start": 0,
+   "range_end": 60.335,
+   "method": "prepared",
+   "file_hash": null,
+   "note": "元動画：d3_拠点ネットワーク定例.mp4（架空の合成音声）",
+   "segments": [
+    {
+     "id": "S0001",
+     "start": 2.0,
+     "end": 6.46,
+     "speaker_label": "中村",
+     "speaker": "中村",
+     "speaker_status": "確認済み",
+     "text_auto": "本日は大阪拠点のネットワーク更新について確認します。",
+     "text": "本日は大阪拠点のネットワーク更新について確認します。",
+     "edits": [],
+     "content_status": "確認済み",
+     "kind": "その他",
+     "inaudible": false,
+     "target": true
+    },
+    {
+     "id": "S0002",
+     "start": 7.16,
+     "end": 15.86,
+     "speaker_label": "小林",
+     "speaker": "小林",
+     "speaker_status": "確認済み",
+     "text_auto": "現場の要望は、速くて止まりにくい回線です。朝九時の受発注の時間帯に画面が遅くなります。",
+     "text": "現場の要望は、速くて止まりにくい回線です。朝九時の受発注の時間帯に画面が遅くなります。",
+     "edits": [],
+     "content_status": "確認済み",
+     "kind": "要望",
+     "inaudible": false,
+     "target": true
+    },
+    {
+     "id": "S0003",
+     "start": 16.55,
+     "end": 21.8,
+     "speaker_label": "中村",
+     "speaker": "中村",
+     "speaker_status": "確認済み",
+     "text_auto": "通信量はまだ計測していません。切替時間も未計測です。",
+     "text": "通信量はまだ計測していません。切替時間も未計測です。",
+     "edits": [],
+     "content_status": "確認済み",
+     "kind": "制約",
+     "inaudible": false,
+     "target": true
+    },
+    {
+     "id": "S0004",
+     "start": 22.5,
+     "end": 28.63,
+     "speaker_label": "岡田",
+     "speaker": "岡田",
+     "speaker_status": "確認済み",
+     "text_auto": "保守担当としては、障害対応を早くするために、外部からの遠隔保守を提案します。",
+     "text": "保守担当としては、障害対応を早くするために、外部からの遠隔保守を提案します。",
+     "edits": [],
+     "content_status": "確認済み",
+     "kind": "提案",
+     "inaudible": false,
+     "target": true
+    },
+    {
+     "id": "S0005",
+     "start": 29.33,
+     "end": 36.39,
+     "speaker_label": "中村",
+     "speaker": "中村",
+     "speaker_status": "確認済み",
+     "text_auto": "当社の規程では外部からの接続は禁止です。例外の手続きがあるかは確認が必要です。",
+     "text": "当社の規程では外部からの接続は禁止です。例外の手続きがあるかは確認が必要です。",
+     "edits": [],
+     "content_status": "確認済み",
+     "kind": "制約",
+     "inaudible": false,
+     "target": true
+    },
+    {
+     "id": "S0006",
+     "start": 37.09,
+     "end": 42.78,
+     "speaker_label": "岡田",
+     "speaker": "岡田",
+     "speaker_status": "確認済み",
+     "text_auto": "接続時間を限定して、承認者が都度許可する方式なら運用できると思います。",
+     "text": "接続時間を限定して、承認者が都度許可する方式なら運用できると思います。",
+     "edits": [],
+     "content_status": "確認済み",
+     "kind": "提案",
+     "inaudible": false,
+     "target": true
+    },
+    {
+     "id": "S0007",
+     "start": 43.48,
+     "end": 51.85,
+     "speaker_label": "小林",
+     "speaker": "小林",
+     "speaker_status": "確認済み",
+     "text_auto": "回線が切れたときは、受発注だけでも続けたいです。停止が何分まで許容できるかは持ち帰ります。",
+     "text": "回線が切れたときは、受発注だけでも続けたいです。停止が何分まで許容できるかは持ち帰ります。",
+     "edits": [],
+     "content_status": "確認済み",
+     "kind": "要望",
+     "inaudible": false,
+     "target": true
+    },
+    {
+     "id": "S0008",
+     "start": 52.55,
+     "end": 60.34,
+     "speaker_label": "中村",
+     "speaker": "中村",
+     "speaker_status": "確認済み",
+     "text_auto": "遠隔保守はまだ提案の段階で、決定ではありません。次回までに情報セキュリティ担当に確認します。",
+     "text": "遠隔保守はまだ提案の段階で、決定ではありません。次回までに情報セキュリティ担当に確認します。",
+     "edits": [],
+     "content_status": "確認済み",
+     "kind": "保留",
+     "inaudible": false,
+     "target": true
+    }
+   ],
+   "visibility": "社内のみ",
+   "registered_at": "2026-11-05T10:55:16+09:00",
+   "id": "REC-001",
+   "created_at": "2026-11-05T10:55:16+09:00",
+   "video_file": "d3_拠点ネットワーク定例.mp4"
+  }
+ ],
+ "questions": [
+  {
+   "text": "この取り組みで解決したい業務上の問題と、成功とみなす状態は何ですか。",
+   "why": "目的が曖昧なまま要件を詰めると、優先順位を判断できないため。",
+   "ask": "依頼部門の責任者",
+   "priority": "中",
+   "status": "未質問",
+   "answer": null,
+   "perspective_id": "C01",
+   "evidence": [],
+   "id": "QST-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "text": "今回の対象と対象外はどこまでですか。担当範囲の境界はどこですか。",
+   "why": "追加要望が範囲内かどうかを判断する基準になるため。",
+   "ask": "プロジェクト責任者",
+   "priority": "中",
+   "status": "未質問",
+   "answer": null,
+   "perspective_id": "C02",
+   "evidence": [],
+   "id": "QST-002",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "text": "時期・予算・社内規程など、動かせない制約はありますか。根拠の資料はありますか。",
+   "why": "制約を要望と混同すると、実現方式の検討を誤るため。",
+   "ask": "プロジェクト責任者",
+   "priority": "中",
+   "status": "未質問",
+   "answer": null,
+   "perspective_id": "C03",
+   "evidence": [],
+   "id": "QST-003",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "text": "論点ごとに、誰が判断し、誰が確認しますか。",
+   "why": "発言しただけでは合意にならないため、判断者を明らかにする。",
+   "ask": "プロジェクト責任者",
+   "priority": "中",
+   "status": "未質問",
+   "answer": null,
+   "perspective_id": "C04",
+   "evidence": [],
+   "id": "QST-004",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "text": "拠点、端末、利用者、接続対象は何ですか。一覧はありますか。",
+   "why": "接続対象の抜けは工事と設定の抜けに直結するため。",
+   "ask": "ネットワーク担当者",
+   "priority": "中",
+   "status": "未質問",
+   "answer": null,
+   "perspective_id": "N01",
+   "evidence": [],
+   "id": "QST-005",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "text": "通信元・通信先・方向・用途は何ですか。",
+   "why": "用途の確認されていない通信を許可しないため。",
+   "ask": "ネットワーク担当者",
+   "priority": "中",
+   "status": "未質問",
+   "answer": null,
+   "perspective_id": "N02",
+   "evidence": [],
+   "id": "QST-006",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "text": "通信量、ピーク、増加の見込みは何ですか。測定した期間と方法を教えてください。",
+   "why": "資料や人数だけでは実効速度や回線品質を実測済みと扱えないため。",
+   "ask": "ネットワーク担当者",
+   "priority": "中",
+   "status": "未質問",
+   "answer": null,
+   "perspective_id": "N03",
+   "evidence": [],
+   "id": "QST-007",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "text": "帯域・遅延・損失について、業務上の条件と根拠は何ですか。",
+   "why": "「速い」を測定できる条件にするため。",
+   "ask": "業務担当者",
+   "priority": "中",
+   "status": "未質問",
+   "answer": null,
+   "perspective_id": "N04",
+   "evidence": [],
+   "id": "QST-008",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "candidates": [
+  {
+   "kind": "質問",
+   "text": "外部接続の禁止に例外の手続きはありますか。",
+   "detail": "規程の第13条に例外の記載がある。",
+   "ask": "情報セキュリティ責任者",
+   "evidence": [
+    {
+     "source_id": "SRC-003",
+     "quote": "事前承認により例外を認めることがある",
+     "verified": true,
+     "unit_id": "U0003",
+     "locator": "3行目",
+     "version": 1
+    }
+   ],
+   "state": "採用",
+   "origin_run": "AIR-001",
+   "origin": "会議前の準備",
+   "unsupported_numbers": [],
+   "no_evidence": false,
+   "resolved_as": null,
+   "id": "CAN-001",
+   "created_at": "2026-11-05T10:55:16+09:00",
+   "resolved_by": "デモ担当者"
+  },
+  {
+   "kind": "不足情報",
+   "text": "通信のポートが未確認です",
+   "detail": "通信一覧のポート欄が未確認。創作しないこと。",
+   "ask": "ネットワーク担当",
+   "evidence": [
+    {
+     "source_id": "SRC-001",
+     "quote": "未確認",
+     "verified": true,
+     "unit_id": "U0002",
+     "locator": "シート「通信一覧」 A2:H2",
+     "version": 1
+    }
+   ],
+   "state": "採用",
+   "origin_run": "AIR-001",
+   "origin": "会議前の準備",
+   "unsupported_numbers": [],
+   "no_evidence": false,
+   "resolved_as": null,
+   "id": "CAN-002",
+   "created_at": "2026-11-05T10:55:16+09:00",
+   "resolved_by": "デモ担当者"
+  },
+  {
+   "kind": "質問",
+   "text": "「速い」は、どの画面が、何秒以内なら満たしますか。",
+   "detail": null,
+   "ask": "小林",
+   "evidence": [
+    {
+     "source_id": "REC-001",
+     "quote": "現場の要望は、速くて止まりにくい回線です",
+     "verified": true,
+     "unit_id": "S0002",
+     "locator": "00:00:07-00:00:15",
+     "version": 1
+    }
+   ],
+   "state": "採用",
+   "origin_run": "AIR-002",
+   "origin": "要件の具体化",
+   "unsupported_numbers": [],
+   "no_evidence": false,
+   "resolved_as": "REQ-001",
+   "id": "CAN-003",
+   "created_at": "2026-11-05T10:55:16+09:00",
+   "resolved_by": "デモ担当者"
+  },
+  {
+   "kind": "質問",
+   "text": "「止まりにくい」は、どの障害で、何分の停止まで許容しますか。",
+   "detail": null,
+   "ask": "小林",
+   "evidence": [
+    {
+     "source_id": "REC-001",
+     "quote": "停止が何分まで許容できるかは持ち帰ります",
+     "verified": true,
+     "unit_id": "S0007",
+     "locator": "00:00:43-00:00:51",
+     "version": 1
+    }
+   ],
+   "state": "採用",
+   "origin_run": "AIR-002",
+   "origin": "要件の具体化",
+   "unsupported_numbers": [],
+   "no_evidence": false,
+   "resolved_as": "REQ-003",
+   "id": "CAN-004",
+   "created_at": "2026-11-05T10:55:16+09:00",
+   "resolved_by": "デモ担当者"
+  },
+  {
+   "kind": "要件",
+   "text": "遠隔保守を採用する",
+   "detail": "岡田の発言。提案であり、決定ではない。",
+   "ask": null,
+   "evidence": [
+    {
+     "source_id": "REC-001",
+     "quote": "外部からの遠隔保守を提案します",
+     "verified": true,
+     "unit_id": "S0004",
+     "locator": "00:00:22-00:00:28",
+     "version": 1
+    }
+   ],
+   "state": "却下",
+   "origin_run": "AIR-003",
+   "origin": "会議後の整理",
+   "unsupported_numbers": [],
+   "no_evidence": false,
+   "resolved_as": null,
+   "id": "CAN-005",
+   "created_at": "2026-11-05T10:55:16+09:00",
+   "resolved_by": "デモ担当者"
+  },
+  {
+   "kind": "保留",
+   "text": "遠隔保守はまだ提案の段階",
+   "detail": "中村の発言。",
+   "ask": null,
+   "evidence": [
+    {
+     "source_id": "REC-001",
+     "quote": "遠隔保守はまだ提案の段階で、決定ではありません",
+     "verified": true,
+     "unit_id": "S0008",
+     "locator": "00:00:52-00:01:00",
+     "version": 1
+    }
+   ],
+   "state": "採用",
+   "origin_run": "AIR-003",
+   "origin": "会議後の整理",
+   "unsupported_numbers": [],
+   "no_evidence": false,
+   "resolved_as": "REQ-006",
+   "id": "CAN-006",
+   "created_at": "2026-11-05T10:55:16+09:00",
+   "resolved_by": "デモ担当者"
+  },
+  {
+   "kind": "影響候補",
+   "text": "常時接続ではログの確認の負担が増える",
+   "detail": "規程の第14条に関連。",
+   "ask": "運用",
+   "evidence": [
+    {
+     "source_id": "SRC-003",
+     "quote": "接続者、時間、作業内容のログを保存する",
+     "verified": true,
+     "unit_id": "U0004",
+     "locator": "4行目",
+     "version": 1
+    }
+   ],
+   "state": "採用",
+   "origin_run": "AIR-004",
+   "origin": "変更影響の候補",
+   "unsupported_numbers": [],
+   "no_evidence": false,
+   "resolved_as": null,
+   "id": "CAN-007",
+   "created_at": "2026-11-05T10:55:16+09:00",
+   "resolved_by": "デモ担当者"
+  }
+ ],
+ "requirements": [
+  {
+   "version": 1,
+   "domain": "network",
+   "kind": "性能",
+   "title": "受発注の画面は3秒以内に開く",
+   "body": "朝9時の受発注の時間帯に、受発注の画面が3秒以内に開く。",
+   "background": null,
+   "target": null,
+   "preconditions": null,
+   "behavior": null,
+   "exceptions": null,
+   "data_io": null,
+   "nonfunctional": null,
+   "measures": [
+    {
+     "metric": "画面の表示時間",
+     "value": 3,
+     "unit": "秒以内",
+     "kind": "必要条件",
+     "condition": "平日9時台、大阪拠点の端末",
+     "basis": "第2回定例",
+     "status": "確認待ち"
+    },
+    {
+     "metric": "ピーク時の通信量",
+     "value": null,
+     "unit": "Mbps",
+     "kind": "現状の計測値",
+     "condition": "平日9時台",
+     "basis": "未計測",
+     "status": "未計測"
+    }
+   ],
+   "priority": "高",
+   "scope": "今回必須",
+   "scope_reason": "業務の中心のため",
+   "scope_impact": null,
+   "scope_depends": [],
+   "scope_decider": null,
+   "scope_decided_at": null,
+   "acceptance": [
+    {
+     "given": "平日9時台",
+     "when": "受発注の画面を開く",
+     "then": "3秒以内に表示される",
+     "how": "計測の結果で確認"
+    }
+   ],
+   "open_items": null,
+   "related": [],
+   "decider": "小林",
+   "confirm_with": null,
+   "due": "2026-10-30",
+   "status": "確認待ち",
+   "evidence": [
+    {
+     "source_id": "REC-001",
+     "quote": "朝九時の受発注の時間帯に画面が遅くなります",
+     "verified": true,
+     "unit_id": "S0002",
+     "locator": "00:00:07-00:00:15",
+     "version": 1
+    },
+    {
+     "source_id": "SRC-004",
+     "quote": "朝9時の受発注の画面は3秒以内で開いてほしい",
+     "verified": true,
+     "unit_id": "U0002",
+     "locator": "2行目",
+     "version": 1
+    }
+   ],
+   "versions": [],
+   "split_from": null,
+   "merged_into": null,
+   "replaced_by": [],
+   "internal_note": null,
+   "author": "人",
+   "id": "REQ-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "version": 1,
+   "domain": "network",
+   "kind": "通信",
+   "title": "受発注の通信を確保する",
+   "body": "大阪拠点の端末から本社の受発注サーバーへの通信を確保する。ポートは未確認。",
+   "background": null,
+   "target": null,
+   "preconditions": null,
+   "behavior": null,
+   "exceptions": null,
+   "data_io": null,
+   "nonfunctional": null,
+   "measures": [],
+   "priority": "高",
+   "scope": "今回必須",
+   "scope_reason": null,
+   "scope_impact": null,
+   "scope_depends": [],
+   "scope_decider": null,
+   "scope_decided_at": null,
+   "acceptance": [],
+   "open_items": null,
+   "related": [],
+   "decider": null,
+   "confirm_with": "中村",
+   "due": null,
+   "status": "確認待ち",
+   "evidence": [
+    {
+     "source_id": "SRC-001",
+     "quote": "本社の受発注サーバー",
+     "verified": true,
+     "unit_id": "U0002",
+     "locator": "シート「通信一覧」 A2:H2",
+     "version": 1
+    },
+    {
+     "source_id": "SRC-001",
+     "quote": "受発注",
+     "verified": true,
+     "unit_id": "U0002",
+     "locator": "シート「通信一覧」 A2:H2",
+     "version": 1
+    }
+   ],
+   "versions": [],
+   "split_from": null,
+   "merged_into": null,
+   "replaced_by": [],
+   "internal_note": null,
+   "author": "人",
+   "id": "REQ-002",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "version": 1,
+   "domain": "network",
+   "kind": "障害",
+   "title": "回線断のとき受発注を続ける",
+   "body": "回線が切れたときも受発注だけは続ける。代替の方式は未決。停止の許容は30分まで。",
+   "background": null,
+   "target": null,
+   "preconditions": null,
+   "behavior": null,
+   "exceptions": null,
+   "data_io": null,
+   "nonfunctional": null,
+   "measures": [
+    {
+     "metric": "許容停止時間",
+     "value": 30,
+     "unit": "分まで",
+     "kind": "必要条件",
+     "condition": "受発注、平日",
+     "basis": "第2回定例",
+     "status": "確認待ち"
+    },
+    {
+     "metric": "代替回線への切替時間",
+     "value": null,
+     "unit": "分",
+     "kind": "現状の計測値",
+     "condition": null,
+     "basis": "未計測",
+     "status": "未計測"
+    }
+   ],
+   "priority": "高",
+   "scope": "今回必須",
+   "scope_reason": "業務の継続のため",
+   "scope_impact": null,
+   "scope_depends": [],
+   "scope_decider": null,
+   "scope_decided_at": null,
+   "acceptance": [
+    {
+     "given": "主回線が切れた",
+     "when": "切替または紙の伝票へ移行",
+     "then": "30分以内に受発注を再開する",
+     "how": "切替試験で確認"
+    }
+   ],
+   "open_items": null,
+   "related": [],
+   "decider": "小林",
+   "confirm_with": null,
+   "due": "2026-10-30",
+   "status": "確認待ち",
+   "evidence": [
+    {
+     "source_id": "REC-001",
+     "quote": "回線が切れたときは、受発注だけでも続けたいです",
+     "verified": true,
+     "unit_id": "S0007",
+     "locator": "00:00:43-00:00:51",
+     "version": 1
+    },
+    {
+     "source_id": "SRC-004",
+     "quote": "受発注の停止は30分までなら紙の伝票で対応できる",
+     "verified": true,
+     "unit_id": "U0001",
+     "locator": "1行目",
+     "version": 1
+    }
+   ],
+   "versions": [],
+   "split_from": null,
+   "merged_into": null,
+   "replaced_by": [],
+   "internal_note": null,
+   "author": "人",
+   "nfr_tags": [
+    "failure",
+    "availability"
+   ],
+   "open_area": "代替経路の方式が未決",
+   "id": "REQ-003",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "version": 1,
+   "domain": "network",
+   "kind": "接続",
+   "title": "回線を二重化する",
+   "body": "拠点間の回線を二重化する（実現方式の候補）。",
+   "background": null,
+   "target": null,
+   "preconditions": null,
+   "behavior": null,
+   "exceptions": null,
+   "data_io": null,
+   "nonfunctional": null,
+   "measures": [
+    {
+     "metric": "回線の二重化",
+     "value": null,
+     "unit": null,
+     "kind": "実現方式の候補",
+     "condition": null,
+     "basis": "候補であり決定ではない",
+     "status": "確認待ち"
+    }
+   ],
+   "priority": "中",
+   "scope": "判断待ち",
+   "scope_reason": null,
+   "scope_impact": null,
+   "scope_depends": [],
+   "scope_decider": null,
+   "scope_decided_at": null,
+   "acceptance": [],
+   "open_items": null,
+   "related": [],
+   "decider": null,
+   "confirm_with": "中村",
+   "due": null,
+   "status": "提案",
+   "evidence": [
+    {
+     "source_id": "SRC-002",
+     "quote": "代替回線はない",
+     "verified": true,
+     "unit_id": "U0005",
+     "locator": "スライド1「大阪拠点の構成（架空）」 TextBox 7",
+     "version": 1
+    }
+   ],
+   "versions": [],
+   "split_from": null,
+   "merged_into": null,
+   "replaced_by": [],
+   "internal_note": "保守会社には費用の話をまだしない。",
+   "author": "人",
+   "nfr_tags": [
+    "availability"
+   ],
+   "id": "REQ-004",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "version": 1,
+   "domain": "network",
+   "kind": "分離",
+   "title": "外部からの接続は禁止する",
+   "body": "社外から社内ネットワークへの外部接続は禁止する。",
+   "background": null,
+   "target": null,
+   "preconditions": null,
+   "behavior": null,
+   "exceptions": null,
+   "data_io": null,
+   "nonfunctional": null,
+   "measures": [],
+   "priority": "高",
+   "scope": "今回必須",
+   "scope_reason": "規程のため",
+   "scope_impact": null,
+   "scope_depends": [],
+   "scope_decider": null,
+   "scope_decided_at": null,
+   "acceptance": [],
+   "open_items": null,
+   "related": [],
+   "decider": "森",
+   "confirm_with": null,
+   "due": "2026-10-15",
+   "status": "提案",
+   "evidence": [
+    {
+     "source_id": "SRC-003",
+     "quote": "社外から社内ネットワークへの外部接続は禁止する",
+     "verified": true,
+     "unit_id": "U0002",
+     "locator": "2行目",
+     "version": 1
+    },
+    {
+     "source_id": "REC-001",
+     "quote": "当社の規程では外部からの接続は禁止です",
+     "verified": true,
+     "unit_id": "S0005",
+     "locator": "00:00:29-00:00:36",
+     "version": 1
+    }
+   ],
+   "versions": [],
+   "split_from": null,
+   "merged_into": null,
+   "replaced_by": [],
+   "internal_note": null,
+   "author": "人",
+   "nfr_tags": [
+    "auth"
+   ],
+   "id": "REQ-005",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "version": 2,
+   "domain": "network",
+   "kind": "認証",
+   "title": "保守は現地対応とする",
+   "body": "今回の保守は現地対応とする。時間限定の遠隔接続は次回以降に検討する。",
+   "background": null,
+   "target": null,
+   "preconditions": null,
+   "behavior": null,
+   "exceptions": null,
+   "data_io": null,
+   "nonfunctional": null,
+   "measures": [],
+   "priority": "中",
+   "scope": "今回必須",
+   "scope_reason": "規程の例外の条件がそろっていないため",
+   "scope_impact": null,
+   "scope_depends": [],
+   "scope_decider": "森",
+   "scope_decided_at": "2026-10-12",
+   "acceptance": [],
+   "open_items": null,
+   "related": [],
+   "decider": "森",
+   "confirm_with": null,
+   "due": "2026-10-15",
+   "status": "合意済み",
+   "evidence": [
+    {
+     "source_id": "REC-001",
+     "quote": "外部からの遠隔保守を提案します",
+     "verified": true,
+     "unit_id": "S0004",
+     "locator": "00:00:22-00:00:28",
+     "version": 1
+    },
+    {
+     "source_id": "REC-001",
+     "quote": "接続時間を限定して、承認者が都度許可する方式なら運用できると思います",
+     "verified": true,
+     "unit_id": "S0006",
+     "locator": "00:00:37-00:00:42",
+     "version": 1
+    }
+   ],
+   "versions": [
+    {
+     "version": 1,
+     "domain": "network",
+     "kind": "認証",
+     "title": "保守会社の遠隔保守",
+     "body": "保守会社が遠隔保守を行う（提案）。接続者、時間、作業内容のログと承認者の条件は未確認。",
+     "background": null,
+     "target": null,
+     "preconditions": null,
+     "behavior": null,
+     "exceptions": null,
+     "data_io": null,
+     "nonfunctional": null,
+     "measures": [],
+     "priority": "中",
+     "scope": "判断待ち",
+     "scope_reason": null,
+     "scope_impact": null,
+     "scope_depends": [],
+     "scope_decider": null,
+     "scope_decided_at": null,
+     "acceptance": [],
+     "open_items": null,
+     "related": [],
+     "decider": "森",
+     "confirm_with": null,
+     "due": "2026-10-15",
+     "status": "提案",
+     "evidence": [
+      {
+       "source_id": "REC-001",
+       "quote": "外部からの遠隔保守を提案します",
+       "verified": true,
+       "unit_id": "S0004",
+       "locator": "00:00:22-00:00:28",
+       "version": 1
+      },
+      {
+       "source_id": "REC-001",
+       "quote": "接続時間を限定して、承認者が都度許可する方式なら運用できると思います",
+       "verified": true,
+       "unit_id": "S0006",
+       "locator": "00:00:37-00:00:42",
+       "version": 1
+      }
+     ],
+     "split_from": null,
+     "merged_into": null,
+     "replaced_by": [],
+     "internal_note": null,
+     "author": "人",
+     "nfr_tags": [
+      "auth",
+      "audit",
+      "maintenance"
+     ],
+     "open_area": "責任分界と承認者が未決",
+     "id": "REQ-006",
+     "superseded_at": "2026-11-05T10:55:16+09:00",
+     "change_reason": "規程の例外の条件（ログ、承認者）がそろっていないため。業務は紙の伝票で30分はしのげる。",
+     "changed_by": "デモ担当者",
+     "change_id": "CHG-001"
+    }
+   ],
+   "split_from": null,
+   "merged_into": null,
+   "replaced_by": [
+    "REQ-009"
+   ],
+   "internal_note": null,
+   "author": "人",
+   "nfr_tags": [
+    "auth",
+    "audit",
+    "maintenance"
+   ],
+   "open_area": "責任分界と承認者が未決",
+   "id": "REQ-006",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "version": 1,
+   "domain": "network",
+   "kind": "運用",
+   "title": "例外接続のログを保存する",
+   "body": "例外の接続は、接続者、時間、作業内容のログを保存する。",
+   "background": null,
+   "target": null,
+   "preconditions": null,
+   "behavior": null,
+   "exceptions": null,
+   "data_io": null,
+   "nonfunctional": null,
+   "measures": [],
+   "priority": "高",
+   "scope": "今回必須",
+   "scope_reason": null,
+   "scope_impact": null,
+   "scope_depends": [],
+   "scope_decider": null,
+   "scope_decided_at": null,
+   "acceptance": [],
+   "open_items": null,
+   "related": [],
+   "decider": "森",
+   "confirm_with": null,
+   "due": null,
+   "status": "提案",
+   "evidence": [
+    {
+     "source_id": "SRC-003",
+     "quote": "接続者、時間、作業内容のログを保存する",
+     "verified": true,
+     "unit_id": "U0004",
+     "locator": "4行目",
+     "version": 1
+    }
+   ],
+   "versions": [],
+   "split_from": null,
+   "merged_into": null,
+   "replaced_by": [],
+   "internal_note": null,
+   "author": "人",
+   "nfr_tags": [
+    "audit"
+   ],
+   "id": "REQ-007",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "version": 1,
+   "domain": "network",
+   "kind": "障害",
+   "title": "工事の切戻し",
+   "body": "工事に失敗したときは元の回線へ切り戻す。判断基準は未決。",
+   "background": null,
+   "target": null,
+   "preconditions": null,
+   "behavior": null,
+   "exceptions": null,
+   "data_io": null,
+   "nonfunctional": null,
+   "measures": [],
+   "priority": "高",
+   "scope": "今回必須",
+   "scope_reason": null,
+   "scope_impact": null,
+   "scope_depends": [],
+   "scope_decider": null,
+   "scope_decided_at": null,
+   "acceptance": [],
+   "open_items": null,
+   "related": [],
+   "decider": null,
+   "confirm_with": "小林",
+   "due": null,
+   "status": "下書き",
+   "evidence": [],
+   "versions": [],
+   "split_from": null,
+   "merged_into": null,
+   "replaced_by": [],
+   "internal_note": null,
+   "author": "人",
+   "nfr_tags": [
+    "migration"
+   ],
+   "open_area": "切戻しの判断基準が未決",
+   "id": "REQ-008",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "version": 1,
+   "domain": "network",
+   "kind": "認証",
+   "title": "時間限定の遠隔接続",
+   "body": "時間を限定し、承認者が都度許可する遠隔接続を検討する。",
+   "background": null,
+   "target": null,
+   "preconditions": null,
+   "behavior": null,
+   "exceptions": null,
+   "data_io": null,
+   "nonfunctional": null,
+   "measures": [],
+   "priority": null,
+   "scope": "次回以降",
+   "scope_reason": "承認者とログの運用が未決のため",
+   "scope_impact": null,
+   "scope_depends": [],
+   "scope_decider": "森",
+   "scope_decided_at": "2026-10-12",
+   "acceptance": [],
+   "open_items": null,
+   "related": [],
+   "decider": "森",
+   "confirm_with": null,
+   "due": null,
+   "status": "提案",
+   "evidence": [
+    {
+     "source_id": "REC-001",
+     "quote": "接続時間を限定して、承認者が都度許可する方式なら運用できると思います",
+     "verified": true,
+     "unit_id": "S0006",
+     "locator": "00:00:37-00:00:42",
+     "version": 1
+    },
+    {
+     "source_id": "SRC-006",
+     "quote": "時間限定の接続は次回以降に検討する",
+     "verified": true,
+     "unit_id": "U0002",
+     "locator": "2行目",
+     "version": 1
+    }
+   ],
+   "versions": [],
+   "split_from": "REQ-006",
+   "merged_into": null,
+   "replaced_by": [],
+   "internal_note": null,
+   "author": "人",
+   "id": "REQ-009",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "issues": [
+  {
+   "topic": "外部接続の禁止と遠隔保守",
+   "opinions": [
+    {
+     "who": "岡田（保守会社）",
+     "nature": "業務上の希望",
+     "text": "障害対応を早くするために遠隔保守を提案",
+     "evidence": {
+      "source_id": "REC-001",
+      "quote": "障害対応を早くするために、外部からの遠隔保守を提案します",
+      "verified": true,
+      "unit_id": "S0004",
+      "locator": "00:00:22-00:00:28",
+      "version": 1
+     }
+    },
+    {
+     "who": "中村（情報システム課）",
+     "nature": "技術制約",
+     "text": "規程では外部からの接続は禁止",
+     "evidence": {
+      "source_id": "REC-001",
+      "quote": "当社の規程では外部からの接続は禁止です",
+      "verified": true,
+      "unit_id": "S0005",
+      "locator": "00:00:29-00:00:36",
+      "version": 1
+     }
+    },
+    {
+     "who": "森（情報セキュリティ）",
+     "nature": "運用負担",
+     "text": "ログがそろう場合に例外を検討できる",
+     "evidence": {
+      "source_id": "SRC-004",
+      "quote": "接続者、時間、作業内容のログがそろう場合に検討できる",
+      "verified": true,
+      "unit_id": "U0004",
+      "locator": "4行目",
+      "version": 1
+     }
+    }
+   ],
+   "common_goal": "障害時に業務を早く再開する",
+   "conflict_condition": "外部接続の禁止と、遠隔からの保守作業が両立するか",
+   "options": [
+    "常時の遠隔接続",
+    "時間限定・都度承認の接続",
+    "現地対応"
+   ],
+   "decider": "森",
+   "ask": "森",
+   "extra_questions": [
+    "承認者は誰か",
+    "接続の時間帯はいつか",
+    "ログは誰が確認するか"
+   ],
+   "conclusion": "今回は現地対応。時間限定の接続は次回以降に検討（DEC-001）",
+   "state": "結論あり",
+   "evidence": [
+    {
+     "source_id": "SRC-004",
+     "quote": "接続者、時間、作業内容のログがそろう場合に検討できる",
+     "verified": true,
+     "unit_id": "U0004",
+     "locator": "4行目",
+     "version": 1
+    }
+   ],
+   "related_requirements": [
+    "REQ-005",
+    "REQ-006"
+   ],
+   "id": "ISU-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "scenarios": [
+  {
+   "title": "通常の受発注",
+   "kind": "通常",
+   "start": "拠点の端末が受発注の画面を開く",
+   "roles": null,
+   "steps": [
+    "端末から本社へ接続",
+    "受発注を入力"
+   ],
+   "end": "受発注が完了",
+   "failure": null,
+   "related_requirements": [
+    "REQ-001",
+    "REQ-002"
+   ],
+   "id": "SCN-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "title": "回線断",
+   "kind": "例外",
+   "start": "主回線が切れる",
+   "roles": null,
+   "steps": [
+    "切断を検知",
+    "代替手段へ移行（方式は未決）",
+    "紙の伝票で受発注",
+    "復旧後に入力"
+   ],
+   "end": "受発注を再開",
+   "failure": "代替回線がない場合は紙の伝票",
+   "related_requirements": [
+    "REQ-003"
+   ],
+   "id": "SCN-002",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "title": "認証失敗",
+   "kind": "例外",
+   "start": "利用者の認証に失敗する",
+   "roles": null,
+   "steps": [
+    "失敗を通知",
+    "問い合わせ先へ連絡"
+   ],
+   "end": "認証が復旧",
+   "failure": "認証基盤の障害時の扱いは未決",
+   "related_requirements": [
+    "REQ-005"
+   ],
+   "id": "SCN-003",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "title": "工事の切戻し",
+   "kind": "例外",
+   "start": "工事で通信を確認できない",
+   "roles": null,
+   "steps": [
+    "判断基準に照らす（未決）",
+    "元の回線へ切り戻す"
+   ],
+   "end": "元の通信を確認",
+   "failure": "判断者が未決",
+   "related_requirements": [
+    "REQ-008"
+   ],
+   "id": "SCN-004",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "decisions": [
+  {
+   "topic": "遠隔保守の扱い",
+   "options": [
+    {
+     "id": "A",
+     "label": "常時の遠隔接続",
+     "pros": "障害対応が早い",
+     "cons": "規程の例外の条件を満たしにくい"
+    },
+    {
+     "id": "B",
+     "label": "時間限定・都度承認の接続",
+     "pros": "ログと承認を残せる",
+     "cons": "承認者の運用負担、責任分界が未決"
+    },
+    {
+     "id": "C",
+     "label": "現地対応",
+     "pros": "外部接続が不要",
+     "cons": "到着までの時間がかかる"
+    }
+   ],
+   "adopted": "C",
+   "rejected_reasons": {
+    "A": "常時接続は認めないと判断したため",
+    "B": "承認者とログの運用が未決のため次回以降に検討する"
+   },
+   "rationale": "規程の例外の条件（ログ、承認者）がそろっていないため。業務は紙の伝票で30分はしのげる。",
+   "hold_reason": null,
+   "decider": "森",
+   "confirmer": "小林",
+   "decided_on": "2026-10-12",
+   "evidence": [
+    {
+     "source_id": "REC-001",
+     "quote": "外部からの遠隔保守を提案します",
+     "verified": true,
+     "unit_id": "S0004",
+     "locator": "00:00:22-00:00:28",
+     "version": 1
+    },
+    {
+     "source_id": "SRC-006",
+     "quote": "今回は現地対応とし、時間限定の接続は次回以降に検討する",
+     "verified": true,
+     "unit_id": "U0002",
+     "locator": "2行目",
+     "version": 1
+    },
+    {
+     "source_id": "SRC-006",
+     "quote": "紙の伝票で30分はしのげる",
+     "verified": true,
+     "unit_id": "U0003",
+     "locator": "3行目",
+     "version": 1
+    }
+   ],
+   "related_requirements": [
+    "REQ-006"
+   ],
+   "related_changes": [
+    "CHG-001"
+   ],
+   "state": "合意済み",
+   "state_log": [
+    {
+     "at": "2026-11-05T10:55:16+09:00",
+     "from": "提案",
+     "to": "確認待ち",
+     "by": "デモ担当者"
+    },
+    {
+     "at": "2026-11-05T10:55:16+09:00",
+     "from": "確認待ち",
+     "to": "合意済み",
+     "by": "デモ担当者"
+    }
+   ],
+   "internal_note": null,
+   "id": "DEC-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "changes": [
+  {
+   "requested_at": "2026-10-05",
+   "requester": "保守会社（岡田）",
+   "background": "障害対応の時間を短くするため。",
+   "content": "障害時に備えて、常時接続の遠隔保守を設定したい",
+   "evidence": [
+    {
+     "source_id": "SRC-005",
+     "quote": "常時接続の遠隔保守を設定させてほしい",
+     "verified": true,
+     "unit_id": "U0001",
+     "locator": "1行目",
+     "version": 1
+    }
+   ],
+   "desired_by": null,
+   "status": "反映済み",
+   "classification": "矛盾候補",
+   "related_requirements": [
+    "REQ-006",
+    "REQ-005"
+   ],
+   "impacts": [
+    {
+     "area": "シナリオ",
+     "target": "SCN-003",
+     "note": "関連シナリオ：認証失敗",
+     "basis": "登録関係"
+    },
+    {
+     "area": "過去の判断",
+     "target": "DEC-001",
+     "note": "関連する判断：遠隔保守の扱い（確認待ち）",
+     "basis": "登録関係"
+    },
+    {
+     "area": "成果物",
+     "target": "DOC-001",
+     "note": "共有資料 第2回定例 確認資料 v1",
+     "basis": "登録関係"
+    },
+    {
+     "area": "分離",
+     "target": "REQ-005",
+     "note": "外部接続の禁止と衝突する",
+     "basis": "確認済み"
+    },
+    {
+     "area": "責任分界",
+     "target": null,
+     "note": "接続の管理者が未決",
+     "basis": "未調査"
+    },
+    {
+     "area": "運用",
+     "target": "REQ-007",
+     "note": "常時接続ではログの確認の負担が増える",
+     "basis": "AI候補"
+    }
+   ],
+   "surveyed_areas": [
+    "シナリオ",
+    "過去の判断",
+    "成果物",
+    "分離",
+    "責任分界",
+    "運用"
+   ],
+   "decision_id": "DEC-001",
+   "internal_note": null,
+   "id": "CHG-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "conflicts": [
+  {
+   "kind": "前提確認が必要な候補",
+   "a": "REQ-005",
+   "b": "REQ-006",
+   "note": "外部接続の禁止と遠隔保守が併存しています。禁止の適用範囲と例外手続きの有無を確認してください。",
+   "applicability": "今回は現地対応のため外部接続は発生しない。時間限定の接続は次回の検討で再確認する。",
+   "state": "矛盾なしと確認",
+   "scan_key": "noexternal_vs_remote:REQ-005:REQ-006",
+   "evidence": [],
+   "origin": "プログラム検出",
+   "id": "CNF-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "kind": "前提確認が必要な候補",
+   "a": "REQ-005",
+   "b": "CHG-001",
+   "note": "外部接続の禁止と遠隔保守が併存しています。禁止の適用範囲と例外手続きの有無を確認してください。",
+   "applicability": null,
+   "state": "解消",
+   "scan_key": "noexternal_vs_remote:CHG-001:REQ-005",
+   "evidence": [],
+   "origin": "プログラム検出",
+   "id": "CNF-002",
+   "created_at": "2026-11-05T10:55:16+09:00",
+   "resolution": "現地対応を採用（DEC-001）"
+  },
+  {
+   "kind": "前提確認が必要な候補",
+   "a": "REQ-005",
+   "b": "REQ-009",
+   "note": "外部接続の禁止と遠隔保守が併存しています。禁止の適用範囲と例外手続きの有無を確認してください。",
+   "applicability": null,
+   "state": "未確認",
+   "scan_key": "noexternal_vs_remote:REQ-005:REQ-009",
+   "evidence": [],
+   "origin": "プログラム検出",
+   "id": "CNF-003",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "risks": [
+  {
+   "content": "通信量が未計測のまま帯域の条件を決めてしまう",
+   "nature": "事実に基づく",
+   "condition": "計測前に回線を選定した場合",
+   "impact": "朝の遅さが解消しない可能性",
+   "uncertainty": "実測がない",
+   "mitigation": "10月に1週間計測する",
+   "ask": "中村",
+   "action": null,
+   "state": "未対応",
+   "evidence": [
+    {
+     "source_id": "REC-001",
+     "quote": "通信量はまだ計測していません",
+     "verified": true,
+     "unit_id": "S0003",
+     "locator": "00:00:16-00:00:21",
+     "version": 1
+    }
+   ],
+   "related_requirements": [
+    "REQ-001"
+   ],
+   "id": "RSK-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "content": "切替時間が未計測のまま30分以内と判断してしまう",
+   "nature": "事実に基づく",
+   "condition": "回線断の発生時",
+   "impact": "受発注の停止が長引く",
+   "uncertainty": "切替時間は未測定",
+   "mitigation": "切替試験を行う",
+   "ask": "岡田",
+   "action": null,
+   "state": "未対応",
+   "evidence": [
+    {
+     "source_id": "SRC-004",
+     "quote": "代替回線の切替時間はまだ測定していない",
+     "verified": true,
+     "unit_id": "U0005",
+     "locator": "5行目",
+     "version": 1
+    }
+   ],
+   "related_requirements": [
+    "REQ-003"
+   ],
+   "id": "RSK-002",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "actions": [
+  {
+   "content": "通信量を1週間計測する",
+   "owner": "中村",
+   "due": null,
+   "related": [
+    "REQ-001"
+   ],
+   "state": "未着手",
+   "id": "ACT-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "content": "例外接続の承認者を確認する",
+   "owner": null,
+   "due": null,
+   "related": [
+    "REQ-006"
+   ],
+   "state": "未着手",
+   "id": "ACT-002",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "history": [
+  {
+   "requirement_id": "REQ-006",
+   "change_id": "CHG-001",
+   "decision_id": "DEC-001",
+   "trigger": "追加要望 CHG-001",
+   "meeting_date": null,
+   "proposed_on": "2026-10-05",
+   "decided_on": "2026-10-12",
+   "applied_on": "2026-10-13",
+   "recorded_at": "2026-11-05T10:55:16+09:00",
+   "before": "保守会社が遠隔保守を行う（提案）。接続者、時間、作業内容のログと承認者の条件は未確認。",
+   "after": "今回の保守は現地対応とする。時間限定の遠隔接続は次回以降に検討する。",
+   "options": [
+    "常時の遠隔接続",
+    "時間限定・都度承認の接続",
+    "現地対応"
+   ],
+   "outcome": "採用",
+   "rationale": "規程の例外の条件（ログ、承認者）がそろっていないため。業務は紙の伝票で30分はしのげる。",
+   "decider": "森",
+   "confirmer": "小林",
+   "evidence": [
+    {
+     "source_id": "REC-001",
+     "quote": "外部からの遠隔保守を提案します",
+     "verified": true,
+     "unit_id": "S0004",
+     "locator": "00:00:22-00:00:28",
+     "version": 1
+    },
+    {
+     "source_id": "SRC-006",
+     "quote": "今回は現地対応とし、時間限定の接続は次回以降に検討する",
+     "verified": true,
+     "unit_id": "U0002",
+     "locator": "2行目",
+     "version": 1
+    },
+    {
+     "source_id": "SRC-006",
+     "quote": "紙の伝票で30分はしのげる",
+     "verified": true,
+     "unit_id": "U0003",
+     "locator": "3行目",
+     "version": 1
+    }
+   ],
+   "impact": "6件の影響を調査",
+   "artifacts": [],
+   "corrects": null,
+   "id": "HIS-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "requirement_id": "REQ-006",
+   "change_id": "CHG-001",
+   "decision_id": "DEC-001",
+   "trigger": "追加要望 CHG-001（常時接続）",
+   "meeting_date": null,
+   "proposed_on": "2026-10-05",
+   "decided_on": "2026-10-12",
+   "applied_on": null,
+   "recorded_at": "2026-11-05T10:55:16+09:00",
+   "before": null,
+   "after": null,
+   "options": [],
+   "outcome": "却下",
+   "rationale": "常時接続は認めないと判断したため。",
+   "decider": "森",
+   "confirmer": null,
+   "evidence": [
+    {
+     "source_id": "SRC-006",
+     "quote": "常時接続は認めない",
+     "verified": true,
+     "unit_id": "U0001",
+     "locator": "1行目",
+     "version": 1
+    }
+   ],
+   "impact": null,
+   "artifacts": [],
+   "corrects": null,
+   "id": "HIS-002",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "baselines": [
+  {
+   "label": "第2回定例後の版",
+   "saved_at": "2026-11-05T10:55:16+09:00",
+   "saved_by": "デモ担当者",
+   "requirements": {},
+   "decisions": {},
+   "id": "BSL-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ],
+ "shared_docs": [
+  {
+   "doc_type": "meeting",
+   "title": "第2回定例 確認資料",
+   "version": 1,
+   "issued_at": "2026-11-05T10:55:16+09:00",
+   "issued_by": "デモ担当者",
+   "item_ids": [
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "REQ-004",
+    "REQ-005",
+    "REQ-006",
+    "REQ-007",
+    "REQ-008",
+    "DEC-001"
+   ],
+   "fingerprint": "7cde4120247ec03f",
+   "sent": false,
+   "scope_note": "内部メモ除外",
+   "id": "DOC-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "doc_type": "change",
+   "title": "追加要望確認資料",
+   "version": 1,
+   "issued_at": "2026-11-05T10:55:16+09:00",
+   "issued_by": "デモ担当者",
+   "item_ids": [
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "REQ-004",
+    "REQ-005",
+    "REQ-006",
+    "REQ-007",
+    "REQ-008",
+    "REQ-009",
+    "DEC-001"
+   ],
+   "fingerprint": "26b80663d0176906",
+   "sent": false,
+   "scope_note": "内部メモ除外",
+   "id": "DOC-002",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "doc_type": "spec",
+   "title": "要件定義書（第1版）",
+   "version": 1,
+   "issued_at": "2026-11-05T10:55:16+09:00",
+   "issued_by": "デモ担当者",
+   "item_ids": [
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "REQ-004",
+    "REQ-005",
+    "REQ-006",
+    "REQ-007",
+    "REQ-008",
+    "REQ-009",
+    "DEC-001"
+   ],
+   "fingerprint": "fb17b3bef96cc6a3",
+   "sent": false,
+   "scope_note": "内部メモ除外",
+   "id": "DOC-003",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "doc_type": "meeting",
+   "title": "打ち合わせ確認資料",
+   "version": 2,
+   "issued_at": "2026-11-05T10:55:22+09:00",
+   "issued_by": "利用者",
+   "item_ids": [
+    "REQ-001",
+    "REQ-002",
+    "REQ-003",
+    "REQ-004",
+    "REQ-005",
+    "REQ-006",
+    "REQ-007",
+    "REQ-008",
+    "REQ-009",
+    "DEC-001"
+   ],
+   "fingerprint": "43869a6a27b9c594",
+   "sent": false,
+   "scope_note": "内部メモ除外",
+   "id": "DOC-004",
+   "created_at": "2026-11-05T10:55:22+09:00"
+  }
+ ],
+ "responses": [],
+ "ai_runs": [
+  {
+   "task": "prep",
+   "source": "準備済み",
+   "input_fingerprint": "9cc9fd0d84ca633a",
+   "items": 2,
+   "note": "デモ用に事前に用意した結果です（AIを実行していません）",
+   "cost_jpy": 0.0,
+   "ran_at": "2026-11-05T10:55:16+09:00",
+   "selection": {
+    "source_ids": [
+     "SRC-001",
+     "SRC-003"
+    ],
+    "recording_ids": null,
+    "extra": ""
+   },
+   "id": "AIR-001",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "task": "refine",
+   "source": "準備済み",
+   "input_fingerprint": "2f57158eac71f12c",
+   "items": 2,
+   "note": "デモ用に事前に用意した結果です（AIを実行していません）",
+   "cost_jpy": 0.0,
+   "ran_at": "2026-11-05T10:55:16+09:00",
+   "selection": {
+    "source_ids": null,
+    "recording_ids": [
+     "REC-001"
+    ],
+    "extra": ""
+   },
+   "id": "AIR-002",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "task": "extract",
+   "source": "準備済み",
+   "input_fingerprint": "0a83798e8b587763",
+   "items": 2,
+   "note": "デモ用に事前に用意した結果です（AIを実行していません）",
+   "cost_jpy": 0.0,
+   "ran_at": "2026-11-05T10:55:16+09:00",
+   "selection": {
+    "source_ids": null,
+    "recording_ids": [
+     "REC-001"
+    ],
+    "extra": ""
+   },
+   "id": "AIR-003",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  },
+  {
+   "task": "impact",
+   "source": "準備済み",
+   "input_fingerprint": "99ac6a7ba27a74bf",
+   "items": 1,
+   "note": "デモ用に事前に用意した結果です（AIを実行していません）",
+   "cost_jpy": 0.0,
+   "ran_at": "2026-11-05T10:55:16+09:00",
+   "selection": {
+    "source_ids": [
+     "SRC-003",
+     "SRC-005"
+    ],
+    "recording_ids": null,
+    "extra": ""
+   },
+   "id": "AIR-004",
+   "created_at": "2026-11-05T10:55:16+09:00"
+  }
+ ]
+}

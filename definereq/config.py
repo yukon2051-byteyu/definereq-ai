@@ -22,6 +22,7 @@ MAX_ZIP_RATIO = 120          # 圧縮爆弾の検出（展開後/圧縮後の比
 MAX_TEXT_CHARS = 400_000     # 1資料あたりの本文の上限（超えた分は省略と表示）
 MAX_PDF_PAGES = 400
 MAX_SHEET_ROWS = 20_000
+MAX_JSON_MB = 30
 
 # ---- 録画 ----
 ALLOWED_VIDEO = {".mp4", ".webm", ".mov"}

@@ -129,7 +129,7 @@ def answer(p: dict, question: str) -> dict:
         "reason_recorded": bool(reasons),
         "decisions": [_decision_view(p, d) for d in agreed],
         "not_agreed": [_decision_view(p, d) for d in others],
-        "history": [{"id": h["id"], "date": h.get("decided_on"), "applied": h.get("applied_on"), "outcome": h["outcome"],
+        "history": [{"id": h["id"], "meeting": h.get("meeting_id"), "date": h.get("decided_on"), "applied": h.get("applied_on"), "outcome": h["outcome"],
                      "trigger": h.get("trigger"), "before": h.get("before"), "after": h.get("after"),
                      "rationale": h.get("rationale"), "decider": h.get("decider"),
                      "superseded": h["id"] in corrected, "corrects": h.get("corrects")} for h in trail],

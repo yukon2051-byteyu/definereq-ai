@@ -17,7 +17,7 @@ readonly.install()
 
 project = state.current()
 try:
-    if project is None:
+    if project is None or st.session_state.get("show_home"):
         home.render()
     else:
         shell.render(project)

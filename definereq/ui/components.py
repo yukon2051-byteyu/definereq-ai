@@ -75,7 +75,7 @@ def evidence_block(p: dict, e: dict, key: str = "") -> None:
 def play_at(rec: dict, start: float, key: str) -> None:
     """時刻から聞き直す。元動画が手元にない場合は名称と時刻を示す。"""
     path = None
-    if rec.get("video_file"):
+    if rec.get("video_file"):  # デモの動画
         candidate = config.DEMO_FILES / rec["video_file"]
         if candidate.exists():
             path = str(candidate)
@@ -85,7 +85,7 @@ def play_at(rec: dict, start: float, key: str) -> None:
         if st.toggle("この時刻から再生", key=f"play_{key}"):
             st.video(path, start_time=int(start))
     else:
-        st.caption(f"元動画はこの画面にありません。「{rec['name']}」の {int(start // 60):02d}:{int(start % 60):02d} を確認してください。")
+        st.caption(f"元動画はこの画面にありません。「{rec['name']}」の {int(start // 60):02d}:{int(start % 60):02d} を確認するか、録画・発言の画面で同じ動画を添付し直してください。")
 
 
 def tri_text(label: str, value, key: str, area: bool = False):
@@ -100,6 +100,18 @@ def tri_text(label: str, value, key: str, area: bool = False):
         return NA
     widget = c2.text_area if area else c2.text_input
     return widget(f"{label}の内容", value="" if value in (None, NA) else str(value), key=f"{key}_t") or None
+
+
+def save_controls(p: dict, key: str) -> None:
+    """案件の保存。ダウンロードの作成日時と、作成後の変更の有無を示す。"""
+    from ..export import jsonio
+    from . import state
+
+    st.download_button("案件を保存（JSON）", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json",
+                       key=key, width="stretch", on_click=state.mark_saved, args=(p,))
+    made = st.session_state.get("save_time")
+    when = f"保存用ファイルの作成：{made[:16].replace('T', ' ')}" if made else "保存用ファイルはまだ作成していません"
+    st.caption(when + ("／作成後の変更あり" if state.is_dirty(p) else "／作成後の変更なし"))
 
 
 def edit_block(name: str):
@@ -124,6 +136,15 @@ def add_evidence_form(p: dict, item: dict, key: str) -> None:
             item.setdefault("evidence", []).append(e)
             touch(p)
             ok_rerun("根拠を追加しました" if e["verified"] else "本文で確認できない引用です。確認できない根拠として記録しました")
+
+
+def meeting_select(p: dict, key: str, value: str | None = None) -> str | None:
+    """関連付ける会議を選ぶ。"""
+    from ..logic import continuity
+
+    ids = [None, *[m["id"] for m in p["meetings"]]]
+    return st.selectbox("関連付ける会議", ids, index=ids.index(value) if value in ids else 0,
+                        format_func=lambda i: "関連付けない" if i is None else continuity.label(p, i), key=key)
 
 
 def people(p: dict) -> list[str]:

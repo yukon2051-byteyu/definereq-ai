@@ -50,13 +50,14 @@ def set_state(p: dict, dec_id: str, state: str, actor_kind: str, actor: str = "�
 
 def receive_change(p: dict, content: str, requester: str | None = None, background: str | None = None,
                    evidence: list | None = None, desired_by: str | None = None,
-                   requested_at: str | None = None, related_requirements: list[str] | None = None) -> dict:
+                   requested_at: str | None = None, related_requirements: list[str] | None = None,
+                   meeting_id: str | None = None) -> dict:
     """追加要望の受付。要件は変更しない。"""
     item = pj.add(p, "changes", {
         "requested_at": requested_at, "requester": requester, "background": background, "content": content,
         "evidence": evidence or [], "desired_by": desired_by, "status": "受付", "classification": "未分類",
         "related_requirements": related_requirements or [], "impacts": [], "surveyed_areas": [],
-        "decision_id": None, "internal_note": None,
+        "decision_id": None, "internal_note": None, "meeting_id": meeting_id,
     })
     pj.log(p, f"追加要望 {item['id']} を受け付けました（要件は変更していません）")
     return item
@@ -84,7 +85,8 @@ def record_history(p: dict, req_id: str | None, outcome: str, trigger: str, *, c
                    meeting_date: str | None = None, proposed_on: str | None = None, decided_on: str | None = None,
                    applied_on: str | None = None, options: list[str] | None = None, rationale: str | None = None,
                    decider: str | None = None, confirmer: str | None = None, evidence: list | None = None,
-                   impact: str | None = None, artifacts: list[str] | None = None, corrects: str | None = None) -> dict:
+                   impact: str | None = None, artifacts: list[str] | None = None, corrects: str | None = None,
+                   meeting_id: str | None = None) -> dict:
     """仕様の変遷を追加する。不明な日付は None のまま残し、記録日時で代用しない。"""
     if outcome not in schema.HISTORY_OUTCOMES:
         raise ValueError(f"不明な結果です: {outcome}")
@@ -93,7 +95,7 @@ def record_history(p: dict, req_id: str | None, outcome: str, trigger: str, *, c
         "meeting_date": meeting_date, "proposed_on": proposed_on, "decided_on": decided_on, "applied_on": applied_on,
         "recorded_at": pj.now_iso(), "before": before, "after": after, "options": options or [],
         "outcome": outcome, "rationale": rationale, "decider": decider, "confirmer": confirmer,
-        "evidence": evidence or [], "impact": impact, "artifacts": artifacts or [], "corrects": corrects,
+        "evidence": evidence or [], "impact": impact, "artifacts": artifacts or [], "corrects": corrects, "meeting_id": meeting_id,
     })
 
 
@@ -124,6 +126,8 @@ def apply_change(p: dict, chg_id: str, decision_id: str, updates: dict[str, dict
     if chg_id not in dec.get("related_changes", []):
         raise ValueError("この判断は追加要望に関連付いていません。")
     results = []
+    meeting_id = dec.get("meeting_id")
+    meeting = pj.get(p, "meetings", meeting_id) if meeting_id else None
     for req_id, fields in updates.items():
         req = pj.require(p, "requirements", req_id)
         before = req.get("body")
@@ -131,6 +135,7 @@ def apply_change(p: dict, chg_id: str, decision_id: str, updates: dict[str, dict
                                     change_id=chg_id)
         record_history(p, req_id, "採用", f"追加要望 {chg_id}", change_id=chg_id, decision_id=decision_id,
                        before=before, after=req.get("body"), decided_on=dec.get("decided_on"), applied_on=applied_on,
+                       meeting_id=meeting_id, meeting_date=meeting.get("held_on") if meeting else None,
                        proposed_on=chg.get("requested_at"), options=[o["label"] for o in dec.get("options", [])],
                        rationale=dec.get("rationale"), decider=dec.get("decider"), confirmer=dec.get("confirmer"),
                        evidence=dec.get("evidence"), impact=f"{len(chg.get('impacts', []))}件の影響を調査")

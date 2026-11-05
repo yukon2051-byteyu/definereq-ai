@@ -181,12 +181,12 @@ def to_segments(raw: list[dict]) -> list[dict]:
 
 def register_recording(p: dict, name: str, raw_segments: list[dict], method: str, meeting_date: str | None,
                        duration: float, range_start: float, range_end: float, digest: str | None = None,
-                       source_note: str | None = None) -> dict:
+                       source_note: str | None = None, meeting_id: str | None = None) -> dict:
     version = 1 + sum(1 for r in p["recordings"] if r["name"] == name)
     rec = pj.add(p, "recordings", {
         "name": name, "version": version, "meeting_date": meeting_date, "duration": duration,
         "range_start": range_start, "range_end": range_end, "method": method, "file_hash": digest,
-        "note": source_note, "segments": to_segments(raw_segments), "visibility": "社内のみ",
+        "note": source_note, "meeting_id": meeting_id, "segments": to_segments(raw_segments), "visibility": "社内のみ",
         "registered_at": pj.now_iso(),
     })
     pj.log(p, f"録画 {rec['id']}「{name}」の文字起こしを登録しました（{method}）")

@@ -10,6 +10,7 @@ import streamlit as st
 from ... import config
 from ... import project as pj
 from ...ingest import registry
+from ...logic import continuity
 from ...ingest.formats import format_time, parse_subtitles
 from ...ingest.safety import IngestError, safe_filename
 from ...media import probe as media
@@ -18,7 +19,7 @@ from ...schema import CONTENT_CONFIRM, SOURCE_KINDS, SPEAKER_CONFIRM, UTTERANCE_
 from ...usage import gate
 from ...usage.ledger import BudgetExceeded, LedgerUnavailable, Limits
 from ..ai_panel import current_code
-from ..components import chips, edit_block, head, ok_rerun, play_at, select_item, touch
+from ..components import chips, edit_block, head, meeting_select, ok_rerun, play_at, select_item, touch
 
 
 def sources(p: dict) -> None:
@@ -28,13 +29,14 @@ def sources(p: dict) -> None:
         kind = c1.selectbox("資料の種類", SOURCE_KINDS, key="src_kind")
         vis = c2.selectbox("公開範囲", VISIBILITY, key="src_vis")
         date = st.text_input("資料の日付（不明なら空欄）", key="src_date")
+        meeting = meeting_select(p, "src_mtg")
         files = st.file_uploader("ファイル（PDF / Word / Excel / PowerPoint / テキスト / SRT / VTT）", accept_multiple_files=True,
                                  type=["pdf", "docx", "xlsx", "pptx", "txt", "srt", "vtt"], key="src_up")
         if st.button("読み込む", type="primary", disabled=not files):
             done = 0
             for f in files:
                 try:
-                    registry.ingest_bytes(p, f.name, f.getvalue(), kind=kind, visibility=vis, occurred_at=date or None)
+                    registry.ingest_bytes(p, f.name, f.getvalue(), kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
                     done += 1
                 except IngestError as e:
                     st.error(f"{safe_filename(f.name)}：{e}")
@@ -45,13 +47,13 @@ def sources(p: dict) -> None:
         title = st.text_input("貼り付ける文章の名称", key="paste_t")
         text = st.text_area("文章を貼り付ける", key="paste_b")
         if st.button("貼り付けた文章を登録") and text.strip():
-            registry.ingest_paste(p, title, text, kind=kind, visibility=vis, occurred_at=date or None)
+            registry.ingest_paste(p, title, text, kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
             touch(p)
             ok_rerun("登録しました")
 
     rows = [{"ID": s["id"], "名称": s["name"], "版": f"v{s['version']}", "種類": s["kind"], "日付": s.get("occurred_at") or "未設定", "公開範囲": s["visibility"],
-             "単位数": len(s["units"]), "警告": len(s["warnings"]), "状態": "旧版" if s.get("superseded_by") else "最新"} for s in p["sources"]]
-    st.dataframe(pd.DataFrame(rows, columns=["ID", "名称", "版", "種類", "日付", "公開範囲", "単位数", "警告", "状態"]), hide_index=True, width="stretch")
+             "会議": continuity.label(p, s.get("meeting_id")), "単位数": len(s["units"]), "警告": len(s["warnings"]), "状態": "旧版" if s.get("superseded_by") else "最新"} for s in p["sources"]]
+    st.dataframe(pd.DataFrame(rows, columns=["ID", "名称", "版", "種類", "日付", "公開範囲", "会議", "単位数", "警告", "状態"]), hide_index=True, width="stretch")
     src = select_item(p["sources"], lambda s: f"{s['id']} {s['name']} v{s['version']}", "src_sel", "資料はまだありません。")
     if not src:
         return
@@ -95,7 +97,7 @@ def _save_upload(up) -> str:
     return path
 
 
-def _transcribe_ui(p: dict) -> None:
+def _transcribe_ui(p: dict, meeting: str | None) -> None:
     st.markdown("**録画から文字起こしする**")
     st.caption(f"MP4 / WebM / MOV、最大 {config.MAX_MEDIA_MB}MB。許可のある録画だけを使用してください。アップロードしただけでは処理は始まりません。")
     up = st.file_uploader("録画ファイル", type=["mp4", "webm", "mov", "m4a", "mp3", "wav"], key="rec_up")
@@ -121,7 +123,8 @@ def _transcribe_ui(p: dict) -> None:
     digest = tr.file_hash(path)
     reuse = tr.find_reusable(p, digest, start, end)
     if reuse:
-        st.info(f"同じ録画・同じ区間の文字起こし {reuse['id']} が登録済みです。再利用できるため、処理は不要です。")
+        st.session_state.setdefault("media_paths", {})[reuse["id"]] = path  # 添付し直した動画で再生できるようにする
+        st.info(f"同じ録画・同じ区間の文字起こし {reuse['id']} が登録済みです。再利用できるため、処理は不要です。この動画で再生できます。")
         return
     plans = tr.plans(minutes)
     st.dataframe(pd.DataFrame([{"方式": x.label, "送信先": x.destination, "対象時間": f"{x.minutes:.1f}分", "費用見込み": f"約{x.est_jpy:,.0f}円", "補足": x.note} for x in plans]), hide_index=True, width="stretch")
@@ -168,7 +171,7 @@ def _transcribe_ui(p: dict) -> None:
         if not segs:
             st.warning("発言を検出できませんでした。音声を確認してください。")
             return
-        rec = tr.register_recording(p, safe_filename(up.name), segs, choice, date or None, info.duration, start, end, digest)
+        rec = tr.register_recording(p, safe_filename(up.name), segs, choice, date or None, info.duration, start, end, digest, meeting_id=meeting)
         st.session_state.setdefault("media_paths", {})[rec["id"]] = path
         touch(p)
         ok_rerun(f"{len(segs)}件の発言を登録しました")
@@ -179,7 +182,8 @@ def recordings(p: dict) -> None:
     with edit_block("rec"), st.expander("録画・字幕を追加する", expanded=not p["recordings"]):
         if p.get("is_demo"):
             st.caption("デモでも録画の検証は実行できますが、文字起こしの実行は準備済みの結果を利用します。")
-        _transcribe_ui(p)
+        meeting = meeting_select(p, "rec_mtg")
+        _transcribe_ui(p, meeting)
         st.divider()
         st.markdown("**字幕・議事録の時刻付きテキストを取り込む**（SRT / VTT）")
         st.caption("この取り込みは録画の文字起こしではありません。方式は「字幕の取込」と記録されます。")
@@ -192,13 +196,14 @@ def recordings(p: dict) -> None:
                 st.error("字幕の時刻を読み取れませんでした。")
             else:
                 dur = segs[-1]["end"]
-                tr.register_recording(p, name or safe_filename(sub.name), segs, "subtitle", date or None, dur, 0, dur)
+                tr.register_recording(p, name or safe_filename(sub.name), segs, "subtitle", date or None, dur, 0, dur, meeting_id=meeting)
                 touch(p)
                 ok_rerun("取り込みました")
 
     rec = select_item(p["recordings"], lambda r: f"{r['id']} {r['name']} v{r['version']}", "rec_sel", "録画はまだありません。")
     if not rec:
         return
+    st.caption(f"会議：{continuity.label(p, rec.get('meeting_id'))}")
     st.caption(f"方式：{tr.METHOD_LABEL.get(rec['method'], rec['method'])}／開催日：{rec.get('meeting_date') or '記録なし'}／長さ：{format_time(rec.get('duration') or 0)}"
                + (f"／{rec['note']}" if rec.get("note") else ""))
     chips(f"話者未確認 {sum(1 for s in rec['segments'] if s['speaker_status'] != '確認済み')}件", f"内容未確認 {sum(1 for s in rec['segments'] if s['content_status'] != '確認済み')}件")

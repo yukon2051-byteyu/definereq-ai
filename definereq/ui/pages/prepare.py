@@ -7,12 +7,12 @@ import streamlit as st
 from ... import config
 from ... import project as pj
 from ...demos.builder import STAGES
-from ...logic import checks
+from ...logic import checks, continuity
 from ...project import PROFILE_FIELDS, display
 from ...schema import CERTAINTY, DOMAINS, QUESTION_STATES
 from .. import state
 from ..ai_panel import ai_panel, ai_runs_list
-from ..components import edit_block, esc, head, ok_rerun, touch
+from ..components import edit_block, esc, guard, head, ok_rerun, select_item, touch
 
 
 def overview(p: dict) -> None:
@@ -117,6 +117,7 @@ def profile(p: dict) -> None:
 def prep(p: dict) -> None:
     head("会議前の準備", "固定の確認観点と案件の特徴を組み合わせて質問を用意します。回答済みの観点は繰り返しません。", "準備")
     pr = p["prep"]
+    carryover_panel(p)
     tabs = st.tabs(["理解と議題", "質問", "分野別の確認観点"])
     with tabs[0], st.form("prep_form"):
         understanding = st.text_area("現時点の理解", value=pr.get("understanding") or "")
@@ -170,3 +171,38 @@ def prep(p: dict) -> None:
         st.dataframe(pd.DataFrame([{"分野": "・".join("共通" if d == "common" else DOMAINS[d] for d in i["domains"]), "分類": i["category"], "確認すること": i["question"],
                                     "確認する理由": i["why"], "確認相手の例": i.get("ask"), "事前に用意": i.get("prep")} for i in items]), hide_index=True, width="stretch")
         st.caption("観点は config/checkpoints.toml で追加・変更できます。すべてを必須入力にはしていません。")
+
+
+def carryover_panel(p: dict) -> None:
+    """前回までに残っている事項。"""
+    groups = {k: v for k, v in continuity.carryover(p).items() if v}
+    st.subheader("前回からの引き継ぎ")
+    if not groups:
+        st.caption("引き継ぐ未決事項や宿題は登録されていません。")
+        return
+    for name, items in groups.items():
+        with st.expander(f"{name}　{len(items)}件"):
+            st.dataframe(pd.DataFrame([{"ID": i["id"], "内容": i["text"], "確認相手・担当": display(i["ask"]), "期限": display(i["due"]), "会議": i["meeting"]} for i in items]),
+                         hide_index=True, width="stretch")
+
+
+def meetings(p: dict) -> None:
+    head("会議", "会議ごとに資料・発言・判断を関連付け、複数回の会議を同じ案件の続きとして記録します。", "準備")
+    with edit_block("addmtg"), st.form("add_mtg", clear_on_submit=True):
+        c1, c2 = st.columns([3, 1])
+        name, held = c1.text_input("会議名", placeholder="例：第2回打ち合わせ"), c2.text_input("開催日（不明なら空欄）")
+        note = st.text_input("補足")
+        if st.form_submit_button("会議を追加") and guard(continuity.add_meeting, p, name, held, note):
+            touch(p)
+            ok_rerun("追加しました")
+    if p["meetings"]:
+        st.dataframe(pd.DataFrame([{"ID": m["id"], "会議名": m["name"], "開催日": m.get("held_on") or "記録なし", "資料": len(continuity.meeting_items(p, m["id"])["資料"]) + len(continuity.meeting_items(p, m["id"])["録画"]),
+                                    "判断": len(continuity.meeting_items(p, m["id"])["判断"]), "変更履歴": len(continuity.meeting_items(p, m["id"])["変更履歴"])} for m in p["meetings"]]), hide_index=True, width="stretch")
+    m = select_item(p["meetings"], lambda x: continuity.label(p, x["id"]), "rq_mtg", "会議はまだありません。")
+    if m:
+        for name, items in continuity.meeting_items(p, m["id"]).items():
+            if items:
+                st.markdown(f"**{name}　{len(items)}件**")
+                for text in items:
+                    st.caption(text)
+    carryover_panel(p)

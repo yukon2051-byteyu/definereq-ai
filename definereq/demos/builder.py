@@ -13,7 +13,7 @@ from .. import project as pj
 from ..ai import tasks as ai
 from ..ingest import formats, registry
 from ..logic import agreement as ag
-from ..logic import baseline, checks
+from ..logic import baseline, checks, continuity
 from ..logic import evidence as ev
 from ..media import transcribe as tr
 from ..export import share
@@ -180,6 +180,7 @@ def build(demo_id: str, stage: int = 4) -> dict:
         if i > stage:
             break
         step(b)
+    continuity.backfill(p)  # 録画と議事録から会議を作り、判断と履歴を関連付ける
     return p
 
 

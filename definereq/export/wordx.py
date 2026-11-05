@@ -127,7 +127,7 @@ def render(p: dict, opt: share.Options, doc_id: str, version: int, issued_at: st
     meta = doc.add_paragraph()
     scope = "内部メモ含む（社外共有不可）" if opt.include_internal else "内部メモ除外"
     _font(meta.add_run(clean(f"資料ID：{doc_id}　版：v{version}　作成日時：{issued_at[:16].replace('T', ' ')}　範囲：{scope}")), 9, color=MUTED)
-    if p.get("is_demo"):
+    if p.get("is_demo") or p.get("from_demo"):
         note = doc.add_paragraph()
         _font(note.add_run("本資料はデモ用の架空データから作成しました。"), 9, color=MUTED)
     note = doc.add_paragraph()

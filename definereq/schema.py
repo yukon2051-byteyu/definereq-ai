@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 APP_ID = "DefineReq_AI"
 
 # 値が「未設定」(None) と「該当なし」(NA) は意味が違うため区別する
@@ -43,6 +43,8 @@ CONTENT_CONFIRM = ["未確認", "確認済み", "要聞き直し"]
 # 会議後の候補
 CANDIDATE_KINDS = ["要点", "要望", "要件", "決定", "保留", "未回答", "意見の違い", "制約", "リスク", "次の行動"]
 CANDIDATE_STATES = ["候補", "採用", "修正して採用", "却下"]
+# 新しい情報の振り分け先
+CANDIDATE_INTAKE = ["既存要件の補足", "変更候補", "新規要望", "確認事項"]
 
 # 追加要望
 CHANGE_STATES = ["受付", "調査中", "判断待ち", "反映済み", "却下", "保留", "取り下げ"]
@@ -71,9 +73,35 @@ DOC_TYPES = {"meeting": "打ち合わせ確認資料", "change": "追加要望�
 
 # 案件JSONの中の一覧（収録先名 → ID接頭語）
 COLLECTIONS = {
-    "stakeholders": "STK", "glossary": "TRM", "sources": "SRC", "recordings": "REC",
+    "meetings": "MTG", "stakeholders": "STK", "glossary": "TRM", "sources": "SRC", "recordings": "REC",
     "questions": "QST", "candidates": "CAN", "requirements": "REQ", "issues": "ISU",
     "scenarios": "SCN", "decisions": "DEC", "changes": "CHG", "conflicts": "CNF",
     "risks": "RSK", "actions": "ACT", "history": "HIS", "baselines": "BSL",
     "shared_docs": "DOC", "responses": "RES", "ai_runs": "AIR",
 }
+
+# JSON読込で値を検証する項目（一覧名, 項目名, 許される値）
+ENUM_CHECKS = [
+    ("requirements", "status", AGREEMENT_STATES),
+    ("requirements", "scope", SCOPE_CHOICES + [None]),
+    ("decisions", "state", AGREEMENT_STATES),
+    ("changes", "status", CHANGE_STATES),
+    ("changes", "classification", CHANGE_CLASSES),
+    ("conflicts", "kind", CONFLICT_KINDS),
+    ("candidates", "state", CANDIDATE_STATES),
+    ("history", "outcome", HISTORY_OUTCOMES),
+]
+
+# 別の項目を参照する欄（JSON読込で参照切れを検出する）
+REF_CHECKS = [
+    ("requirements", "related", "requirements"),
+    ("decisions", "related_requirements", "requirements"),
+    ("decisions", "related_changes", "changes"),
+    ("scenarios", "related_requirements", "requirements"),
+    ("issues", "related_requirements", "requirements"),
+    ("risks", "related_requirements", "requirements"),
+    ("changes", "related_requirements", "requirements"),
+]
+
+# 会議に関連付ける一覧
+MEETING_LINKED = ["sources", "recordings", "questions", "decisions", "changes", "history", "candidates"]

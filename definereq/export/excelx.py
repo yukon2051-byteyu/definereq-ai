@@ -61,7 +61,7 @@ def render(p: dict, include_internal: bool = False) -> bytes:
     for i, (k, v) in enumerate((("案件", p["name"]), ("案件ID", p["id"]), ("分野", "、".join(p["domains"])),
                                 ("出力日時", pj.now_iso()), ("形式版", p["format_version"]),
                                 ("範囲", "内部メモ含む" if include_internal else "内部メモ除外"),
-                                ("データ", "デモ用の架空データ" if p.get("is_demo") else "利用者の登録データ")), 1):
+                                ("データ", "デモ用の架空データ" if p.get("is_demo") or p.get("from_demo") else "利用者の登録データ")), 1):
         info.cell(row=i, column=1, value=k).font = Font(name="Yu Gothic", bold=True)
         info.cell(row=i, column=2, value=safe_cell(v)).font = Font(name="Yu Gothic")
     info.column_dimensions["A"].width = 12

@@ -9,13 +9,14 @@ from ... import project as pj
 from ...demos import builder
 from ...export import excelx, jsonio, share, wordx
 from ...logic import agreement as ag
+from ...logic import continuity
 from ...logic import why as whylogic
 from ...project import display
 from ...schema import DOC_TYPES
 from ...usage import gate
 from ...usage.ledger import LedgerUnavailable
 from ..ai_panel import current_code
-from ..components import chip, chips, edit_block, esc, evidence_block, head, ok_rerun, select_item, touch
+from ..components import chip, chips, edit_block, esc, evidence_block, head, ok_rerun, save_controls, select_item, touch
 
 
 def trail(p: dict) -> None:
@@ -46,6 +47,7 @@ def trail(p: dict) -> None:
             if h.get("options"):
                 st.caption("比較した案：" + "、".join(h["options"]))
             st.write(f"理由：{h.get('rationale') or whylogic.NO_REASON}")
+            st.caption(f"会議：{continuity.label(p, h.get('meeting_id'))}")
             st.caption(f"会議日：{display(h.get('meeting_date'))}／提案日：{display(h.get('proposed_on'))}／判断日：{display(h.get('decided_on'))}／適用日：{display(h.get('applied_on'))}／"
                        f"記録日時：{(h.get('recorded_at') or '')[:16].replace('T', ' ')}／判断者：{display(h.get('decider'))}／確認者：{display(h.get('confirmer'))}")
             for i, e in enumerate(h.get("evidence") or []):
@@ -127,7 +129,7 @@ def why(p: dict) -> None:
     if a["history"]:
         with st.expander("変更の経緯"):
             for h in a["history"]:
-                st.write(f"{h['date'] or '判断日の記録なし'}　{h['outcome']}　{h['trigger']}")
+                st.write(f"{h['date'] or '判断日の記録なし'}　{h['outcome']}　{h['trigger']}　{continuity.label(p, h['meeting'])}")
                 st.caption(h["rationale"] or whylogic.NO_REASON)
     if a["evidence"]:
         st.markdown("**要件の根拠**")
@@ -207,8 +209,11 @@ def share_page(p: dict) -> None:
         include = st.toggle("Excelに内部メモを含める（社外共有は不可）", value=False, key="xl_in")
         st.download_button("Excelをダウンロード（要件・質問・残件・リスク・履歴）", excelx.render(p, include), file_name=f"{pj.today()}_DefineReq_要件一覧.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        st.download_button("案件JSONをダウンロード（要件IDつきの受け渡し用）", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json")
-        st.caption("JSONには資料の本文と文字起こしが含まれます。元ファイルは含みません。取り扱いに注意してください。案件はこの画面の利用中のみ保持され、閉じると消えます。")
+        if p.get("is_demo"):
+            st.download_button("案件JSONをダウンロード", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json")
+        else:
+            save_controls(p, "save_share")
+        st.caption("JSONには資料の本文と文字起こしが含まれます。元ファイルは含みません。取り扱いに注意してください。案件はこの画面の利用中のみ保持されます。続きを行うときは、トップの「保存した案件から再開する」で読み込みます。")
 
 
 def usage(p: dict) -> None:

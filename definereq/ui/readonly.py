@@ -24,6 +24,8 @@ def is_demo() -> bool:
         project = st.session_state.get("project")
     except Exception:  # 画面の外（テストの準備など）では対象外
         return False
+    if st.session_state.get("show_home"):  # トップ画面は閲覧専用の対象外
+        return False
     return bool(project and project.get("is_demo"))
 
 

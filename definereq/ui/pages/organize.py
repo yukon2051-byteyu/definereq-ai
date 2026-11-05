@@ -5,11 +5,11 @@ import pandas as pd
 import streamlit as st
 
 from ... import project as pj
-from ...logic import checks
+from ...logic import checks, continuity
 from ...project import display, field_state
-from ...schema import AGREEMENT_STATES, CANDIDATE_KINDS, DOMAINS, MEASURE_KINDS, MEASURE_STATUS, PRIORITIES, REQ_KINDS, SCOPE_CHOICES
+from ...schema import AGREEMENT_STATES, CANDIDATE_INTAKE, CANDIDATE_KINDS, DOMAINS, MEASURE_KINDS, MEASURE_STATUS, PRIORITIES, REQ_KINDS, SCOPE_CHOICES
 from ..ai_panel import ai_panel, ai_runs_list
-from ..components import add_evidence_form, chip, chips, edit_block, evidence_block, flow, guard, head, ok_rerun, people, select_item, touch, tri_text
+from ..components import add_evidence_form, chip, chips, edit_block, evidence_block, flow, guard, head, meeting_select, ok_rerun, people, select_item, touch, tri_text
 
 
 def candidates(p: dict) -> None:
@@ -17,6 +17,8 @@ def candidates(p: dict) -> None:
     flow([("入力", "選択した資料・発言"), ("AI候補", "要点・要望・決定候補など"), ("人の判断", "採用／修正／却下"), ("結果", "根拠付きの要件・論点")])
     ai_panel(p, "extract")
     ai_runs_list(p, "extract")
+    with edit_block("cand_mtg"):
+        meeting = meeting_select(p, "cand_mtg")
     kinds = sorted({c["kind"] for c in p["candidates"]})
     filt = st.multiselect("種類で絞り込む", kinds, key="cand_f")
     items = [c for c in p["candidates"] if not filt or c["kind"] in filt]
@@ -35,12 +37,18 @@ def candidates(p: dict) -> None:
             for i, e in enumerate(c.get("evidence", [])):
                 evidence_block(p, e, f"cand_{c['id']}_{i}")
             if c["state"] == "候補":
+                with edit_block(f"intake_{c['id']}"):
+                    c1, c2 = st.columns(2)
+                    kind = c1.selectbox("振り分け", CANDIDATE_INTAKE, key=f"ik_{c['id']}", index=2)
+                    reqs = [r["id"] for r in p["requirements"]]
+                    target = c2.selectbox("対象の要件（補足・変更候補）", reqs, key=f"it_{c['id']}", index=None, format_func=lambda i: pj.label_of(p, i))
+                    st.caption("補足と変更候補は追加要望として受け付けます。合意済みの要件は書き換えません。")
                 b1, b2, b3 = st.columns(3)
-                if b1.button("要件として採用", key=f"adopt_{c['id']}"):
-                    r = pj.add(p, "requirements", pj.new_requirement(title=c["text"][:60], body=c["text"], evidence=c["evidence"], status="下書き", author="AI候補を人が採用"))
-                    c.update(state="採用", resolved_as=r["id"])
-                    touch(p)
-                    ok_rerun(f"{r['id']} を作成しました")
+                if b1.button("振り分けて採用", key=f"adopt_{c['id']}"):
+                    item = guard(continuity.intake_candidate, p, c["id"], kind, target, meeting)
+                    if item:
+                        touch(p)
+                        ok_rerun(f"{item['id']} を作成しました")
                 if b2.button("記録のみ採用", key=f"keep_{c['id']}"):
                     c["state"] = "採用"
                     touch(p)

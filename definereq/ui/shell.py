@@ -7,13 +7,13 @@ from ..demos.builder import STAGES, catalog
 from ..schema import DOMAINS
 from . import state
 from .readonly import HIDE_CSS
-from .components import esc, flow, show_flash
+from .components import esc, flow, save_controls, show_flash
 from .pages import decide, materials, organize, prepare, trace
 
 # 通常は主要な工程だけを表示し、詳しい機能は「詳細の機能」に収める
 GROUPS = [
     ("全体", [("overview", "概要・残件", prepare.overview)]),
-    ("準備", [("prep", "会議前の準備", prepare.prep), ("sources", "資料", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
+    ("準備", [("meetings", "会議", prepare.meetings), ("prep", "会議前の準備", prepare.prep), ("sources", "資料", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
     ("整理", [("candidates", "会議後の整理", organize.candidates), ("requirements", "要件", organize.requirements)]),
     ("判断", [("decisions", "決定・合意", decide.decisions)]),
     ("共有", [("share", "共有資料・出力", trace.share_page)]),
@@ -27,7 +27,7 @@ PAGES = {key: (label, fn) for _, items in GROUPS for key, label, fn in items}
 PAGES.update({key: (label, fn) for key, label, fn in DETAILS})
 
 # 各画面の次の行動（移動先）
-NEXT = {"overview": ("残件のもとになる要件を確認します", "requirements"), "profile": ("会議の質問を準備します", "prep"), "prep": ("会議の資料を登録します", "sources"),
+NEXT = {"overview": ("残件のもとになる要件を確認します", "requirements"), "profile": ("会議の質問を準備します", "prep"), "meetings": ("次の会議の質問を準備します", "prep"), "prep": ("会議の資料を登録します", "sources"),
         "sources": ("録画と発言を確認します", "recordings"), "recordings": ("資料と発言から候補を整理します", "candidates"), "candidates": ("採用した内容を要件で確認します", "requirements"),
         "requirements": ("曖昧な要件を具体化します", "refine"), "refine": ("非機能を確認します", "nfr"), "nfr": ("今回の範囲を決めます", "scope"),
         "scope": ("通常と例外の流れを確認します", "scenarios"), "scenarios": ("意見の違いを整理します", "issues"), "issues": ("判断を記録します", "decisions"),
@@ -41,7 +41,9 @@ def sidebar(p: dict) -> None:
         st.markdown(f"**{p['name']}**")
         st.caption("・".join(DOMAINS[d] for d in p["domains"]))
         if st.button("← トップへ戻る", key="nav_home"):
-            state.close_project()
+            state.go_home()
+        if not p.get("is_demo"):
+            save_controls(p, "save_side")
         current = st.session_state.get("page", "overview")
 
         def nav(key: str, label: str) -> None:
