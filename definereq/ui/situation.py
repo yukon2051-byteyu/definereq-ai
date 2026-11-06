@@ -53,12 +53,19 @@ def _advice_html(a: gd.Advice, open_detail: bool) -> str:
     return frame(f"現在の状況と次にすること｜{a.title}", rows, _short(a), kind="work")
 
 
+def _move(label: str, target: str) -> None:
+    """議事録を取り込むボタンは、資料の種類を議事録にして移動する。"""
+    if target == "sources" and "議事録" in label:
+        state.goto_minutes()
+    state.goto(target)
+
+
 def _go(a: gd.Advice, page: str, key: str) -> None:
     if a.page == page:
         return
     if st.button(a.button, key=key, type="primary"):
         st.session_state["resumed"] = False
-        state.goto(a.page)
+        _move(a.button, a.page)
 
 
 def _actions(main: gd.Advice | None, page: str, hidden: bool) -> None:
@@ -73,7 +80,7 @@ def _actions(main: gd.Advice | None, page: str, hidden: bool) -> None:
     for n, (label, target) in enumerate(alts):
         if cols[n + 1].button(label, key=f"guide_alt_{n}"):
             st.session_state["resumed"] = False
-            state.goto(target)
+            _move(label, target)
     if hidden:
         if cols[-1].button("詳しい説明を表示", key="guide_show", type="tertiary", width="stretch"):
             st.session_state["guidance_hidden"] = False
@@ -141,9 +148,15 @@ def _stage_question(p: dict) -> None:
     current = gd.user_stage(p)
     keys = list(gd.STAGE_LABELS)
     with st.expander("作業の段階を選び直す"):
+        st.caption("選ぶと、その作業の画面へ移動します。")
         choice = st.radio("今の作業", keys, index=keys.index(current) if current in keys else 0, format_func=gd.STAGE_LABELS.get, key="guide_stage")
     if choice != current:
         gd.guidance_store(p)["user_stage"] = choice
+        target = gd.STAGE_PAGES.get(choice)
+        if target == "sources":
+            state.goto_minutes()
+        if target:
+            state.goto(target)
         st.rerun()
 
 

@@ -19,13 +19,15 @@ from ...logic.evidence import speaker_view
 from ...schema import CONTENT_CONFIRM, SOURCE_KINDS, SPEAKER_CONFIRM, UTTERANCE_KINDS, VISIBILITY
 from ...usage import gate
 from ...usage.ledger import BudgetExceeded, LedgerUnavailable, Limits
+from .. import state
 from ..ai_panel import current_code
 from ..components import chips, edit_block, head, meeting_select, ok_rerun, play_at, select_item, touch
 
 
 def sources(p: dict) -> None:
-    head("資料・議事録", "議事録も資料としてここへ登録します。利用の許可がある資料だけを登録してください。構成資料に認証情報が含まれていないことを確認してください。", "資料")
-    with edit_block("src"), st.expander("資料を追加する", expanded=not p["sources"]):
+    head("資料・議事録", "議事録はWord・Excel・PDF・テキストのファイル、または文章の貼り付けで取り込めます。録画は不要です。利用の許可がある資料だけを登録してください。構成資料に認証情報が含まれていないことを確認してください。", "資料")
+    with edit_block("src"), st.expander("議事録・資料を追加する", expanded=not p["sources"] or st.session_state.get("src_kind") == "議事録"):
+        st.caption("議事録を取り込むときは、資料の種類を「議事録」にしてください。AIで整理する対象になります。")
         c1, c2 = st.columns(2)
         kind = c1.selectbox("資料の種類", SOURCE_KINDS, key="src_kind")
         vis = c2.selectbox("公開範囲", VISIBILITY, key="src_vis")
@@ -183,6 +185,11 @@ def _transcribe_ui(p: dict, meeting: str | None) -> None:
 
 def recordings(p: dict) -> None:
     head("録画・発言", "発言ごとに話者と内容を確認します。AIが話者を確定することはありません。発言を全員の合意として扱いません。", "資料")
+    if not p["recordings"] and not p.get("is_demo"):
+        c1, c2 = st.columns([3, 1])
+        c1.caption("録画がなくても進められます。Word・Excel・PDF・テキストの議事録は「資料・議事録」から取り込めます。")
+        if c2.button("議事録を取り込む", key="go_minutes", width="stretch"):
+            state.goto_minutes()
     with edit_block("rec"), st.expander("録画・字幕を追加する", expanded=not p["recordings"]):
         if p.get("is_demo"):
             st.caption("デモでも録画の検証は実行できますが、文字起こしの実行は準備済みの結果を利用します。")

@@ -535,6 +535,76 @@ def test_home_shows_stats_and_backlog_after_requirements(p):
     assert 'class="dr-stat"' in html(at) and any(s.value == "残件" for s in at.subheader)
 
 
+@pytest.mark.parametrize("stage,page", [("before_first", "prep"), ("after_first", "sources"), ("deciding", "requirements"), ("output", "share")])
+def test_choosing_stage_moves_to_that_work(p, stage, page):
+    p["profile"]["problem"].update(value="月末の集計に時間がかかる")
+    at = open_app(p, "recordings")
+    at = next(r for r in at.radio if r.key == "guide_stage").set_value(stage).run()
+    assert not at.exception and at.session_state["page"] == page
+
+
+def test_auto_stage_has_no_destination():
+    assert None not in gd.STAGE_PAGES
+
+
+def _word_minutes() -> bytes:
+    d = Document()
+    d.add_paragraph("初回打ち合わせ議事録")
+    d.add_paragraph("講師が出欠を登録する。予算は未確認。")
+    buf = io.BytesIO()
+    d.save(buf)
+    return buf.getvalue()
+
+
+def _excel_minutes() -> bytes:
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.active.append(["発言者", "内容"])
+    wb.active.append(["事務局", "講師が出欠を登録する。予算は未確認。"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize("name,data", [("議事録.docx", _word_minutes()), ("議事録.xlsx", _excel_minutes()), ("議事録.txt", "講師が出欠を登録する。予算は未確認。".encode())])
+def test_minutes_files_without_recording_can_be_analyzed(p, name, data):
+    item = registry.ingest_bytes(p, name, data, kind="議事録", visibility="社内のみ")
+    assert any("出欠を登録" in u["text"] for u in item["units"])
+    assert gd.assess(p, "recordings")["main"].id == "extract"
+    ctx = ai.build_context(p, ai.TASKS["extract"], [item["id"]], [])
+    assert "出欠を登録" in ctx
+    run(p, "extract", [cand("要望", "出欠を登録する", evidence=[{"source_id": item["id"], "unit_id": "", "quote": "講師が出欠を登録する"}])], source_ids=[item["id"]])
+    assert p["candidates"][0]["evidence"][0]["verified"] and gd.assess(p, "sources")["main"].id == "candidates"
+
+
+def test_after_meeting_stage_opens_minutes_import(p):
+    p["profile"]["problem"].update(value="月末の集計に時間がかかる")
+    at = open_app(p, "recordings")
+    at = next(r for r in at.radio if r.key == "guide_stage").set_value("after_first").run()
+    assert at.session_state["page"] == "sources" and at.session_state["src_kind"] == "議事録"
+    assert not at.exception
+
+
+def test_recordings_page_points_to_minutes(p):
+    p["profile"]["problem"].update(value="月末の集計に時間がかかる")
+    at = key(open_app(p, "recordings"), "go_minutes").click().run()
+    assert at.session_state["page"] == "sources" and at.session_state["src_kind"] == "議事録"
+
+
+@pytest.mark.parametrize("stage,want", [("before_first", "next_input"), ("after_first", "meeting_missing"), ("deciding", "stage_require"), ("output", "export")])
+def test_every_stage_has_next_action(p, stage, want):
+    p["profile"]["problem"].update(value="月末の集計に時間がかかる")
+    gd.guidance_store(p)["user_stage"] = stage
+    assert gd.assess(p, "overview")["main"].id == want
+
+
+def test_deciding_stage_with_requirements_points_to_them(p):
+    pj.add(p, "requirements", pj.new_requirement(title="T", body="B", status="合意済み", kind="機能", acceptance=[{"given": "a", "when": "b", "then": "c", "how": "d"}], scope="今回必須"))
+    gd.guidance_store(p)["user_stage"] = "deciding"
+    assert gd.assess(p, "overview")["main"].id == "stage_refine"
+
+
 def test_profile_page_end_has_next_steps(p):
     at = open_app(p, "profile")
     at = key(at, "pf_next_rec").click().run()

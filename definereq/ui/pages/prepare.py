@@ -29,7 +29,7 @@ def start(p: dict) -> None:
         st.session_state["start_form"] = True
         st.rerun()
     if c2.button("資料・議事録から始める", key="start_records", width="stretch"):
-        state.goto("sources")
+        state.goto_minutes()
     if st.session_state.get("start_form"):
         with st.form("start_profile"):
             values = {key: st.text_area(label, placeholder=hint, height=68, key=f"start_{key}") for key, label, hint in QUICK_FIELDS}
@@ -151,6 +151,8 @@ def profile(p: dict) -> None:
                 value["origin"] = p["profile"][key].get("origin")
             p["profile"].update(new)
             touch(p)
+            if to_records:
+                st.session_state["src_kind"] = "議事録"
             if to_prep or to_records:
                 st.session_state["page"] = "prep" if to_prep else "sources"
             ok_rerun("案件情報を反映しました")
@@ -194,9 +196,9 @@ def _next_block() -> None:
                 state.goto("prep")
         with c2:
             st.markdown("**すでに議事録・資料がある**")
-            st.caption("記録を取り込み、AIで整理します。")
+            st.caption("Word・Excel・PDFの議事録を取り込み、AIで整理します。録画がなくても進められます。")
             if st.button("記録を取り込む", key="pf_next_rec", width="stretch"):
-                state.goto("sources")
+                state.goto_minutes()
 
 
 def prep(p: dict) -> None:

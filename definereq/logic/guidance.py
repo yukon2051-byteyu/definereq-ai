@@ -157,7 +157,8 @@ def _meeting_records(p: dict) -> list[Advice]:
                           "発言の話者と内容を確認してください。", "話者または内容の確認状態が「確認済み」でない発言があるため。", "recordings", f"発言{len(unconfirmed)}件を確認する", 25, {"recordings", "sources"}))
     if user_stage(p) == "after_first" and not has_meeting_record(p):
         out.append(Advice("meeting_missing", "会議の記録が未登録", "会議は実施済みと指定されていますが、議事録や録画が登録されていません。",
-                          "議事録を資料として登録するか、録画・字幕を登録してください。", "「初回会議の後」と指定され、会議の記録が0件のため。", "recordings", "会議の記録を登録する", 22, {"recordings", "sources", "meetings"}))
+                          "Word・Excel・PDF・テキストの議事録を取り込むか、文章を貼り付けてください。録画がなくても進められます。", "会議の記録が0件のため。", "sources", "議事録を取り込む", 22, {"recordings", "sources", "meetings"},
+                          short="議事録（Word・Excel・PDF・テキスト）を取り込みます。録画がなくても進められます。", alt=[("録画を取り込む", "recordings")]))
     waiting = unanalyzed_minutes(p)
     if waiting:
         # 要件を手作業で登録している場合は、解析を強く勧めない
@@ -310,6 +311,26 @@ STAGE_FOCUS = {"before_first": {"prep", "prep_candidates", "sources_added", "nex
                "deciding": {"after_decision", "decide_next", "decision_wait", "conflicts", "change_new", "change_wait", "unclassified", "acceptance_missing"}, "output": {"export"}}
 
 
+STAGE_PAGES = {"before_first": "prep", "after_first": "sources", "deciding": "requirements", "output": "share"}
+
+
+def _stage_default(p: dict, stage: str) -> Advice | None:
+    """選んだ段階に当てはまる項目がないときの、次の操作。段階を選んでも何も起きない状態を作らない。"""
+    if stage == "before_first":
+        return Advice("stage_prep", "これから会議をする", "会議の質問はまだ準備していません。", "質問候補を確認し、会議で聞く項目を選んでください。", "「これから会議をする」を選んだため。", "prep", "質問候補を確認する", 1, {"prep"},
+                      short="会議で聞く質問と議題を準備します。")
+    if stage == "after_first":
+        return Advice("stage_records", "会議が終わり、記録を整理する", "整理する会議の記録がまだありません。", "議事録を貼り付けるか、ファイルを登録してください。", "「会議が終わり、記録を整理する」を選び、未整理の記録がないため。", "sources", "議事録を取り込む", 1, {"sources"},
+                      short="議事録（Word・Excel・PDF・テキスト）を取り込み、AIで整理します。録画がなくても進められます。", alt=[("録画を取り込む", "recordings")])
+    if stage == "deciding":
+        if p["requirements"]:
+            return Advice("stage_refine", "要件を具体化・判断する", "確認が必要な要件は検出されていません。", "要件の内容と受入条件を確認してください。", "「要件を具体化・判断する」を選んだため。", "requirements", "要件を確認する", 1, {"requirements"},
+                          short="要件の内容を確認し、具体化と判断へ進めます。", alt=[("判断を記録する", "decisions")])
+        return Advice("stage_require", "要件を具体化・判断する", "要件はまだ登録されていません。", "要件を手作業で追加するか、議事録をAIで整理して候補から採用してください。", "「要件を具体化・判断する」を選び、要件が0件のため。", "requirements", "要件を追加する", 1, {"requirements"},
+                      short="要件はまだありません。手作業で追加するか、議事録の整理から候補を採用します。", alt=[("議事録をAIで整理する", "candidates")])
+    return None
+
+
 def collect(p: dict, page: str | None = None) -> list[Advice]:
     found = [a for rule in RULES for a in rule(p)]
     if page == "share" or user_stage(p) == "output":
@@ -322,6 +343,10 @@ def assess(p: dict, page: str | None = None, resumed: bool = False) -> dict:
     資料の画面だけは、作成前の確認を先に出す。"""
     focus = STAGE_FOCUS.get(user_stage(p), set())
     found = sorted(collect(p, page), key=lambda a: (0 if a.id in focus else 1, a.rank))
+    if focus and not any(a.id in focus for a in found):
+        fallback = _stage_default(p, user_stage(p))
+        if fallback:
+            found.insert(0, fallback)
     if resumed:
         found.insert(0, _resume(p))
     main = found[0] if found else None

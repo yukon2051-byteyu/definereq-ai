@@ -129,7 +129,7 @@ with sync_playwright() as pw:
     # 4. 議事録
     nav(g, "記録を取り込む")
     if g.get_by_label("貼り付ける文章の名称").count() == 0:
-        g.get_by_text("資料を追加する").first.click()
+        g.get_by_text("議事録・資料を追加する").first.click()
         wait(g, 700)
     pick(g, "資料の種類", "議事録")
     g.get_by_label("貼り付ける文章の名称").fill("初回打ち合わせ議事録")
