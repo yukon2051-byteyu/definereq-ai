@@ -161,7 +161,7 @@ __PALETTE_CSS__
  .dr-v-mid,.dr-m-arrow{display:none}
 }
 .stMainBlockContainer{padding-top:1.6rem}
-[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{padding-top:.4rem}
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{padding-top:0}
 [data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:.12rem}
 [data-testid="stSidebar"] .stCaption{margin-top:.55rem}
 [data-testid="stSidebar"] .stButton button{justify-content:flex-start;text-align:left;border:none;background:transparent;color:#F5F5F7;padding:2px 10px;min-height:30px}
@@ -171,7 +171,7 @@ __PALETTE_CSS__
 [data-testid="stSidebar"] .stButton button[kind="primary"]{background:#fff;color:#161618}
 [data-testid="stSidebar"] .stButton button[kind="primary"] p{font-weight:700;color:#161618}
 /* サイドバーのロゴ（トップへのリンク） */
-[data-testid="stSidebarHeader"]{height:auto;min-height:0;padding:6px 12px 0}
+[data-testid="stSidebarHeader"]{position:absolute;top:0;right:0;z-index:2;width:auto;height:auto;min-height:0;padding:6px 12px 0}
 [data-testid="stSidebar"] .st-key-nav_logo button{background:url("__MARK_DARK__") 8px center/24px 24px no-repeat transparent;padding:2px 10px 2px 42px;min-height:40px}
 [data-testid="stSidebar"] .st-key-nav_logo button:hover,[data-testid="stSidebar"] .st-key-nav_logo button:focus,[data-testid="stSidebar"] .st-key-nav_logo button:active{background:url("__MARK_DARK__") 8px center/24px 24px no-repeat #26262B}
 [data-testid="stSidebar"] .st-key-nav_logo button p{font-size:17px;font-weight:900;color:#fff;letter-spacing:.01em}
