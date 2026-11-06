@@ -74,15 +74,28 @@ def overview(p: dict) -> None:
         return
     head(p["name"], "現在の状況と、確認・依頼することをまとめています。" if not p.get("is_demo") else "残件と次の行動を確認します。完成度の点数は表示しません。", "案件ホーム")
     bl = checks.backlog(p)
-    cols = st.columns(4)
     stats = [("要件", sum(1 for r in p["requirements"] if r["status"] not in ("廃止", "却下"))),
              ("合意済み", sum(1 for r in p["requirements"] if r["status"] == "合意済み")),
              ("残件（対象の数）", bl["unique_total"]),
              ("未解消の矛盾候補", sum(1 for c in p["conflicts"] if c["state"] in ("未確認", "確認中")))]
-    for col, (label, n) in zip(cols, stats):
-        col.html(f'<div class="dr-stat"><div class="dr-stat-n">{n}</div><div class="dr-stat-l">{esc(label)}</div></div>')
-    st.caption(f"分類別の合計は {bl['category_total']} 件です。1つの対象が複数の分類に入ることがあるため、重複を除いた対象の数は {bl['unique_total']} 件です。")
+    # 登録が進むまでは0件の指標と残件の欄を出さない
+    if p.get("is_demo") or any(n for _, n in stats):
+        for col, (label, n) in zip(st.columns(4), stats):
+            col.html(f'<div class="dr-stat"><div class="dr-stat-n">{n}</div><div class="dr-stat-l">{esc(label)}</div></div>')
+    if bl["category_total"] != bl["unique_total"]:
+        st.caption(f"分類別の合計は {bl['category_total']} 件です。1つの対象が複数の分類に入ることがあるため、重複を除いた対象の数は {bl['unique_total']} 件です。")
 
+    if bl["unique_total"] or phase == "clear" or p.get("is_demo"):
+        _backlog(p, bl, phase)
+    _todo_list(p)
+
+    with st.expander("操作の記録"):
+        for a in reversed(p["activity"][-30:]):
+            st.caption(f"{a['at'][:16].replace('T', ' ')}　{a['message']}")
+
+
+def _backlog(p: dict, bl: dict, phase: str) -> None:
+    """残件の一覧。確認した結果として0件の場合は、完了と誤解されないように説明する。"""
     st.subheader("残件")
     for cat, items in bl["categories"].items():
         if not items:
@@ -94,16 +107,7 @@ def overview(p: dict) -> None:
             if st.button("対象の画面へ移動", key=f"go_{cat}"):
                 state.goto(items[0]["page"])
     if not bl["unique_total"]:
-        if phase == "unprocessed":
-            st.info("登録された情報はまだ解析していません。残件が0件でも、確認が済んだことを示すものではありません。")
-        else:
-            st.info("確認した範囲では、残件は検出されていません。登録されていない論点は検出できず、案件全体の確認が完了したことを示すものではありません。")
-
-    _todo_list(p)
-
-    with st.expander("操作の記録"):
-        for a in reversed(p["activity"][-30:]):
-            st.caption(f"{a['at'][:16].replace('T', ' ')}　{a['message']}")
+        st.info("確認した範囲では、残件は検出されていません。登録されていない論点は検出できず、案件全体の確認が完了したことを示すものではありません。")
 
 
 def profile(p: dict) -> None:

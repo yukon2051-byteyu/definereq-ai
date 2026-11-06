@@ -521,6 +521,20 @@ def test_real_project_candidates_page_has_no_demo_wording():
     assert not any("準備済みのAI候補" in c.value for c in open_app(p, "candidates").caption)
 
 
+def test_early_home_has_no_zero_stats_or_backlog(p):
+    p["profile"]["problem"].update(value="月末の集計に時間がかかる")
+    at = open_app(p)
+    assert not at.exception and 'class="dr-stat"' not in html(at)
+    assert not any(s.value == "残件" for s in at.subheader)
+    assert any(s.value == "確認・依頼すること" for s in at.subheader)
+
+
+def test_home_shows_stats_and_backlog_after_requirements(p):
+    pj.add(p, "requirements", pj.new_requirement(title="T", body="B", scope="今回必須"))
+    at = open_app(p)
+    assert 'class="dr-stat"' in html(at) and any(s.value == "残件" for s in at.subheader)
+
+
 def test_profile_page_end_has_next_steps(p):
     at = open_app(p, "profile")
     at = key(at, "pf_next_rec").click().run()
