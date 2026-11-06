@@ -132,6 +132,9 @@ def step2(b):
           ["直接変更", "再承認", "再申請"], "山本", "山本", [b.E("minutes", "承認後でも金額を訂正できるようにしたい")], b.R("immut", "resubmit"),
           state="結論あり", conclusion="再申請を採用（DEC-001）")
 
+    before = pj.get(p, "requirements", b.r["immut"])["body"]
+    pj.update_requirement(p, b.r["immut"], {"body": "承認済みの申請は直接変更できない。金額の誤りは再申請で訂正する。"},
+                          reason="DEC-001 により訂正の手順を追記", actor="デモ担当者")
     b.decide("method", "承認後の金額訂正の方式", [
         opt("A", "直接変更", "現場の手間が少ない", "変更履歴が残っても監査で説明できないと経理が判断"),
         opt("B", "再承認", "承認の記録は続く", "今回の再承認案では元の金額を保持しない"),
@@ -146,9 +149,6 @@ def step2(b):
              "経費申請規程の第6条（金額基準）と第8条（精算後の取消不可）に合わせるため。", {}, "山本", "田中", "2026-09-15",
              [b.E("rule", "10万円以上の申請は部長の承認を必要とする"), b.E("rule", "精算後の申請は取り消せない"), b.E("mtg2", "再申請でも金額の基準は同じです")],
              b.R("limit", "settled"))
-    before = pj.get(p, "requirements", b.r["immut"])["body"]
-    pj.update_requirement(p, b.r["immut"], {"body": "承認済みの申請は直接変更できない。金額の誤りは再申請で訂正する。"},
-                          reason="DEC-001 により訂正の手順を追記", actor="デモ担当者")
     ag.record_history(p, b.r["immut"], "採用", "第2回打ち合わせの論点", decision_id=b.d["method"], before=before,
                       after="承認済みの申請は直接変更できない。金額の誤りは再申請で訂正する。", meeting_date="2026-09-15",
                       proposed_on="2026-09-08", decided_on="2026-09-15", applied_on="2026-09-16",

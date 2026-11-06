@@ -174,6 +174,7 @@ __PALETTE_CSS__
 .dr-doc-m{font-size:12.5px;color:#4A4C53;margin-top:1px}
 .dr-doc-b{font-size:14px;line-height:1.6;color:#2F3036;margin-top:4px}
 .st-key-doc_spec{background:#FBF3E8;border-left:4px solid #D9330F}
+.dr-cand{padding:2px 0}
 .dr-ai-note{border-left:3px solid #2A5DB0;background:#F7F9FC;padding:6px 12px;margin:4px 0}
 .dr-ai-t{font-size:14.5px;font-weight:700;line-height:1.6;color:var(--ink)}
 button:focus-visible,a:focus-visible{outline:2px solid #2A5DB0;outline-offset:2px}
@@ -223,6 +224,10 @@ button:focus-visible,a:focus-visible{outline:2px solid #2A5DB0;outline-offset:2p
 [data-testid="stSidebar"] .st-key-nav_logo button:hover,[data-testid="stSidebar"] .st-key-nav_logo button:focus,[data-testid="stSidebar"] .st-key-nav_logo button:active{background:url("__MARK_DARK__") 8px center/24px 24px no-repeat #26262B}
 [data-testid="stSidebar"] .st-key-nav_logo button p{font-size:17px;font-weight:900;color:#fff;letter-spacing:.01em}
 [data-testid="stSidebar"] .st-key-nav_logo{margin-bottom:8px}
+/* 作業のメニュー：上位は太字、選んだ作業の機能は字下げする */
+[data-testid="stSidebar"] [class*="st-key-nav_group_"] button p{font-weight:700;font-size:14px}
+[data-testid="stSidebar"] [class*="st-key-nav_sub_"]{padding-left:12px;margin-bottom:4px}
+[data-testid="stSidebar"] [class*="st-key-nav_sub_"] button p{font-size:13px}
 /* トップページ専用の余白。見た目の間隔は 区切り30px／説明→内容14px／カード内8px */
 .st-key-home{gap:14px}
 .stMainBlockContainer:has(.st-key-home){padding-bottom:32px}

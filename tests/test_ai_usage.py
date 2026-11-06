@@ -46,7 +46,7 @@ def test_fake_citation_is_marked(project, ledger, fake_llm):
     s = src(project)
     bad = {"source_id": s["id"], "unit_id": "", "quote": "架空の引用"}
     good = {"source_id": s["id"], "unit_id": "", "quote": "承認後は変更できない"}
-    r = ai.run_task(project, "extract", "c", ledger, fake_llm([item(evidence=[bad]), item(evidence=[good])]), limits=BIG)
+    r = ai.run_task(project, "extract", "c", ledger, fake_llm([item(text="案A", evidence=[bad]), item(text="別の内容の案", evidence=[good])]), limits=BIG)
     assert r["candidates"][0]["no_evidence"] and not r["candidates"][1]["no_evidence"]
 
 

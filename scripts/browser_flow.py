@@ -46,7 +46,7 @@ with sync_playwright() as pw:
     print("案件作成", "ブラウザ確認の案件" in page.inner_text("body"))
 
     # 資料のアップロード
-    btn(page, "資料")
+    btn(page, "記録を取り込む")
     page.locator('input[type="file"]').first.set_input_files(str(FILES / "d2_移行計画案.pptx"))
     wait(page)
     btn(page, "読み込む")
@@ -68,7 +68,7 @@ with sync_playwright() as pw:
     page.get_by_role("button", name="案内付きでデモを見る").nth(2).click()
     wait(page)
     btn(page, "全機能のメニューを見る")
-    btn(page, "共有資料・出力")
+    btn(page, "共有・変更管理")
     btn(page, "この内容でWordを作成する")
     with page.expect_download() as d:
         page.get_by_role("button", name="をダウンロード（Word）").click()
@@ -101,7 +101,9 @@ with sync_playwright() as pw:
     p2.screenshot(path=OUT / "resume_summary.png", full_page=True)
     btn(p2, "この案件を再開する")
     print("再開", "拠点ネットワーク更新と遠隔保守" in p2.inner_text("body"), "保存の表示", "保存用ファイル" in p2.inner_text("body"))
-    btn(p2, "会議")
+    btn(p2, "会議の準備")
+    p2.get_by_role("button", name="会議", exact=True).first.click()
+    wait(p2)
     print("会議の画面", "前回からの引き継ぎ" in p2.inner_text("body"))
     p2.screenshot(path=OUT / "meetings.png", full_page=True)
     # 不正なファイルを読んでも案件を失わない

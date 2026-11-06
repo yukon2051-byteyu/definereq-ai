@@ -89,10 +89,12 @@ def decisions(p: dict) -> None:
             ag.new_decision(p, topic.strip(), opts, related_requirements=reqs)
             touch(p)
             ok_rerun("追加しました")
-    d = select_item(p["decisions"], lambda x: f"{x['id']} {x['topic']}（{x['state']}）", "dc_sel", "判断はまだありません。")
+    d = select_item(p["decisions"], lambda x: f"{x['id']} {x['topic']}", "dc_sel", "判断はまだありません。")
     if not d:
         return
     chips(d["state"])
+    if not p.get("is_demo") and d["state"] == "合意済み":
+        _reflect_requirements(p, d)
     if d["options"]:
         st.dataframe(pd.DataFrame([{"案": o["label"], "利点": display(o.get("pros")), "懸念": display(o.get("cons")), "採否": share.option_verdict(d, o), "不採用の理由": d.get("rejected_reasons", {}).get(o["id"]) or "—"} for o in d["options"]]), hide_index=True, width="stretch")
     st.markdown(f"**採用理由**：{d.get('rationale') or '理由の記録がありません'}")
@@ -110,35 +112,77 @@ def decisions(p: dict) -> None:
     k = f"dc_{d['id']}_{d['state']}"
     labels = {o["id"]: o["label"] for o in d["options"]}
     names = ["", *people(p)]
+    with edit_block("dc_who"), st.expander("判断者が一覧にない場合はここで登録"):
+        st.caption("登録しても、下の入力内容は失われません。")
+        with st.form(f"{k}_person", clear_on_submit=True):
+            c1, c2, c3 = st.columns(3)
+            who, org, role = c1.text_input("氏名・役割"), c2.text_input("所属"), c3.text_input("立場")
+            if st.form_submit_button("関係者として登録") and who.strip():
+                pj.add(p, "stakeholders", {"name": who.strip(), "org": org or None, "position": role or None, "authority": "判断者", "certainty": "本人申告", "note": None})
+                touch(p)
+                ok_rerun("登録しました")
     with edit_block("dc"), st.form(k):
-        adopted = st.selectbox("採用案", [None, *labels], index=[None, *labels].index(d.get("adopted")) if d.get("adopted") in [None, *labels] else 0, format_func=lambda v: labels.get(v, "未定"))
-        reason = st.text_area("採用理由", d.get("rationale") or "")
+        reqs_all = [r["id"] for r in p["requirements"]]
+        related = st.multiselect("関連する要件", reqs_all, default=[x for x in d.get("related_requirements", []) if x in reqs_all], format_func=lambda i: pj.label_of(p, i), key=f"{k}_rel")
+        adopted = st.selectbox("採用案", [None, *labels], index=[None, *labels].index(d.get("adopted")) if d.get("adopted") in [None, *labels] else 0, format_func=lambda v: labels.get(v, "未定"), key=f"{k}_ad")
+        reason = st.text_area("採用理由", d.get("rationale") or "", key=f"{k}_why")
         pros = {}
         cons = {}
         for o in d["options"]:
             c1, c2 = st.columns(2)
-            pros[o["id"]] = c1.text_input(f"利点：{o['label']}", o.get("pros") or "")
-            cons[o["id"]] = c2.text_input(f"懸念：{o['label']}", o.get("cons") or "")
-        rej = {oid: st.text_input(f"不採用の理由：{lab}", d.get("rejected_reasons", {}).get(oid) or "") for oid, lab in labels.items()}
-        hold = st.text_input("保留の理由", d.get("hold_reason") or "")
+            pros[o["id"]] = c1.text_input(f"利点：{o['label']}", o.get("pros") or "", key=f"{k}_pro_{o['id']}")
+            cons[o["id"]] = c2.text_input(f"懸念：{o['label']}", o.get("cons") or "", key=f"{k}_con_{o['id']}")
+        rej = {oid: st.text_input(f"不採用の理由：{lab}", d.get("rejected_reasons", {}).get(oid) or "", key=f"{k}_rej_{oid}") for oid, lab in labels.items()}
+        hold = st.text_input("保留の理由", d.get("hold_reason") or "", key=f"{k}_hold")
         c1, c2, c3 = st.columns(3)
-        decider = c1.selectbox("判断者", names, index=names.index(d["decider"]) if d.get("decider") in names else 0)
-        confirmer = c2.selectbox("確認者", names, index=names.index(d["confirmer"]) if d.get("confirmer") in names else 0)
-        date = c3.text_input("判断日（YYYY-MM-DD）", d.get("decided_on") or "")
-        state = st.selectbox("状態", AGREEMENT_STATES, index=AGREEMENT_STATES.index(d["state"]))
+        decider = c1.selectbox("判断者", names, index=names.index(d["decider"]) if d.get("decider") in names else 0, key=f"{k}_dec_{len(names)}")
+        confirmer = c2.selectbox("確認者", names, index=names.index(d["confirmer"]) if d.get("confirmer") in names else 0, key=f"{k}_con_{len(names)}")
+        date = c3.text_input("判断日（YYYY-MM-DD）", d.get("decided_on") or "", key=f"{k}_date")
+        state = st.selectbox("状態", AGREEMENT_STATES, index=AGREEMENT_STATES.index(d["state"]), key=f"{k}_st")
         meeting = meeting_select(p, f"{k}_mtg", d.get("meeting_id"))
         if st.form_submit_button("記録する", type="primary"):
             d["meeting_id"] = meeting
             for o in d["options"]:
                 o["pros"], o["cons"] = pros[o["id"]] or None, cons[o["id"]] or None
             d.update(adopted=adopted, rationale=reason or None, rejected_reasons={a: b for a, b in rej.items() if b}, hold_reason=hold or None,
-                     decider=decider or None, confirmer=confirmer or None, decided_on=date or None)
+                     decider=decider or None, confirmer=confirmer or None, decided_on=date or None, related_requirements=related)
             touch(p)
             if state != d["state"]:
                 if guard(ag.set_state, p, d["id"], state, "human"):
-                    ok_rerun("記録しました")
+                    ok_rerun("判断を合意済みとして記録しました。画面上部の確認欄から、要件へ反映できます" if state == "合意済み" else "記録しました")
             else:
                 ok_rerun("記録しました")
+
+
+def _reflect_requirements(p: dict, d: dict) -> None:
+    """合意済みの判断を、人が選んだ要件へ反映する。判断と要件の合意は別の状態のまま、操作をつなぐ。"""
+    rows = ag.decision_targets(p, d)
+    waiting = [r for r in rows if not r["done"]]
+    if not rows:
+        st.warning("関連する要件が未設定です。下の「関連する要件」で対象を選ぶと、要件へ反映できます。")
+        return
+    if not waiting:
+        st.caption("関連する要件は全てこの判断に基づいて合意済みです。")
+        return
+    with st.container(border=True):
+        st.markdown(f"**判断を合意済みとして記録しました**　関連する要件 {len(waiting)}件に、この判断を反映できます。対象を確認して選んでください。")
+        chosen = []
+        for r in waiting:
+            st.markdown(f"**{r['id']} {r['title']}**（v{r['version']}）")
+            st.caption(f"現在の状態：{r['status']} → 反映後：{r['after']}／根拠：{d['id']} {d['topic']}／残っている確認事項：{display(r['open'])}")
+            if r["same_version"]:
+                if st.checkbox("この要件に反映する", key=f"rf_{d['id']}_{r['id']}_{r['version']}"):
+                    chosen.append(r["id"])
+            else:
+                st.warning(f"判断は v{r['recorded_version']} に対するものです。現在の v{r['version']} には自動で適用しません。内容を確認して、必要なら判断の対象を更新してください。")
+                if st.button(f"v{r['version']} の内容を確認した（判断の対象を更新）", key=f"rv_{d['id']}_{r['id']}"):
+                    ag.reconfirm_version(p, d["id"], r["id"], "human")
+                    touch(p)
+                    ok_rerun("判断の対象を更新しました")
+        if st.button("選んだ要件を合意済みにする", key=f"rf_go_{d['id']}", type="primary", disabled=not chosen):
+            if guard(ag.apply_decision, p, d["id"], chosen, "human") is not None:
+                touch(p)
+                ok_rerun("要件へ反映しました")
 
 
 def changes(p: dict) -> None:

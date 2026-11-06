@@ -41,6 +41,12 @@ def migrate(p: dict) -> dict:
     return q
 
 
+def normalize(p: dict) -> None:
+    """古いデータに、後から増えた任意の項目を補う。既存の値は変更しない。"""
+    for key in pj.PROFILE_FIELDS:
+        p["profile"].setdefault(key, {"value": None, "certainty": "未確認"})
+
+
 def clean_guidance(p: dict) -> None:
     """案内の保存項目を確かめる。案内は補助情報のため、壊れていても案件の読込は止めず、その部分だけ捨てる。"""
     g = p.get("guidance")
@@ -130,6 +136,7 @@ def loads(data: bytes) -> dict:
     errors = validate(p)
     if errors:
         raise LoadError(errors[:20])
+    normalize(p)
     clean_guidance(p)
     if p.get("is_demo"):  # デモから保存した案件は、通常の案件として続きを編集できるようにする
         p.update(is_demo=False, demo=None, from_demo=True)

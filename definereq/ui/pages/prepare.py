@@ -7,16 +7,72 @@ import streamlit as st
 from ... import config
 from ... import project as pj
 from ...demos.builder import STAGES
-from ...logic import checks, continuity
+from ...logic import checks, continuity, intake
+from ...logic import guidance as gd
 from ...project import PROFILE_FIELDS, display
 from ...schema import CERTAINTY, DOMAINS, QUESTION_STATES
 from .. import state
 from ..ai_panel import ai_panel, ai_runs_list
+from ..candidates import board
 from ..components import definition, edit_block, esc, guard, head, ok_rerun, select_item, touch
 
 
+QUICK_FIELDS = (("problem", "現在、何に困っていますか", "例：月末の勤怠集計に時間がかかる"), ("request", "何を変えたいですか", "例：Excel集計をWebシステムへ更新したい"),
+                ("users", "誰が利用しますか", "例：社員100名と上長"), ("constraints", "分かっている制約はありますか", "例：導入時期は未確認"))
+
+
+def start(p: dict) -> None:
+    """新規案件の開始画面。0件の指標は出さず、最初の一歩を案内する。"""
+    head(f"{p['name']}の準備を始めましょう", "まず、更新したい理由や現在の困りごとを教えてください。分かる範囲だけで大丈夫です。資料や議事録から始めることもできます。", "案件の準備")
+    c1, c2 = st.columns(2)
+    if c1.button("背景・困りごとを入力する", key="start_input", type="primary", width="stretch"):
+        st.session_state["start_form"] = True
+        st.rerun()
+    if c2.button("資料・議事録から始める", key="start_records", width="stretch"):
+        state.goto("sources")
+    if st.session_state.get("start_form"):
+        with st.form("start_profile"):
+            values = {key: st.text_area(label, placeholder=hint, height=68, key=f"start_{key}") for key, label, hint in QUICK_FIELDS}
+            st.caption("不明な項目は空欄のままで進められます。入力した内容は案件情報に「本人申告」として記録します。")
+            if st.form_submit_button("案件内に反映", type="primary"):
+                filled = {k: v.strip() for k, v in values.items() if v.strip()}
+                for key, value in filled.items():
+                    p["profile"][key].update(value=value, certainty="本人申告", origin="開始画面の入力")
+                if filled:
+                    touch(p)
+                    st.session_state.pop("start_form", None)
+                    ok_rerun("案件に反映しました")
+                st.warning("1項目以上入力するか、資料・議事録から始めてください。")
+
+
+def _todo_list(p: dict) -> None:
+    """人が担当・期限を付けて管理する宿題。アプリが勧める操作（上の案内）とは別のもの。"""
+    st.subheader("確認・依頼すること")
+    confirm = [q for q in p["questions"] if q.get("category") == "確認事項" and q["status"] in ("未質問", "回答待ち")]
+    acts = [a for a in p["actions"] if a["state"] in ("未着手", "対応中")]
+    if acts:
+        st.dataframe(pd.DataFrame([{"ID": a["id"], "内容": a["content"], "担当": display(a.get("owner")), "期限": display(a.get("due")), "状態": a["state"]} for a in acts]), hide_index=True, width="stretch")
+    if confirm:
+        st.dataframe(pd.DataFrame([{"ID": q["id"], "確認事項": q["text"], "確認相手": display(q.get("ask")), "状態": q["status"]} for q in confirm]), hide_index=True, width="stretch")
+    if not acts and not confirm:
+        st.caption("登録された依頼や確認事項はありません。")
+    with edit_block("action"), st.form("add_action", clear_on_submit=True):
+        c1, c2, c3 = st.columns([3, 1, 1])
+        text = c1.text_input("依頼・確認を追加", placeholder="例：人事担当に現行の勤怠表を依頼する")
+        owner = c2.text_input("担当（未設定可）")
+        due = c3.text_input("期限（未設定可）")
+        if st.form_submit_button("追加") and text.strip():
+            pj.add(p, "actions", {"content": text.strip(), "owner": owner or None, "due": due or None, "related": [], "state": "未着手"})
+            touch(p)
+            ok_rerun("追加しました")
+
+
 def overview(p: dict) -> None:
-    head(p["name"], "残件と次の行動を確認します。完成度の点数は表示しません。", "概要")
+    phase = gd.phase(p)
+    if phase == "empty" and not p.get("is_demo"):
+        start(p)
+        return
+    head(p["name"], "現在の状況と、確認・依頼することをまとめています。" if not p.get("is_demo") else "残件と次の行動を確認します。完成度の点数は表示しません。", "案件ホーム")
     bl = checks.backlog(p)
     cols = st.columns(4)
     stats = [("要件", sum(1 for r in p["requirements"] if r["status"] not in ("廃止", "却下"))),
@@ -38,22 +94,12 @@ def overview(p: dict) -> None:
             if st.button("対象の画面へ移動", key=f"go_{cat}"):
                 state.goto(items[0]["page"])
     if not bl["unique_total"]:
-        st.info("現在の登録内容から検出された残件はありません。登録されていない論点は検出できません。")
+        if phase == "unprocessed":
+            st.info("登録された情報はまだ解析していません。残件が0件でも、確認が済んだことを示すものではありません。")
+        else:
+            st.info("確認した範囲では、残件は検出されていません。登録されていない論点は検出できず、案件全体の確認が完了したことを示すものではありません。")
 
-    st.subheader("次の行動")
-    na = checks.next_actions(p)
-    if na["actions"]:
-        st.dataframe(pd.DataFrame([{"ID": a["id"], "内容": a["content"], "担当": display(a.get("owner")), "期限": display(a.get("due")), "状態": a["state"]}
-                                   for a in na["actions"]]), hide_index=True, width="stretch")
-    with edit_block("action"), st.form("add_action", clear_on_submit=True):
-        c1, c2, c3 = st.columns([3, 1, 1])
-        text = c1.text_input("行動を追加")
-        owner = c2.text_input("担当（未設定可）")
-        due = c3.text_input("期限（未設定可）")
-        if st.form_submit_button("追加") and text.strip():
-            pj.add(p, "actions", {"content": text.strip(), "owner": owner or None, "due": due or None, "related": [], "state": "未着手"})
-            touch(p)
-            ok_rerun("行動を追加しました")
+    _todo_list(p)
 
     with st.expander("操作の記録"):
         for a in reversed(p["activity"][-30:]):
@@ -61,7 +107,8 @@ def overview(p: dict) -> None:
 
 
 def profile(p: dict) -> None:
-    head("案件情報・関係者", "確認済み・本人申告・仮説・未確認を区別して記録します。担当者や期限をAIが設定することはありません。", "準備")
+    head("背景・目的・関係者", "確認済み・本人申告・仮説・未確認を区別して記録します。要件定義書の背景と目的はここを参照します。担当者や期限をAIが設定することはありません。", "案件ホーム")
+    _reflect_panel(p)
     st.subheader("対象分野")
     if p.get("is_demo"):
         st.write("、".join(DOMAINS[d] for d in p["domains"]))
@@ -73,7 +120,7 @@ def profile(p: dict) -> None:
         missing = [traits_all[k]["label"] for k in suggested if k not in p.get("traits", [])]
         if missing:
             st.caption("本文から提案された特徴（採否は人が決めます）：" + "、".join(missing))
-        if st.button("分野と特徴を保存") and domains:
+        if st.button("分野と特徴を案件内に反映") and domains:
             p["domains"], p["traits"] = domains, traits
             touch(p)
             ok_rerun("保存しました")
@@ -89,7 +136,9 @@ def profile(p: dict) -> None:
             value = c1.text_area(label, value=cur["value"] or "", height=68, key=f"pf_{key}")
             cert = c2.selectbox("確かさ", CERTAINTY, index=CERTAINTY.index(cur["certainty"]), key=f"pfc_{key}")
             new[key] = {"value": value.strip() or None, "certainty": cert}
-        if st.form_submit_button("保存", type="primary"):
+        if st.form_submit_button("案件内に反映", type="primary"):
+            for key, value in new.items():  # 出所の記録は残す
+                value["origin"] = p["profile"][key].get("origin")
             p["profile"].update(new)
             touch(p)
             ok_rerun("保存しました")
@@ -120,10 +169,10 @@ def profile(p: dict) -> None:
 
 
 def prep(p: dict) -> None:
-    head("会議前の準備", "固定の確認観点と案件の特徴を組み合わせて質問を用意します。回答済みの観点は繰り返しません。", "準備")
+    head("質問・議題", "会議で確認することを準備します。AIに候補を作ってもらい、この画面で質問や議題へ追加できます。回答済みの観点は繰り返しません。", "会議の準備")
     pr = p["prep"]
     carryover_panel(p)
-    tabs = st.tabs(["理解と議題", "質問", "分野別の確認観点"])
+    tabs = st.tabs(["理解と議題", "質問", "分野別の確認観点"], key="prep_tabs")
     if p.get("is_demo"):
         with tabs[0]:
             definition([("現時点の理解", pr.get("understanding")), ("会議の目的", pr.get("purpose")), ("不足情報", pr.get("gaps")), ("必要な資料・計測", pr.get("materials")),
@@ -136,7 +185,7 @@ def prep(p: dict) -> None:
         materials = c2.text_area("必要な資料・計測（1行に1件）", value="\n".join(pr.get("materials", [])))
         agenda = c1.text_area("議題（1行に1件）", value="\n".join(pr.get("agenda", [])))
         decide = c2.text_area("今回決めたいこと（1行に1件）", value="\n".join(pr.get("decide_today", [])))
-        if st.form_submit_button("保存", type="primary"):
+        if st.form_submit_button("案件内に反映", type="primary"):
             def lines(x: str) -> list[str]:
                 return [v.strip() for v in x.splitlines() if v.strip()]
             pr.update(understanding=understanding or None, purpose=purpose or None, gaps=lines(gaps), materials=lines(materials),
@@ -144,6 +193,7 @@ def prep(p: dict) -> None:
             touch(p)
             ok_rerun("保存しました")
     with tabs[1]:
+        board(p, ("prep",), "prep_cand", heading="AIが作成した準備の候補")  # 実行した結果を最初に見せる
         qs = p["questions"]
         if qs:
             order = {"高": 0, "中": 1, "低": 2, None: 3}
@@ -182,13 +232,40 @@ def prep(p: dict) -> None:
         st.caption("観点は config/checkpoints.toml で追加・変更できます。すべてを必須入力にはしていません。")
 
 
+def _reflect_panel(p: dict) -> None:
+    """会議準備やAI候補の内容を、人の確認のうえで案件情報へ反映する。無断で上書きしない。"""
+    found = intake.profile_suggestions(p)
+    if not found:
+        return
+    with edit_block("reflect"):
+        st.subheader("案件情報へ反映できる内容")
+        for s in found:
+            with st.container(border=True):
+                st.markdown(f"**{s['label']}**（出所：{s['origin']}）")
+                st.write(s["value"])
+                if s["current"]:
+                    st.caption(f"現在の内容：{s['current']}")
+                    c1, c2 = st.columns(2)
+                    if c1.button("置き換える", key=f"pf_replace_{s['id']}"):
+                        intake.apply_profile(p, s, "replace")
+                        touch(p)
+                        ok_rerun("案件情報を更新しました")
+                    if c2.button("追記する", key=f"pf_append_{s['id']}"):
+                        intake.apply_profile(p, s, "append")
+                        touch(p)
+                        ok_rerun("案件情報を更新しました")
+                elif st.button("確認して案件情報へ反映する", key=f"pf_set_{s['id']}", type="primary"):
+                    intake.apply_profile(p, s)
+                    touch(p)
+                    ok_rerun("案件情報へ反映しました")
+
+
 def carryover_panel(p: dict) -> None:
     """前回までに残っている事項。"""
     groups = {k: v for k, v in continuity.carryover(p).items() if v}
-    st.subheader("前回からの引き継ぎ")
-    if not groups:
-        st.caption("引き継ぐ未決事項や宿題は登録されていません。")
+    if not groups or not gd.has_meeting_record(p):  # 初回には引き継ぐものがない
         return
+    st.subheader("前回からの引き継ぎ")
     for name, items in groups.items():
         with st.expander(f"{name}　{len(items)}件"):
             st.dataframe(pd.DataFrame([{"ID": i["id"], "内容": i["text"], "確認相手・担当": display(i["ask"]), "期限": display(i["due"]), "会議": i["meeting"]} for i in items]),

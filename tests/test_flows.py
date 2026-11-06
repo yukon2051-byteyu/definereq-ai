@@ -119,9 +119,9 @@ def test_new_project_is_editable():
 
 
 def test_menu_shows_main_steps_and_details():
-    from definereq.ui.shell import DETAILS, GROUPS, NEXT, PAGES
+    from definereq.ui.shell import GROUPS, NEXT, PAGES
 
-    assert sum(len(i) for _, i in GROUPS) <= 11 and DETAILS
+    assert len(GROUPS) == 5 and all(i for _, i in GROUPS)
     assert set(NEXT) == set(PAGES)
     assert all(t in PAGES for _, t in NEXT.values())
 

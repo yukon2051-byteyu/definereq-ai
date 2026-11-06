@@ -15,7 +15,7 @@ from ...project import display
 from ...schema import DOC_TYPES
 from ...usage import gate
 from ...usage.ledger import LedgerUnavailable
-from .. import artifacts
+from .. import artifacts, state
 from ..ai_panel import current_code
 from ..components import chip, chips, edit_block, esc, evidence_block, head, ok_rerun, save_controls, select_item, touch
 
@@ -138,9 +138,30 @@ def why(p: dict) -> None:
             st.html(f'<div class="dr-ev"><div class="dr-ev-q">「{esc(str(c["text"]))}」</div><div class="dr-ev-w">{esc(c["where"])}</div></div>')
 
 
+def _precheck(p: dict, check: dict) -> None:
+    """要件定義書の出力前確認。不足があっても下書きとして出力できる。"""
+    with st.container(border=True):
+        st.markdown("**要件定義書の出力前確認**")
+        rows = "".join(f"<li>{esc(label)}：{n}件</li>" for label, n, _ in check["rows"])
+        if check["missing_profile"]:
+            rows += f"<li>{esc('・'.join(check['missing_profile']))}が未設定（案件情報を参照します）</li>"
+        st.html(f'<ul class="dr-g-list">{rows}</ul>')
+        st.caption("未採用のAI候補は文書に含まれません。質問・宿題・未回答は、候補の画面から確認事項へ反映すると文書に記載されます。")
+        with st.expander(f"出力対象の要件と版（{len(check['targets'])}件）"):
+            for t in check["targets"]:
+                st.write(t)
+        c1, c2, c3 = st.columns(3)
+        if c1.button("不足項目を確認する", key="go_check_reqs", width="stretch"):
+            state.goto("requirements")
+        if check["pending_candidates"] and c2.button("未処理の候補を確認する", key="go_check_cands", width="stretch"):
+            state.goto("candidates")
+        if check["missing_profile"] and c3.button("案件情報を確認する", key="go_check_prof", width="stretch"):
+            state.goto("profile")
+
+
 def share_page(p: dict) -> None:
-    head("共有資料・出力", "出力の前に対象を確認します。内部メモは既定で対象外です。録画の全文や発言は自動で掲載しません。送付しても合意にはなりません。", "出力")
-    tabs = st.tabs(["確認資料・要件定義書", "回答の記録", "Excel・JSON"])
+    head("確認資料・要件定義書", "出力の前に対象と不足を確認します。内部メモは既定で対象外です。録画の全文や発言は自動で掲載しません。送付しても合意にはなりません。", "共有・変更管理")
+    tabs = st.tabs(["確認資料・要件定義書", "回答の記録", "Excel・JSON"], key="share_tabs")
     with tabs[0]:
         doc_type = st.radio("資料の種類", list(DOC_TYPES), format_func=DOC_TYPES.get, horizontal=True, key="sh_type")
         opt = share.Options(doc_type=doc_type)
@@ -162,19 +183,29 @@ def share_page(p: dict) -> None:
         opt.exclude_ids = set(st.multiselect("対象から外す要件", ids, format_func=lambda i: pj.label_of(p, i), key="sh_ex"))
         with st.expander("内容を確認する", expanded=False):
             artifacts.preview(share.build(p, opt))
-        if st.button("この内容でWordを作成する", type="primary", key="share_word"):
+        check = share.precheck(p, opt) if doc_type == "spec" else None
+        if check:
+            _precheck(p, check)
+        label = "下書きとしてWordを作成する" if check and check["is_draft"] else f"{DOC_TYPES[doc_type]}を作成する（Word）"
+        if st.button(label, type="primary", key="share_word"):
             title = DOC_TYPES[doc_type]
             if p.get("is_demo"):  # 閲覧専用では発行の記録を増やさない。発行済みの資料と同じ版で出力する
                 doc = share.latest_doc(p, doc_type) or {"id": "DEMO", "version": 1, "issued_at": pj.now_iso()}
             else:
                 doc = share.register_doc(p, opt, title)
-            st.session_state["word"] = {"data": wordx.render(p, opt, doc["id"], doc["version"], doc["issued_at"]), "name": wordx.filename(p, doc_type, doc["version"]), "id": doc["id"]}
+            st.session_state["word"] = {"data": wordx.render(p, opt, doc["id"], doc["version"], doc["issued_at"]), "name": wordx.filename(p, doc_type, doc["version"]), "id": doc["id"], "title": title}
             touch(p)
         w = st.session_state.get("word")
         if w:
-            st.download_button(f"{w['id']} をダウンロード（Word）", w["data"], file_name=w["name"], mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            st.success(f"{w['title']}を作成しました。下のボタンからダウンロードしてください。")
+            st.download_button(f"{w['title']}をダウンロード（Word）", w["data"], file_name=w["name"], mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", key="dl_word", on_click="ignore", type="primary")
             st.caption("PDFが必要な場合は、Wordで開いて「名前を付けて保存」からPDFを選んでください。")
-        st.markdown("**発行済みの資料**")
+            c1, c2 = st.columns(2)
+            if c1.button("未確認事項を確認する", key="go_overview_open", width="stretch"):
+                state.goto("overview")
+            if c2.button("案件ホームへ戻る", key="go_home_after", width="stretch"):
+                state.goto("overview")
+        st.markdown("**作成済みの資料**")
         st.dataframe(pd.DataFrame([{"ID": d["id"], "名称": d["title"], "版": d["version"], "発行日時": d["issued_at"][:16].replace("T", " "), "範囲": d["scope_note"], "送付": "送付済み" if d["sent"] else "未送付"} for d in p["shared_docs"]],
                                   columns=["ID", "名称", "版", "発行日時", "範囲", "送付"]), hide_index=True, width="stretch")
         if p["shared_docs"] and not p.get("is_demo"):
@@ -200,7 +231,7 @@ def share_page(p: dict) -> None:
                     ok_rerun("記録しました")
     with tabs[2]:
         include = st.toggle("Excelに内部メモを含める（社外共有は不可）", value=False, key="xl_in")
-        st.download_button("Excelをダウンロード（要件・質問・残件・リスク・履歴）", excelx.render(p, include), file_name=excelx.filename(p, pj.today()),
+        st.download_button("Excelをダウンロード（要件・質問・残件・リスク・履歴）", excelx.render(p, include), file_name=excelx.filename(p, pj.today()), key="dl_xl", on_click="ignore",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         if p.get("is_demo"):
             st.download_button("案件JSONをダウンロード", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json")

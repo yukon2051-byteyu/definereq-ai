@@ -42,9 +42,63 @@ def set_state(p: dict, dec_id: str, state: str, actor_kind: str, actor: str = "�
             raise ValueError("根拠が未確認の情報だけです。話者や内容を確認するか、確認できる根拠を追加してください。")
     if state == "保留" and not dec.get("hold_reason"):
         raise ValueError("保留の理由を入力してください。")
+    if state == "合意済み":  # どの版に対する判断かを残す。後で要件が変わったときに古い判断と分かるように
+        dec["target_versions"] = _versions(p, dec)
     dec["state_log"].append({"at": pj.now_iso(), "from": dec["state"], "to": state, "by": actor})
     dec["state"] = state
     pj.log(p, f"判断 {dec_id} を「{state}」にしました（{actor}）")
+    return dec
+
+
+def _versions(p: dict, dec: dict) -> dict:
+    return {r["id"]: r["version"] for rid in dec.get("related_requirements", []) if (r := pj.get(p, "requirements", rid))}
+
+
+def decision_targets(p: dict, dec: dict) -> list[dict]:
+    """判断の対象の要件と、反映できるかどうか。反映は人が選ぶ。"""
+    rows = []
+    for rid in dec.get("related_requirements", []):
+        r = pj.get(p, "requirements", rid)
+        if not r:
+            continue
+        recorded = (dec.get("target_versions") or {}).get(rid)
+        same = recorded is None or recorded == r["version"]
+        rows.append({"id": rid, "title": r["title"], "version": r["version"], "recorded_version": recorded, "status": r["status"], "same_version": same,
+                     "done": r["status"] == "合意済み" and same, "after": "合意済み" if same else "反映できません（版の確認が必要）",
+                     "open": r.get("open_items") or r.get("open_area") or (None if r.get("acceptance") else "受入条件が未設定")})
+    return rows
+
+
+def apply_decision(p: dict, dec_id: str, req_ids: list[str], actor_kind: str, actor: str = "利用者") -> list[dict]:
+    """合意済みの判断を、人が選んだ要件へ反映する。古い版へは反映しない。"""
+    if actor_kind != "human":
+        raise PermissionError("合意は人の操作でのみ記録できます。")
+    dec = pj.require(p, "decisions", dec_id)
+    if dec["state"] != "合意済み":
+        raise ValueError("反映には合意済みの判断が必要です。")
+    done = []
+    for rid in req_ids:
+        if rid not in dec.get("related_requirements", []):
+            raise ValueError(f"{rid} はこの判断に関連付いていません。")
+        req = pj.require(p, "requirements", rid)
+        if not pj.covers_version(dec, req):
+            raise ValueError(f"{rid} は判断の後に v{req['version']} へ変更されています。内容を確認してください。")
+        pj.set_requirement_status(p, rid, "合意済み", "human", actor)
+        record_history(p, rid, "採用", f"判断 {dec_id}（{dec['topic']}）", decision_id=dec_id, after=req["body"], decided_on=dec.get("decided_on"), meeting_id=dec.get("meeting_id"),
+                       options=[o["label"] for o in dec.get("options", [])], rationale=dec.get("rationale"), decider=dec.get("decider"), confirmer=dec.get("confirmer"), evidence=dec.get("evidence"))
+        done.append(req)
+    return done
+
+
+def reconfirm_version(p: dict, dec_id: str, req_id: str, actor_kind: str, actor: str = "利用者") -> dict:
+    """要件の現在の版を見たうえで、判断の対象を人が更新する。自動では更新しない。"""
+    if actor_kind != "human":
+        raise PermissionError("判断の確認は人の操作でのみ記録できます。")
+    dec = pj.require(p, "decisions", dec_id)
+    req = pj.require(p, "requirements", req_id)
+    dec.setdefault("target_versions", {})[req_id] = req["version"]
+    dec["state_log"].append({"at": pj.now_iso(), "from": dec["state"], "to": dec["state"], "by": actor, "note": f"{req_id} v{req['version']} を確認"})
+    pj.log(p, f"判断 {dec_id} の対象を {req_id} v{req['version']} に更新しました（{actor}）")
     return dec
 
 
@@ -139,6 +193,7 @@ def apply_change(p: dict, chg_id: str, decision_id: str, updates: dict[str, dict
                        proposed_on=chg.get("requested_at"), options=[o["label"] for o in dec.get("options", [])],
                        rationale=dec.get("rationale"), decider=dec.get("decider"), confirmer=dec.get("confirmer"),
                        evidence=dec.get("evidence"), impact=f"{len(chg.get('impacts', []))}件の影響を調査")
+        dec.setdefault("target_versions", {})[req_id] = req["version"]  # この判断に基づく変更なので、新しい版が対象になる
         results.append(req)
     chg["status"] = "反映済み"
     chg["decision_id"] = decision_id

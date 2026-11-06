@@ -7,76 +7,47 @@ import streamlit as st
 from ... import project as pj
 from ...logic import checks, continuity
 from ...project import display, field_state
-from ...schema import AGREEMENT_STATES, CANDIDATE_INTAKE, CANDIDATE_KINDS, DOMAINS, MEASURE_KINDS, MEASURE_ORIGINS, MEASURE_STATUS, PRIORITIES, REQ_KINDS, SCOPE_CHOICES
+from ...export import share
+from ...schema import AGREEMENT_STATES, CANDIDATE_KINDS, DOMAINS, MEASURE_KINDS, MEASURE_ORIGINS, MEASURE_STATUS, PRIORITIES, REQ_KINDS, SCOPE_CHOICES
 from ..ai_panel import ai_panel, ai_runs_list
-from ..components import add_evidence_form, chip, chips, edit_block, evidence_block, flow, guard, head, meeting_select, ok_rerun, people, select_item, touch, tri_text
+from ..candidates import board
+from ..components import STATUS_TONE, add_evidence_form, chip, chips, edit_block, evidence_block, flow, guard, head, meeting_select, ok_rerun, people, select_item, touch, tri_text
 
 
 def candidates(p: dict) -> None:
-    head("会議後の整理", "AIの候補を人が確認し、採用・修正・却下を決めます。候補のままでは要件や合意になりません。", "整理")
-    if not p.get("is_demo"):
+    head("AI候補の確認", "議事録や資料からAIが整理した候補を確認し、内容に合う場所へ反映します。候補のままでは要件や合意になりません。", "要件を整理・判断")
+    if not p.get("is_demo") and not p["candidates"]:
         flow([("入力", "選択した資料・発言"), ("AI候補", "要点・要望・決定候補など"), ("人の判断", "採用／修正／却下"), ("結果", "根拠付きの要件・論点")])
     else:
         st.caption("準備済みのAI候補と、担当者が採用・却下した結果を確認できます。")
-    ai_panel(p, "extract")
-    ai_runs_list(p, "extract")
     with edit_block("cand_mtg"):
         meeting = meeting_select(p, "cand_mtg")
-    kinds = sorted({c["kind"] for c in p["candidates"]})
-    filt = st.multiselect("種類で絞り込む", kinds, key="cand_f")
-    items = [c for c in p["candidates"] if not filt or c["kind"] in filt]
-    if not items:
+    prep_tasks = {r["id"] for r in p["ai_runs"] if r["task"] == "prep"}
+    other = tuple(sorted({r["task"] for r in p["ai_runs"]} - {"prep"}))
+    if not p.get("is_demo") and any(c["state"] == "候補" and c.get("origin_run") in prep_tasks for c in p["candidates"]):
+        st.caption("会議準備で作成した候補は「質問・議題」の画面で確認できます。")
+    if not p["candidates"]:
         st.info("候補はありません。")
-    for c in items:
-        with st.container(border=True):
-            st.html(f"<div>{chip(c['id'], 'plain')} {chip(c['kind'], 'info')} {chip(c['state'])} {chip(c['origin'], 'plain')}</div>")
-            st.markdown(f"**{c['text']}**")
-            if c.get("detail"):
-                st.caption(c["detail"])
-            if c.get("unsupported_numbers"):
-                st.warning("資料にない数値が含まれています：" + "、".join(c["unsupported_numbers"]) + "。創作の可能性があるため確認してください。")
-            if c.get("no_evidence"):
-                st.caption("確認できる根拠がありません。AIの推測として扱ってください。")
-            for i, e in enumerate(c.get("evidence", [])):
-                evidence_block(p, e, f"cand_{c['id']}_{i}")
-            if c["state"] == "候補":
-                with edit_block(f"intake_{c['id']}"):
-                    c1, c2 = st.columns(2)
-                    kind = c1.selectbox("振り分け", CANDIDATE_INTAKE, key=f"ik_{c['id']}", index=2)
-                    reqs = [r["id"] for r in p["requirements"]]
-                    target = c2.selectbox("対象の要件（補足・変更候補）", reqs, key=f"it_{c['id']}", index=None, format_func=lambda i: pj.label_of(p, i))
-                    st.caption("補足と変更候補は追加要望として受け付けます。合意済みの要件は書き換えません。")
-                b1, b2, b3 = st.columns(3)
-                if b1.button("振り分けて採用", key=f"adopt_{c['id']}"):
-                    item = guard(continuity.intake_candidate, p, c["id"], kind, target, meeting)
-                    if item:
-                        touch(p)
-                        ok_rerun(f"{item['id']} を作成しました")
-                if b2.button("記録のみ採用", key=f"keep_{c['id']}"):
-                    c["state"] = "採用"
-                    touch(p)
-                    ok_rerun("採用しました")
-                if b3.button("却下", key=f"rej_{c['id']}"):
-                    c["state"] = "却下"
-                    touch(p)
-                    ok_rerun("却下しました")
-            elif c.get("resolved_as"):
-                st.caption(f"反映先：{pj.label_of(p, c['resolved_as'])}")
+    elif p.get("is_demo") or other:
+        board(p, None if p.get("is_demo") else other, "cand", meeting)
+    ai_panel(p, "extract")
+    ai_runs_list(p, "extract")
 
 
 def _req_label(r: dict) -> str:
-    return f"{r['id']} {r['title']}（v{r['version']}・{r['status']}）"
+    # 状態や版は変わるため選択欄の表示名に入れない（選択中の項目に古い状態が残るのを防ぐ）。現在の値は下に表示する
+    return f"{r['id']} {r['title']}"
 
 
 def requirements(p: dict) -> None:
     head("要件", "段階的に入力できます。未設定と該当なしを区別します。合意済みの要件を変更すると、確認待ちに戻ります。", "整理")
     rows = [{"ID": r["id"], "名称": r["title"], "版": r["version"], "分野": DOMAINS.get(r.get("domain"), "未設定"), "種類": display(r.get("kind")), "優先": display(r.get("priority")),
-             "範囲": display(r.get("scope")), "状態": r["status"], "受入条件": len(r.get("acceptance") or []), "根拠": len(r.get("evidence") or [])} for r in p["requirements"]]
+             "対象範囲": share.scope_label(r.get("scope")), "合意状態": r["status"], "受入条件": len(r.get("acceptance") or []), "根拠": len(r.get("evidence") or [])} for r in p["requirements"]]
     if rows:  # 要件がないときは絞り込みを出さない
         c1, c2 = st.columns(2)
-        fs = c1.multiselect("状態", AGREEMENT_STATES, key="rq_fs")
+        fs = c1.multiselect("合意状態", AGREEMENT_STATES, key="rq_fs")
         fq = c2.text_input("検索", key="rq_q")
-        rows = [r for r in rows if (not fs or r["状態"] in fs) and (not fq or fq in r["名称"] or fq in r["ID"])]
+        rows = [r for r in rows if (not fs or r["合意状態"] in fs) and (not fq or fq in r["名称"] or fq in r["ID"])]
         st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     with edit_block("addreq"), st.expander("要件を追加する"):
         with st.form("add_req", clear_on_submit=True):
@@ -89,18 +60,20 @@ def requirements(p: dict) -> None:
     r = select_item(p["requirements"], _req_label, "rq_sel", "要件はまだありません。")
     if not r:
         return
-    chips(r["status"], r.get("scope") or "未設定")
+    st.html('<div class="dr-chips">' + chip(f"合意状態：{r['status']}", STATUS_TONE.get(r["status"], "plain")) + chip(f"対象範囲：{share.scope_label(r.get('scope'))}", "plain") + chip(f"版：v{r['version']}", "plain") + "</div>")
     if r.get("merged_into") or r.get("replaced_by") or r.get("split_from"):
         st.caption("系譜：" + " → ".join(pj.lineage(p, r["id"])))
     if p.get("is_demo"):  # 閲覧専用では編集と関係のタブを出さない
-        shown = st.tabs(["内容", "根拠", "版の履歴"])
+        shown = st.tabs(["内容", "根拠", "版の履歴"], key="req_tabs_demo")
         hidden = st.container(key="edit-req")
         tab = [shown[0], shown[1], hidden, shown[2], hidden]
     else:
-        tab = st.tabs(["内容", "根拠", "編集", "版の履歴", "関係"])
+        tab = st.tabs(["内容", "根拠", "編集", "版の履歴", "関係"], key="req_tabs")  # 再実行しても開いているタブを保つ
     with tab[0]:
         st.markdown(f"**{r['title']}**")
         st.write(r["body"])
+        if r.get("from_candidate"):
+            st.caption(f"元の候補：{pj.label_of(p, r['from_candidate'])}")
         for key, label in (("background", "背景・目的"), ("target", "対象業務・役割・構成要素"), ("preconditions", "前提"), ("behavior", "必要な動作・サービス条件"),
                            ("exceptions", "例外・境界"), ("data_io", "データ・入出力・通信"), ("nonfunctional", "非機能"), ("open_items", "未決")):
             st.caption(f"{label}：{display(r.get(key))}")
@@ -134,15 +107,15 @@ def requirements(p: dict) -> None:
         due = c3.text_input("期限（人が決めます）", r.get("due") or "", key=k + "due")
         note = st.text_input("内部メモ", r.get("internal_note") or "", key=k + "n")
         reason = st.text_input("変更の理由", key=k + "r")
-        if st.button("変更を保存（版が上がります）", type="primary", key=k + "s"):
+        if st.button("案件内に反映（版が上がります）", type="primary", key=k + "s"):
             pj.update_requirement(p, r["id"], {"title": title, "body": body, "domain": domain, "kind": kind, "priority": prio, "decider": decider or None,
                                                "confirm_with": ask or None, "due": due or None, "internal_note": note or None, **values}, reason=reason or None)
             touch(p)
             ok_rerun("保存しました")
         st.divider()
-        new_status = st.selectbox("状態の変更", AGREEMENT_STATES, index=AGREEMENT_STATES.index(r["status"]), key=k + "st")
-        st.caption("合意済みにするには、関連付いた合意済みの判断記録が必要です（「決定・合意」の画面で記録します）。")
-        if st.button("状態を変更", key=k + "stb") and new_status != r["status"]:
+        new_status = st.selectbox("合意状態の変更", AGREEMENT_STATES, index=AGREEMENT_STATES.index(r["status"]), key=k + "st")
+        st.caption("合意済みにするには、この版を対象にした合意済みの判断記録が必要です（「決定・合意」の画面で記録します）。")
+        if st.button("合意状態を変更", key=k + "stb") and new_status != r["status"]:
             if guard(pj.set_requirement_status, p, r["id"], new_status, "human"):
                 touch(p)
                 ok_rerun("変更しました")

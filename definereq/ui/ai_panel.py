@@ -35,8 +35,15 @@ def ai_panel(p: dict, task_key: str, extra: str = "", recordings: bool = False) 
                                      format_func=lambda i: next(r["name"] for r in p["recordings"] if r["id"] == i), key=f"ai_rec_{task_key}")
         context = ai.build_context(p, task, chosen, rec_ids, extra)
         est = ai.estimate(context)
+        refs = ai.reference_items(p)
+        st.markdown("**AIが参照する案件の情報**")
+        for group, values in refs.items():
+            if values:
+                st.caption(f"{group}：" + "／".join(f"{k}（{v['確かさ']}）：{v['内容']}" if isinstance(v, dict) else f"{k}：{'、'.join(v) if isinstance(v, list) else v}" for k, v in values.items()))
+        if not any(refs.values()):
+            st.caption("案件の情報は未登録です。案件名と対象分野、選んだ資料だけを送信します。")
         st.caption(f"送信先：Anthropic（Claude API、モデル {config.ai_model()}）／送信量：{len(context):,}文字／費用見込み：最大 約{est:,.0f}円")
-        st.caption("選んでいない資料、対象外の単位（発表者ノートの初期状態など）、内部メモは送信しません。")
+        st.caption("上の案件情報と選んだ資料だけを送信します。選んでいない資料、対象外の単位（発表者ノートの初期状態など）、内部メモは送信しません。")
         code = current_code()
         rd = gate.readiness(code if code else None)
         if len(context) > config.MAX_AI_INPUT_CHARS:
@@ -64,7 +71,8 @@ def ai_panel(p: dict, task_key: str, extra: str = "", recordings: bool = False) 
                     st.error(str(e))
                     return
             touch(p)
-            ok_rerun(f"{len(res['candidates'])}件の候補を作成しました（約{res['cost_jpy']:,.1f}円）")
+            skipped = res["run"].get("skipped_duplicates") or 0
+            ok_rerun(f"{len(res['candidates'])}件の候補を作成しました（約{res['cost_jpy']:,.1f}円）" + (f"。重複{skipped}件は追加していません" if skipped else ""))
 
 
 def ai_runs_list(p: dict, task_key: str) -> None:

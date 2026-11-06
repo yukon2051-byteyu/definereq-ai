@@ -118,11 +118,15 @@ def save_controls(p: dict, key: str) -> None:
     from ..export import jsonio
     from . import state
 
-    st.download_button("案件を保存（JSON）", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json",
+    st.download_button("再開用ファイルをダウンロード", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json",
                        key=key, width="stretch", on_click=state.mark_saved, args=(p,))
     made = st.session_state.get("save_time")
-    when = f"保存用ファイルの作成：{made[:16].replace('T', ' ')}" if made else "保存用ファイルはまだ作成していません"
-    st.caption(when + ("／作成後の変更あり" if state.is_dirty(p) else "／作成後の変更なし"))
+    if not state.is_dirty(p):
+        st.caption(f"{made[11:16]} に最新の内容でファイルを作成しました。" if made else "読み込んだファイルから変更はありません。")
+    elif made:
+        st.caption(f"{made[11:16]} にファイルを作成した後、案件に変更があります。")
+    else:
+        st.caption("案件はブラウザーを閉じると消えます。続きを行うときは、このファイルを手元に保管してください。")
 
 
 def definition(rows: list[tuple[str, object]]) -> None:

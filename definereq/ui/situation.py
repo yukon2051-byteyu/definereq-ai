@@ -45,7 +45,7 @@ def demo_banner(name: str, intro: dict, step: dict, first: bool, move: str | Non
 
 
 def _advice_html(a: gd.Advice) -> str:
-    return frame(f"現在：{a.title}", [("記録から分かる状況", a.situation), ("次にすること", a.todo), ("案内の理由", a.reason)], kind="work")
+    return frame(f"現在：{a.title}", [("現在の状況", a.situation), ("今、確認するとよいこと", a.todo), ("案内の理由", a.reason)], kind="work")
 
 
 def _go(a: gd.Advice, page: str, key: str) -> None:

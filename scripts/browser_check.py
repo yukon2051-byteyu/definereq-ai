@@ -63,7 +63,7 @@ with sync_playwright() as pw:
     wait(page)
     page.screenshot(path=OUT / "tour2.png")
     click(page, "全機能のメニューを見る")
-    for name, label in (("overview", "概要・残件"), ("reqs", "要件"), ("decisions", "決定・合意"), ("why", "なぜこの仕様か"), ("share", "共有資料・出力")):
+    for name, label in (("overview", "案件ホーム"), ("reqs", "要件を整理・判断"), ("share", "共有・変更管理")):
         click(page, label)
         page.screenshot(path=OUT / f"{name}.png")
     print("page errors", errors[:5])

@@ -245,13 +245,13 @@ def test_demo_does_not_lose_work_in_progress():
 
 def test_save_status_shown_in_sidebar():
     at = app(project=first_session(), page="overview")
-    assert any("保存用ファイルはまだ作成していません" in c.value and "作成後の変更あり" in c.value for c in at.sidebar.caption)
+    assert any("ブラウザーを閉じると消えます" in c.value for c in at.sidebar.caption)
 
 
 def test_after_load_project_is_not_dirty():
     p = jsonio.loads(jsonio.dumps(first_session()))
     at = app(project=p, page="overview", save_fp=pj.fingerprint(p))
-    assert any("作成後の変更なし" in c.value for c in at.sidebar.caption)
+    assert any("読み込んだファイルから変更はありません" in c.value for c in at.sidebar.caption)
 
 
 def test_meeting_and_prep_pages_show_carryover():

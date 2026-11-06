@@ -24,7 +24,7 @@ from ..components import chips, edit_block, head, meeting_select, ok_rerun, play
 
 
 def sources(p: dict) -> None:
-    head("資料", "利用の許可がある資料だけを登録してください。構成資料に認証情報が含まれていないことを確認してください。", "資料")
+    head("資料・議事録", "議事録も資料としてここへ登録します。利用の許可がある資料だけを登録してください。構成資料に認証情報が含まれていないことを確認してください。", "資料")
     with edit_block("src"), st.expander("資料を追加する", expanded=not p["sources"]):
         c1, c2 = st.columns(2)
         kind = c1.selectbox("資料の種類", SOURCE_KINDS, key="src_kind")
@@ -47,7 +47,7 @@ def sources(p: dict) -> None:
         st.divider()
         title = st.text_input("貼り付ける文章の名称", key="paste_t")
         text = st.text_area("文章を貼り付ける", key="paste_b")
-        if st.button("貼り付けた文章を登録") and text.strip():
+        if st.button("貼り付けた文章を案件内に登録") and text.strip():
             registry.ingest_paste(p, title, text, kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
             touch(p)
             ok_rerun("登録しました")

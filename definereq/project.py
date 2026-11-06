@@ -87,7 +87,7 @@ def new_project(name: str, domains: list[str], actor: str = "利用者") -> dict
 
 PROFILE_FIELDS = {
     "background": "背景", "purpose": "目的", "problem": "課題", "outcome": "期待する成果",
-    "current": "現状の業務・構成・運用", "request": "要望の概要", "scope_in": "範囲",
+    "current": "現状の業務・構成・運用", "request": "要望の概要", "users": "利用者", "scope_in": "範囲",
     "scope_out": "対象外", "constraints": "制約", "timeline": "時期", "budget": "予算",
 }
 
@@ -194,6 +194,12 @@ def update_requirement(p: dict, req_id: str, changes: dict, reason: str | None =
     return req
 
 
+def covers_version(decision: dict, req: dict) -> bool:
+    """判断が要件の現在の版を対象にしているか。版の記録がない古い判断は判定できないため対象として扱う。"""
+    version = (decision.get("target_versions") or {}).get(req["id"])
+    return version is None or version == req["version"]
+
+
 def set_requirement_status(p: dict, req_id: str, status: str, actor_kind: str, actor: str = "利用者") -> dict:
     """要件の状態変更。AIの出力やプログラムの自動処理から合意済みにはできない。"""
     if status not in schema.AGREEMENT_STATES:
@@ -202,10 +208,11 @@ def set_requirement_status(p: dict, req_id: str, status: str, actor_kind: str, a
         raise PermissionError("合意は人の操作でのみ記録できます。")
     req = require(p, "requirements", req_id)
     if status == "合意済み":
-        has_decision = any(req_id in d.get("related_requirements", []) and d.get("state") == "合意済み"
-                           for d in p["decisions"])
-        if not has_decision:
+        linked = [d for d in p["decisions"] if req_id in d.get("related_requirements", []) and d.get("state") == "合意済み"]
+        if not linked:
             raise ValueError("合意済みにするには、この要件に関連付いた合意済みの判断記録が必要です。")
+        if not any(covers_version(d, req) for d in linked):
+            raise ValueError(f"判断は古い版を対象にしています（現在は v{req['version']}）。現在の版の内容を確認し、判断を確認し直してください。")
     req["status"] = status
     log(p, f"{req_id} の状態を「{status}」にしました（{actor}）")
     return req

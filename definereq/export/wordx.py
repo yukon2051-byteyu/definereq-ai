@@ -59,6 +59,21 @@ def _field(paragraph, code: str):
     _font(run, 8, color=MUTED)
 
 
+# 折り返すと読みにくい列の最小幅（cm）。IDや日付が途中で切れないようにする
+MIN_WIDTH = {"ID": 1.8, "要件": 1.8, "対象": 1.8, "判断日": 2.2, "確認ID": 2.7, "版": 0.9, "状態": 1.6, "期限": 2.2}
+
+
+def fit_widths(cols: list[str], widths: list[float], total: float) -> list[float]:
+    """列幅を合計 total に合わせ、最小幅に足りない分は最も広い列から回す。"""
+    out = [w * total / sum(widths) for w in widths]
+    for i, name in enumerate(cols):
+        need = MIN_WIDTH.get(name, 0) - out[i]
+        if need > 0:
+            out[i] += need
+            out[out.index(max(out))] -= need
+    return out
+
+
 def _table(doc: Document, table: dict, total_cm: float):
     rows, cols = table.get("rows") or [], table["columns"]
     if not rows:
@@ -67,30 +82,34 @@ def _table(doc: Document, table: dict, total_cm: float):
         return
     t = doc.add_table(rows=1, cols=len(cols))
     t.style = "Table Grid"
+    t.style = "Table Grid"
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
     t.autofit = False
-    widths = table.get("widths") or [1] * len(cols)
-    scale = total_cm / sum(widths)
+    widths = fit_widths(cols, table.get("widths") or [1] * len(cols), total_cm)
     for i, c in enumerate(cols):
         cell = t.rows[0].cells[i]
         cell.text = ""
         _font(cell.paragraphs[0].add_run(c), 8.5, True, RGBColor(0xFF, 0xFF, 0xFF))
+        cell.paragraphs[0].paragraph_format.keep_with_next = True  # 見出し行だけがページ末に残らないようにする
         _shade(cell, "161618")
     trpr = t.rows[0]._tr.get_or_add_trPr()
     header = OxmlElement("w:tblHeader")
     header.set(qn("w:val"), "true")
     trpr.append(header)
     for row in rows:
-        cells = t.add_row().cells
+        added = t.add_row()
+        no_split = OxmlElement("w:cantSplit")  # 行の途中で改ページしない
+        added._tr.get_or_add_trPr().append(no_split)
+        cells = added.cells
         for i, v in enumerate(row):
             cells[i].text = ""
             _font(cells[i].paragraphs[0].add_run(clean(v)), 8.5)
     # Word は表の列定義（grid）を優先するため、列とセルの両方に幅を設定する
     for i, w in enumerate(widths):
-        t.columns[i].width = Cm(w * scale)
+        t.columns[i].width = Cm(w)
     for row in t.rows:
         for i, w in enumerate(widths):
-            row.cells[i].width = Cm(w * scale)
+            row.cells[i].width = Cm(w)
     doc.add_paragraph()
 
 
@@ -112,6 +131,9 @@ def render(p: dict, opt: share.Options, doc_id: str, version: int, issued_at: st
         h.font.color.rgb = INK
         h.element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
 
+    # 見出しが表から離れて改ページされないようにする
+    doc.styles["Heading 1"].paragraph_format.keep_with_next = True
+    doc.styles["Heading 2"].paragraph_format.keep_with_next = True
     head = sec.header.paragraphs[0]
     sample = "【サンプル・架空案件】" if p.get("is_demo") or p.get("from_demo") else ""
     _font(head.add_run(clean(f"{sample}{p['name']}　{title}　{doc_id} 第{version}版")), 8, color=MUTED)

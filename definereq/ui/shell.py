@@ -5,27 +5,25 @@ import streamlit as st
 
 from .. import project as pj
 from ..demos.builder import STAGES
+from ..logic import guidance as gd
 from ..schema import DOMAINS
 from . import guide, situation, state
 from .readonly import HIDE_CSS
 from .components import esc, save_controls, show_flash
 from .pages import decide, materials, organize, prepare, trace
 
-# 通常は主要な工程だけを表示し、詳しい機能は「詳細の機能」に収める
+# 上位は作業単位の5つ。機能は削除せず、選んだ作業の下に並べる
 GROUPS = [
-    ("全体", [("overview", "概要・残件", prepare.overview)]),
-    ("準備", [("meetings", "会議", prepare.meetings), ("prep", "会議前の準備", prepare.prep), ("sources", "資料", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
-    ("整理", [("candidates", "会議後の整理", organize.candidates), ("requirements", "要件", organize.requirements)]),
-    ("判断", [("decisions", "決定・合意", decide.decisions)]),
-    ("共有", [("share", "共有資料・出力", trace.share_page)]),
-    ("追跡", [("changes", "追加要望と影響", decide.changes), ("why", "なぜこの仕様か", trace.why)]),
+    ("案件ホーム", [("overview", "現在の状況", prepare.overview), ("profile", "背景・目的・関係者", prepare.profile)]),
+    ("会議の準備", [("prep", "質問・議題", prepare.prep), ("meetings", "会議", prepare.meetings)]),
+    ("記録を取り込む", [("sources", "資料・議事録", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
+    ("要件を整理・判断", [("candidates", "AI候補の確認", organize.candidates), ("requirements", "要件", organize.requirements), ("refine", "具体化・受入条件", organize.refine), ("decisions", "決定・合意", decide.decisions),
+                  ("nfr", "非機能の確認", organize.nfr), ("scope", "範囲・優先順位", organize.scope), ("scenarios", "シナリオ", organize.scenarios), ("issues", "意見調整", decide.issues),
+                  ("conflicts", "矛盾", decide.conflicts), ("risks", "リスク", decide.risks)]),
+    ("共有・変更管理", [("share", "確認資料・要件定義書", trace.share_page), ("changes", "追加要望と影響", decide.changes), ("trail", "変更履歴", trace.trail), ("why", "なぜこの仕様か", trace.why),
+                 ("baseline", "基準版・再確認", decide.baseline), ("usage", "AI・費用", trace.usage)]),
 ]
-DETAILS = [("profile", "案件情報・関係者", prepare.profile), ("refine", "具体化・受入条件", organize.refine), ("nfr", "非機能の確認", organize.nfr),
-           ("scope", "範囲・優先順位", organize.scope), ("scenarios", "シナリオ", organize.scenarios), ("issues", "意見調整", decide.issues),
-           ("conflicts", "矛盾", decide.conflicts), ("risks", "リスク", decide.risks), ("baseline", "基準版・再確認", decide.baseline),
-           ("trail", "仕様の変遷", trace.trail), ("usage", "AI・費用", trace.usage)]
 PAGES = {key: (label, fn) for _, items in GROUPS for key, label, fn in items}
-PAGES.update({key: (label, fn) for key, label, fn in DETAILS})
 
 # 各画面の次の行動（移動先）
 NEXT = {"overview": ("残件のもとになる要件を確認します", "requirements"), "profile": ("会議の質問を準備します", "prep"), "meetings": ("次の会議の質問を準備します", "prep"), "prep": ("会議の資料を登録します", "sources"),
@@ -57,13 +55,15 @@ def sidebar(p: dict) -> None:
                 st.session_state["tour_on"] = False
                 state.goto(key)
 
-        for group, items in GROUPS:
-            st.caption(group)
-            for key, label, _ in items:
-                nav(key, label)
-        with st.expander("詳細の機能", expanded=current in {k for k, _, _ in DETAILS}):
-            for key, label, _ in DETAILS:
-                nav(key, label)
+        for n, (group, items) in enumerate(GROUPS):
+            active = current in {k for k, _, _ in items}
+            if st.button(group, key=f"nav_group_{n}", type="tertiary" if active else "secondary", width="stretch"):
+                st.session_state["tour_on"] = False
+                state.goto(items[0][0])
+            if active:  # 選んだ作業の機能だけを表示する
+                with st.container(key=f"nav_sub_{n}"):
+                    for key, label, _ in items:
+                        nav(key, label)
         if p.get("demo"):
             st.divider()
             if st.button("機能対応表", key="nav_map", width="stretch"):
@@ -73,8 +73,9 @@ def sidebar(p: dict) -> None:
 
 
 def context_bar(p: dict, page_label: str) -> None:
-    base = p["baselines"][-1]["label"] if p["baselines"] else "基準版なし"
-    parts = [f"<b>{esc(p['name'])}</b>", esc("・".join(DOMAINS[d] for d in p["domains"])), f"基準版：{esc(base)}", f"作業位置：{esc(page_label)}"]
+    parts = [f"<b>{esc(p['name'])}</b>", esc("・".join(DOMAINS[d] for d in p["domains"])), f"作業位置：{esc(page_label)}"]
+    if p["baselines"]:
+        parts.insert(2, f"基準版：{esc(p['baselines'][-1]['label'])}")
     if p.get("demo"):
         parts.append(f"デモの段階：{esc(STAGES[p['demo']['stage']])}")
         parts.append("閲覧専用・架空データ")
@@ -94,18 +95,20 @@ def stage_control(p: dict) -> None:
 def scroll_top_on_change(p: dict, key: str) -> None:
     """画面や段階が変わったら先頭へ戻す（案内パネルが画面外に隠れないように）。"""
     marker = f"{p['id']}:{key}:{(p.get('demo') or {}).get('stage')}:{st.session_state.get('tour_on')}:{st.session_state.get('tour_index')}"
-    if st.session_state.get("last_view") != marker:
-        st.session_state["last_view"] = marker
-        # st.html のスクリプトは初回しか実行されないため、毎回読み直される埋め込み枠から親の画面を操作する
-        script = ("const d=window.parent.document;const t=()=>{d.querySelector('[data-testid=stMain]')?.scrollTo(0,0);window.parent.scrollTo(0,0)};"
-                  "t();setTimeout(t,150);setTimeout(t,500)")
-        # 目印は読み込んだJSONの値を含むため、ハッシュにしてからスクリプトへ入れる
-        st.iframe(f"<script>/*{pj.fingerprint(marker)}*/{script}</script>", height=1)
+    # st.html のスクリプトは初回しか実行されないため、埋め込み枠から親の画面を操作する
+    script = ("const d=window.parent.document;const t=()=>{d.querySelector('[data-testid=stMain]')?.scrollTo(0,0);window.parent.scrollTo(0,0)};"
+              "t();setTimeout(t,150);setTimeout(t,500);"
+              # スマートフォン幅ではサイドバーが本文を覆うため、画面を移動したら閉じる
+              "if(window.parent.innerWidth<=760){d.querySelector('[data-testid=stSidebarCollapseButton] button')?.click()}")
+    # 枠は毎回同じ位置に置く。出したり消したりすると後ろの部品の位置がずれ、開いているタブが閉じてしまう
+    # 内容が同じ間は読み直されないため、スクロールは画面が変わったときだけ動く
+    # 目印は読み込んだJSONの値を含むため、ハッシュにしてからスクリプトへ入れる
+    st.iframe(f"<script>/*{pj.fingerprint(marker)}*/{script}</script>", height=1)
 
 
-def next_step(key: str) -> None:
-    """画面の下に、次にすることと移動ボタンを出す。"""
-    if key not in NEXT or st.session_state.get("tour_on"):
+def next_step(key: str, p: dict) -> None:
+    """デモの機能画面の下に、次の画面への移動を出す。実案件は状況案内が現在の状態に合わせて案内する。"""
+    if key not in NEXT or st.session_state.get("tour_on") or not p.get("is_demo"):
         return
     text, target = NEXT[key]
     st.divider()
@@ -137,11 +140,11 @@ def render(p: dict) -> None:
     context_bar(p, label)
     if p.get("demo"):
         demo_bar(p)
-    elif not p.get("is_demo"):
-        situation.project_panel(p, key)
+    elif not p.get("is_demo") and not (key == "overview" and gd.phase(p) == "empty"):
+        situation.project_panel(p, key)  # 初回は開始画面が案内を兼ねる
     stage_control(p)
     if key == "demo_map":
         trace.demo_map(p)
     else:
         PAGES.get(key, PAGES["overview"])[1](p)
-        next_step(key if key in PAGES else "overview")
+        next_step(key if key in PAGES else "overview", p)

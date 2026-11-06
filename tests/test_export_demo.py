@@ -113,8 +113,8 @@ def test_excluded_item_not_in_doc(built):
                                                  (["infra"], "インフラ：配置制約", "業務アプリ：業務")])
 def test_spec_chapters_by_domain(domains, want, absent):
     p = pj.new_project("t", domains)
-    heads = [s.heading for s in share.build(p, share.Options(doc_type="spec"))]
-    assert want in heads and absent not in heads
+    text = str([(s.heading, s.paragraphs) for s in share.build(p, share.Options(doc_type="spec"))])
+    assert want in text and absent not in text  # 要件のない章は「要件が未登録の章」にまとめる
 
 
 def test_composite_spec_has_shared_section():
@@ -127,7 +127,7 @@ def test_composite_spec_has_shared_section():
 def test_spec_marks_draft_with_pending():
     p = builder.build("d2", 4)
     sec = share.build(p, share.Options(doc_type="spec"))[0]
-    assert any("確認待ち" in x for x in sec.paragraphs)
+    assert any("未合意の要件" in x for x in sec.paragraphs)
 
 
 def test_document_says_not_electronic_signature(built):

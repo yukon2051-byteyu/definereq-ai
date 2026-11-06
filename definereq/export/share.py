@@ -81,9 +81,27 @@ def _dec_table(p: dict, opt: Options, states: tuple[str, ...]) -> dict:
     for d in p["decisions"]:
         if d["state"] in states and d["id"] not in opt.exclude_ids:
             adopted = next((o["label"] for o in d["options"] if o["id"] == d.get("adopted")), "未定")
-            rows.append([d["id"], d["topic"], adopted, d.get("rationale") or d.get("hold_reason") or "理由の記録がありません",
+            versions = d.get("target_versions") or {}
+            targets = "、".join(f"{r} v{versions[r]}" if r in versions else r for r in d.get("related_requirements", [])) or "未設定"
+            rows.append([d["id"], d["topic"], adopted, targets, d.get("rationale") or d.get("hold_reason") or "理由の記録がありません",
                          display(d.get("decider")), display(d.get("decided_on")), d["state"]])
-    return {"columns": ["ID", "論点", "採用案", "理由", "判断者", "判断日", "状態"], "rows": rows, "widths": [1.5, 3.5, 3, 4.5, 1.8, 1.8, 1.5]}
+    return {"columns": ["ID", "論点", "採用案", "対象の要件と版", "理由", "判断者", "判断日", "状態"], "rows": rows, "widths": [1.5, 2.8, 2.4, 2.1, 3.6, 1.5, 2.2, 1.6]}
+
+
+def precheck(p: dict, opt: Options | None = None) -> dict:
+    """出力前の確認。件数は実データから求める。不足があっても下書きとして出力できる。"""
+    opt = opt or Options(doc_type="spec")
+    reqs = _active(p, opt)
+    prof = p["profile"]
+    pending_cands = [c for c in p["candidates"] if c["state"] in ("候補", "要再確認")]
+    missing_profile = [label for key, label in (("background", "背景"), ("purpose", "目的")) if not prof[key]["value"]]
+    rows = [("合意済みの要件", sum(1 for r in reqs if r["status"] == "合意済み"), None),
+            ("未合意の要件", sum(1 for r in reqs if r["status"] != "合意済み"), "requirements"),
+            ("分類未設定の要件", sum(1 for r in reqs if not r.get("kind")), "requirements"),
+            ("受入条件未設定の要件", sum(1 for r in reqs if not r.get("acceptance")), "refine"),
+            ("未処理のAI候補（文書には入りません）", len(pending_cands), "candidates")]
+    return {"rows": rows, "missing_profile": missing_profile, "pending_candidates": pending_cands, "targets": [f"{r['id']} v{r['version']} {r['title']}（{_status_label(r)}）" for r in reqs],
+            "is_draft": bool(missing_profile) or any(n and page for _, n, page in rows)}
 
 
 def _qa_rows(p: dict, opt: Options) -> list[list[str]]:
@@ -109,11 +127,15 @@ def _action_rows(p: dict) -> list[list[str]]:
             if a["state"] in ("未着手", "対応中")]
 
 
+def scope_label(value) -> str:
+    return schema.SCOPE_LABELS.get(value, display(value))
+
+
 def _req_rows(reqs: list[dict]) -> list[list[str]]:
-    return [[r["id"], f"v{r['version']}", display(r.get("kind")), r["title"], r["body"], display(r.get("scope")), _status_label(r)] for r in reqs]
+    return [[r["id"], f"v{r['version']}", display(r.get("kind")), r["title"], r["body"], scope_label(r.get("scope")), _status_label(r)] for r in reqs]
 
 
-REQ_COLS = {"columns": ["ID", "版", "種類", "名称", "内容", "範囲", "状態"], "widths": [1.9, 0.8, 1.5, 3, 5.6, 1.6, 2]}
+REQ_COLS = {"columns": ["ID", "版", "種類", "名称", "内容", "範囲", "状態"], "widths": [1.7, 0.9, 1.5, 3, 5.3, 1.6, 2]}
 
 
 def _measures(reqs: list[dict]) -> list[list[str]]:
@@ -190,34 +212,47 @@ def build_spec(p: dict, opt: Options) -> list[Section]:
     reqs = _active(p, opt)
     prof = p["profile"]
     pending = [r for r in reqs if r["status"] != "合意済み"]
+    agreed = len(reqs) - len(pending)
     sections = [Section("この文書について", paragraphs=[
         "本書は登録された情報から作成した下書きを含みます。" if pending else "本書は合意済みの要件から作成しました。",
-        f"確認待ちの要件が {len(pending)} 件あります。該当する行の状態欄を確認してください。" if pending else "記載の範囲について、完全性や正しさを保証するものではありません。"])]
+        f"合意済みの要件 {agreed} 件、未合意の要件 {len(pending)} 件を記載しています。未合意の要件は決定事項ではありません。状態欄を確認してください。" if pending else "記載の範囲について、完全性や正しさを保証するものではありません。",
+        "背景・目的は案件情報を参照しています。未採用のAI候補は本書に含まれません。「未設定」は記録がないこと、「該当なし」は該当しないと確認したことを表します。"])]
     sections.append(Section("背景・目的", paragraphs=[f"背景：{display(prof['background']['value'])}", f"目的：{display(prof['purpose']['value'])}", f"課題：{display(prof['problem']['value'])}", f"期待する成果：{display(prof['outcome']['value'])}"]))
     sections.append(Section("関係者", table={"columns": ["ID", "氏名・役割", "所属", "立場", "判断・確認できる範囲"], "rows": [[s["id"], s["name"], display(s.get("org")), display(s.get("position")), display(s.get("authority"))] for s in p["stakeholders"]], "widths": [1.5, 3, 3, 3, 5.5]}))
     sections.append(Section("用語", table={"columns": ["用語", "意味"], "rows": [[g["term"], g["meaning"]] for g in p["glossary"]], "widths": [4, 12]}))
     sections.append(Section("範囲・対象外", paragraphs=[f"範囲：{display(prof['scope_in']['value'])}", f"対象外：{display(prof['scope_out']['value'])}"],
-                            table={"columns": ["区分", "要件", "理由", "判断者"], "rows": [[r.get("scope"), f"{r['id']} {r['title']}", display(r.get("scope_reason")), display(r.get("scope_decider"))] for r in reqs], "widths": [2.5, 6, 5.5, 2]}))
+                            table={"columns": ["区分", "要件", "理由", "判断者"], "rows": [[scope_label(r.get("scope")), f"{r['id']} {r['title']}", display(r.get("scope_reason")), display(r.get("scope_decider"))] for r in reqs], "widths": [2.5, 6, 5.5, 2]}))
     sections.append(Section("現状・想定", paragraphs=[display(prof["current"]["value"])]))
     # 分野別の章
     sections.append(Section("要件", paragraphs=["対象分野に応じて章を切り替えています。"]))
     used: set[str] = set()
     labels = {d: schema.DOMAINS[d] for d in schema.DOMAINS}
+    empty_chapters = []
     for d, chapter in checks.chapters_for(p["domains"]):
         rows = [r for r in reqs if r.get("kind") == chapter and r["id"] not in used and (r.get("domain") in (d, None) or len(p["domains"]) > 1)]
         used.update(r["id"] for r in rows)
-        sections.append(Section(f"{labels[d]}：{chapter}", level=2, table={**REQ_COLS, "rows": _req_rows(rows)}))
-    rest = [r for r in reqs if r["id"] not in used]
-    if rest:
+        if rows:
+            sections.append(Section(f"{labels[d]}：{chapter}", level=2, table={**REQ_COLS, "rows": _req_rows(rows)}))
+        else:
+            empty_chapters.append(f"{labels[d]}：{chapter}")
+    unclassified = [r for r in reqs if r["id"] not in used and not r.get("kind")]
+    other = [r for r in reqs if r["id"] not in used and r.get("kind")]
+    if other:
         title = "共通・分野をまたぐ要件" if len(p["domains"]) > 1 else "その他の要件"
-        sections.append(Section(title, level=2, table={**REQ_COLS, "rows": _req_rows(rest)}))
+        sections.append(Section(title, level=2, table={**REQ_COLS, "rows": _req_rows(other)}))
+    if unclassified:
+        sections.append(Section("分類未設定の要件", level=2, paragraphs=["分野や種類が確認されていない要件です。"], table={**REQ_COLS, "rows": _req_rows(unclassified)}))
+    if empty_chapters:  # 空の表を章の数だけ並べず、未登録の章としてまとめる
+        sections.append(Section("要件が未登録の章", level=2, paragraphs=["次の章には要件が登録されていません。該当しないと確認されたものではありません。", "、".join(empty_chapters)]))
     sections.append(Section("数値条件と区分", paragraphs=["必要条件・現状の計測値・仮定・実現方式の候補・人が確定した設計制約を区別しています。出所は誰が示した値か、状態はその値の確認が済んだかを表します。"],
                             table={"columns": ["要件", "指標", "値", "区分", "出所", "測定条件", "根拠", "状態"], "rows": _measures(reqs), "widths": [1.4, 2.7, 1.8, 2.2, 1.9, 2.6, 2.6, 1.3]}))
     nfr_rows = [[n["label"], n["state"], display(n.get("note")), "、".join(n["requirements"]) or "未設定"] for n in checks.nfr_overview(p)]
-    sections.append(Section("非機能", table={"columns": ["項目", "状態", "補足", "関連要件"], "rows": nfr_rows, "widths": [3, 2, 8, 3]}))
+    sections.append(Section("非機能", paragraphs=["状態が未確認の項目は、問題がないことを示すものではありません。"], table={"columns": ["項目", "状態", "補足", "関連要件"], "rows": nfr_rows, "widths": [3, 2, 8, 3]}))
     sections.append(Section("シナリオ", table={"columns": ["ID", "名称", "種類", "開始条件", "流れ", "終了・失敗時", "関連要件"], "rows": [[s["id"], s["title"], s.get("kind", ""), display(s.get("start")), " → ".join(s.get("steps", [])), display(s.get("end")), "、".join(s.get("related_requirements", []))] for s in p["scenarios"]], "widths": [1.4, 3, 1.4, 2.6, 4.2, 2.4, 1.5]}))
     op_kinds = ("運用", "移行")
-    sections.append(Section("運用・移行", table={**REQ_COLS, "rows": _req_rows([r for r in reqs if r.get("kind") in op_kinds])}))
+    ops = [r for r in reqs if r.get("kind") in op_kinds]
+    if ops:
+        sections.append(Section("運用・移行", table={**REQ_COLS, "rows": _req_rows(ops)}))
     acc_rows = [[r["id"], a.get("given", ""), a.get("when", ""), a.get("then", ""), a.get("how", "")] for r in reqs for a in r.get("acceptance", []) if isinstance(a, dict)]
     sections.append(Section("受入条件", table={"columns": ["要件", "前提", "条件", "期待結果", "確認方法"], "rows": acc_rows, "widths": [1.5, 4, 3.5, 4, 3]}))
     sections.append(Section("制約", paragraphs=[display(prof["constraints"]["value"])]))
@@ -226,7 +261,7 @@ def build_spec(p: dict, opt: Options) -> list[Section]:
     sections.append(Section("合意", paragraphs=[
         "ここに記載の合意は利用者が記録したものであり、電子署名ではありません。"], table=_dec_table(p, opt, ("合意済み",))))
     hist = [[h["id"], h.get("requirement_id") or "", display(h.get("decided_on")), h["outcome"], h.get("trigger", ""), h.get("rationale") or "理由の記録がありません", display(h.get("decider"))] for h in p["history"]]
-    sections.append(Section("変更履歴", table={"columns": ["ID", "要件", "判断日", "結果", "きっかけ", "理由", "判断者"], "rows": hist, "widths": [1.4, 1.4, 1.8, 1.2, 4, 5, 2]}))
+    sections.append(Section("変更履歴", table={"columns": ["ID", "要件", "判断日", "結果", "きっかけ", "理由", "判断者"], "rows": hist, "widths": [1.5, 1.6, 2.2, 1.2, 3.8, 4.7, 1.6]}))
     if opt.include_internal:
         notes = [f"{r['id']}：{r['internal_note']}" for r in reqs if r.get("internal_note")]
         sections.append(Section("内部メモ", paragraphs=notes or ["なし"]))

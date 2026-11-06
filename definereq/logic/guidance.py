@@ -68,13 +68,34 @@ def needs_stage_question(p: dict) -> bool:
     return has_content and not has_meeting_record(p)
 
 
+def phase(p: dict) -> str:
+    """案件の段階。empty：未登録／unprocessed：情報はあるが未解析／clear：確認した範囲で検出なし／open：確認事項あり。"""
+    has_info = any(v.get("value") for v in p["profile"].values()) or p["sources"] or p["recordings"] or p["requirements"] or p["prep"].get("understanding")
+    if not has_info:
+        return "empty"
+    bl = checks.backlog(p)
+    pending = any(c["state"] in ("候補", "要再確認") for c in p["candidates"])
+    if bl["unique_total"] or pending or p["questions"] or p["actions"]:
+        return "open"
+    return "clear" if p["requirements"] or p["ai_runs"] else "unprocessed"
+
+
 def _start(p: dict) -> list[Advice]:
-    filled = [k for k, v in p["profile"].items() if v.get("value")]
-    if filled or p["sources"] or p["recordings"] or p["requirements"]:
+    if phase(p) != "empty":
         return []
     return [Advice("start", "案件を作成した直後", "案件名と対象分野だけが登録されています。",
                    "背景・目的・要望の概要を入力するか、手元の資料を登録してください。",
                    "案件情報が未入力で、資料も登録されていないため。", "profile", "案件情報を入力する", 10, {"overview", "profile", "sources"})]
+
+
+def _after_profile(p: dict) -> list[Advice]:
+    """背景だけが登録された状態。会議前の人にも、記録を持っている人にも進み先を示す。"""
+    if phase(p) != "unprocessed" or p["sources"] or p["recordings"] or p["questions"]:
+        return []
+    return [Advice("next_input", "案件の情報を登録しました", "背景や困りごとが登録されています。資料や議事録はまだありません。",
+                   "これから会議をする場合は質問を準備し、議事録や資料がある場合は取り込んでください。", "案件情報があり、質問・資料・録画が0件のため。", "prep", "会議の質問を準備する", 12, {"overview", "profile", "prep"}),
+            Advice("next_records", "議事録や資料がある場合", "議事録や資料があれば、AIで要望や未決事項を整理できます。", "議事録や資料を取り込んでください。",
+                   "資料と録画が0件のため。", "sources", "資料・議事録を取り込む", 13, {"overview", "sources"})]
 
 
 def _sources(p: dict) -> list[Advice]:
@@ -132,13 +153,27 @@ def _meeting_records(p: dict) -> list[Advice]:
 
 
 def _candidates(p: dict) -> list[Advice]:
-    pending = [c for c in p["candidates"] if c["state"] == "候補"]
+    pending = [c for c in p["candidates"] if c["state"] in ("候補", "要再確認")]
     if not pending:
         return []
     weak = sum(1 for c in pending if c.get("no_evidence") or c.get("unsupported_numbers"))
     note = f"うち{weak}件は根拠の確認が必要です。" if weak else ""
-    return [Advice("candidates", "要件候補の確認", f"採否が未確認の候補が{len(pending)}件あります。{note}候補のままでは要件になりません。", "候補を読み、採用・修正・却下を決めてください。",
-                   f"状態が「候補」の項目が{len(pending)}件あるため。", "candidates", f"候補{len(pending)}件を確認する", 30, {"candidates", "requirements"}, _titles([c["text"] for c in pending]))]
+    tasks = {r["id"]: r["task"] for r in p["ai_runs"]}
+    prep = [c for c in pending if tasks.get(c.get("origin_run")) == "prep"]
+    out = []
+    if prep:
+        out.append(Advice("prep_candidates", "会議準備の候補の確認", f"AIが作成した準備の候補が{len(prep)}件あります。", "内容を読み、質問や議題へ追加するか却下してください。",
+                          f"会議準備のAI候補に未処理が{len(prep)}件あるため。", "prep", f"候補{len(prep)}件を確認する", 30, {"prep"}, _titles([c["text"] for c in prep])))
+    rest = [c for c in pending if c not in prep]
+    if rest:
+        kinds: dict[str, int] = {}
+        for c in rest:
+            kinds[c["kind"]] = kinds.get(c["kind"], 0) + 1
+        breakdown = "、".join(f"{k}{v}件" for k, v in kinds.items())
+        title = "議事録・資料の解析が完了" if any(tasks.get(c.get("origin_run")) == "extract" for c in rest) else "AI候補の確認"
+        out.append(Advice("candidates", title, f"{len(rest)}件の候補を整理しました（{breakdown}）。{note}候補のままでは要件になりません。", "内容と引用を確認し、必要なものを案件へ反映してください。",
+                          f"未処理の候補が{len(rest)}件あるため。", "candidates", f"候補{len(rest)}件を確認する", 26, {"candidates", "requirements"}, _titles([c["text"] for c in rest])))
+    return out
 
 
 def _conflicts(p: dict) -> list[Advice]:
@@ -204,6 +239,24 @@ def _backlog(p: dict) -> list[Advice]:
     return out
 
 
+def _classify(p: dict) -> list[Advice]:
+    missing = [r for r in p["requirements"] if r["status"] not in ("廃止", "却下") and not r.get("kind")]
+    if not missing:
+        return []
+    return [Advice("unclassified", "分類が未設定の要件", f"分野や種類が未設定の要件が{len(missing)}件あります。文書では「分類未設定の要件」の章に入ります。", "要件の編集で分類を確認してください。",
+                   "要件の種類が空欄のため。", "requirements", "要件を確認する", 47, {"requirements"}, _titles([r["title"] for r in missing]))]
+
+
+def _profile(p: dict) -> list[Advice]:
+    from .intake import profile_suggestions
+
+    found = profile_suggestions(p)
+    if not found:
+        return []
+    return [Advice("profile_reflect", "案件情報へ反映できる内容があります", f"{len(found)}件の内容が案件情報と一致していません。文書の背景・目的は案件情報を参照します。", "内容を確認し、必要なものを案件情報へ反映してください。",
+                   "会議準備やAI候補に、案件情報へ未反映の内容があるため。", "profile", "案件情報への反映を確認する", 44, {"profile", "overview", "share"}, _titles([f"{s['label']}：{s['value']}" for s in found]))]
+
+
 def _before_export(p: dict) -> list[Advice]:
     bl = checks.backlog(p)
     pending = sum(1 for r in p["requirements"] if r["status"] not in ("合意済み", "廃止", "却下"))
@@ -220,7 +273,7 @@ def _resume(p: dict) -> Advice:
                   "残件を確認し、次に進める作業を選んでください。", "保存したJSONを読み込んだ直後のため。", "overview", "残件を確認する", 0, {"overview"})
 
 
-RULES = (_start, _sources, _prep, _meeting_records, _candidates, _conflicts, _changes, _decisions, _backlog)
+RULES = (_start, _after_profile, _sources, _prep, _meeting_records, _candidates, _conflicts, _changes, _decisions, _classify, _profile, _backlog)
 
 
 def collect(p: dict, page: str | None = None) -> list[Advice]:

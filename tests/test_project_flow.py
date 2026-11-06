@@ -1,0 +1,454 @@
+"""実案件の流れの確認（初回、AI入力、候補の反映先、合意と版、出力前確認）。実APIは呼ばない。"""
+from __future__ import annotations
+
+import io
+import json
+from pathlib import Path
+
+import pytest
+from docx import Document
+from streamlit.testing.v1 import AppTest
+
+from definereq import project as pj
+from definereq.ai import tasks as ai
+from definereq.ai.client import AIResult
+from definereq.export import jsonio, share, wordx
+from definereq.ingest import registry
+from definereq.logic import agreement as ag
+from definereq.logic import guidance as gd
+from definereq.logic import intake
+
+APP = str(Path(__file__).resolve().parent.parent / "app.py")
+INITIAL = "社員100名の会社で、Excelによる勤怠集計をWebシステムへ更新したい。打刻漏れの確認と月末集計に時間がかかる。Web打刻、上長の修正承認、給与ソフト向けCSV出力を検討している。予算、導入時期、勤務形態は未確認。"
+MINUTES = ("勤怠システム更新の初回ヒアリング。利用対象は社員100名。現在はExcelで集計し、月末集計に2日かかる。従業員がWebで打刻し、打刻漏れや修正は上長が承認する案を検討する。"
+           "給与ソフトへはCSVで連携したいが項目と形式は未確認。導入時期と予算は未定。次回までに人事担当が現行の勤怠表を用意する。上記の機能はまだ合意していない。")
+
+
+class Ledger:
+    def reserve(self, *a, **k):
+        return 1
+
+    def settle(self, *a, **k):
+        pass
+
+
+class LLM:
+    def __init__(self, items):
+        self.items, self.calls, self.user = items, 0, None
+
+    def complete(self, system, user, schema, max_tokens):
+        self.calls += 1
+        self.user = user
+        return AIResult({"items": self.items, "notes": ""}, 10, 10)
+
+
+def cand(kind, text, **kw):
+    return {"kind": kind, "text": text, "detail": "", "ask": "", "evidence": [], **kw}
+
+
+@pytest.fixture
+def p():
+    return pj.new_project("勤怠システムの更新（架空テスト）", ["app"])
+
+
+def run(p, task, items, **kw):
+    return ai.run_task(p, task, "c", Ledger(), LLM(items), **kw)["candidates"]
+
+
+# ---- 初回 ----
+def test_phase_distinguishes_empty_and_unprocessed(p):
+    assert gd.phase(p) == "empty"
+    p["profile"]["problem"].update(value="月末集計に時間がかかる")
+    assert gd.phase(p) == "unprocessed"
+    run(p, "prep", [cand("質問", "利用人数は？")])
+    assert gd.phase(p) == "open"
+
+
+def test_no_issue_is_not_shown_as_complete_when_nothing_analyzed(p):
+    registry.ingest_paste(p, "メモ", "メモ", kind="要望")
+    assert gd.phase(p) == "unprocessed"
+
+
+def test_profile_only_gets_two_entry_points(p):
+    p["profile"]["problem"].update(value="月末集計に時間がかかる")
+    r = gd.assess(p, "overview")
+    assert r["main"].id == "next_input" and r["extra"][0].id == "next_records"
+
+
+# ---- AI入力 ----
+def test_prep_understanding_reaches_ai_and_changes_input(p):
+    before = ai.build_context(p, ai.TASKS["prep"])
+    p["prep"]["understanding"] = INITIAL
+    after = ai.build_context(p, ai.TASKS["prep"])
+    assert "社員100名" in after and len(after) > len(before) + len(INITIAL) - 5
+    assert ai.input_fingerprint(before) != ai.input_fingerprint(after)
+
+
+def test_profile_keeps_certainty_in_ai_input(p):
+    p["profile"]["problem"].update(value="打刻漏れ", certainty="本人申告")
+    assert "本人申告" in ai.build_context(p, ai.TASKS["prep"])
+
+
+def test_internal_note_stays_out_of_ai_input(p):
+    r = pj.add(p, "requirements", pj.new_requirement(title="T", body="B"))
+    r["internal_note"] = "社外秘メモ"
+    p["prep"]["understanding"] = "理解"
+    for task in ai.TASKS.values():
+        assert "社外秘メモ" not in ai.build_context(p, task)
+
+
+def test_saved_input_makes_old_result_stale(p):
+    run(p, "prep", [cand("質問", "Q")])
+    assert ai.run_status(p, p["ai_runs"][0]) == "最新"
+    p["prep"]["understanding"] = "更新"
+    assert ai.run_status(p, p["ai_runs"][0]) != "最新"
+
+
+def test_registered_info_reported_as_unknown_is_flagged(p):
+    p["prep"]["understanding"] = INITIAL
+    c = run(p, "prep", [cand("不足情報", "利用人数が不明です"), cand("不足情報", "勤務形態が不明です")])
+    assert c[0]["already_known"] == "人数" and c[1]["already_known"] is None
+
+
+# ---- 候補の反映先 ----
+@pytest.mark.parametrize("kind,check", [
+    ("質問", lambda p: p["questions"] and p["questions"][0].get("category") == "質問"),
+    ("議題", lambda p: p["prep"]["agenda"]),
+    ("必要資料", lambda p: p["prep"]["materials"]),
+    ("不足情報", lambda p: p["questions"][0]["category"] == "確認事項"),
+    ("未回答", lambda p: p["questions"][0]["category"] == "確認事項"),
+    ("次の行動", lambda p: p["actions"]),
+    ("リスク", lambda p: p["risks"] and p["risks"][0]["nature"] == "AI候補"),
+    ("決定", lambda p: p["decisions"] and p["decisions"][0]["state"] == "下書き"),
+])
+def test_routes_go_to_the_right_place_and_never_become_requirements(p, kind, check):
+    c = run(p, "extract", [cand(kind, "内容の文")])[0]
+    intake.apply(p, c["id"])
+    assert check(p) and not p["requirements"] and c["state"] == "採用"
+
+
+def test_decision_candidate_does_not_create_agreement(p):
+    c = run(p, "extract", [cand("決定", "Web打刻を採用する")])[0]
+    intake.apply(p, c["id"])
+    assert all(d["state"] != "合意済み" for d in p["decisions"])
+
+
+def test_candidate_cannot_be_applied_twice(p):
+    c = run(p, "prep", [cand("質問", "Q")])[0]
+    intake.apply(p, c["id"])
+    with pytest.raises(ValueError):
+        intake.apply(p, c["id"])
+    assert len(p["questions"]) == 1
+
+
+def test_duplicate_candidates_do_not_grow_on_reanalysis_and_old_stay(p):
+    run(p, "extract", [cand("要望", "Webで打刻できるようにしたい")])
+    registry.ingest_paste(p, "追加", "追加の資料", kind="要望")
+    c = run(p, "extract", [cand("要望", "Webで打刻できるようにしたい。"), cand("要望", "CSVで連携したい")])
+    assert len(p["candidates"]) == 2 and [x["text"] for x in c] == ["CSVで連携したい"]
+    assert p["ai_runs"][-1]["skipped_duplicates"] == 1
+
+
+# ---- 要件への採用 ----
+@pytest.mark.parametrize("text,kind", [("従業員がWebで打刻できる", "機能"), ("上長が修正を承認できる", "機能"), ("給与ソフトへCSVで連携する", "連携")])
+def test_classification_suggestion(p, text, kind):
+    s = intake.suggest(p, {"text": text, "detail": None})
+    assert s["domain"] == "app" and s["kind"] == kind and s["basis"] == "ルールによる推測"
+
+
+def test_adopt_keeps_classification_and_evidence(p):
+    src = registry.ingest_paste(p, "議事録", MINUTES, kind="議事録")
+    c = run(p, "extract", [cand("要望", "CSVで連携したい", evidence=[{"source_id": src["id"], "unit_id": "", "quote": "給与ソフトへはCSVで連携したい"}])])[0]
+    r = intake.adopt_requirement(p, c["id"], {"domain": "app", "kind": "連携"})[0]
+    assert r["kind"] == "連携" and r["domain"] == "app" and r["evidence"][0]["verified"] and r["from_candidate"] == c["id"] and r["status"] == "下書き"
+
+
+def test_can_adopt_unclassified_and_it_is_reported(p):
+    c = run(p, "extract", [cand("要望", "勤怠を見やすくしたい")])[0]
+    intake.adopt_requirement(p, c["id"], {"domain": None, "kind": None})
+    assert share.precheck(p)["rows"][2] == ("分類未設定の要件", 1, "requirements")
+    assert "unclassified" in [a.id for a in gd.collect(p)]
+
+
+def test_split_proposal_uses_only_original_words():
+    parts = intake.split_proposal("従業員がWebで打刻し、打刻漏れや修正は上長が承認する")
+    assert parts == ["従業員がWebで打刻する", "打刻漏れや修正は上長が承認する"]
+    assert intake.split_proposal("従業員がWebで打刻できる") == []
+
+
+def test_split_adoption_traces_each_part(p):
+    c = run(p, "extract", [cand("要望", "打刻し、承認する")])[0]
+    rs = intake.adopt_requirement(p, c["id"], parts=["打刻する", "承認する"])
+    assert len(rs) == 2 and all(r["from_candidate"] == c["id"] for r in rs) and c["resolved_items"] == [r["id"] for r in rs]
+
+
+def test_adoption_does_not_change_existing_requirement(p):
+    old = pj.add(p, "requirements", pj.new_requirement(title="既存", body="本文", status="合意済み"))
+    c = run(p, "extract", [cand("要望", "新しい要望")])[0]
+    intake.adopt_requirement(p, c["id"])
+    assert old["status"] == "合意済み" and old["version"] == 1
+
+
+# ---- 判断と要件 ----
+def agreed(p, *reqs):
+    d = ag.new_decision(p, "方針", [{"id": "A", "label": "案A"}], adopted="A", decider="人事責任者", decided_on="2026-11-01", related_requirements=[r["id"] for r in reqs])
+    ag.set_state(p, d["id"], "合意済み", "human")
+    return d
+
+
+def req(p, title="T"):
+    return pj.add(p, "requirements", pj.new_requirement(title=title, body="本文"))
+
+
+def test_decision_does_not_change_requirement_until_chosen(p):
+    a, b = req(p, "A"), req(p, "B")
+    d = agreed(p, a, b)
+    assert a["status"] == b["status"] == "下書き"
+    rows = ag.decision_targets(p, d)
+    assert [r["after"] for r in rows] == ["合意済み", "合意済み"]
+    ag.apply_decision(p, d["id"], [a["id"]], "human")
+    assert a["status"] == "合意済み" and b["status"] == "下書き"
+
+
+def test_ai_cannot_apply_decision(p):
+    a = req(p)
+    d = agreed(p, a)
+    with pytest.raises(PermissionError):
+        ag.apply_decision(p, d["id"], [a["id"]], "ai")
+
+
+def test_old_version_decision_is_not_applied_to_new_version(p):
+    a = req(p)
+    d = agreed(p, a)
+    pj.update_requirement(p, a["id"], {"body": "変更後"})
+    assert not ag.decision_targets(p, d)[0]["same_version"]
+    with pytest.raises(ValueError):
+        ag.apply_decision(p, d["id"], [a["id"]], "human")
+    with pytest.raises(ValueError):
+        pj.set_requirement_status(p, a["id"], "合意済み", "human")
+    ag.reconfirm_version(p, d["id"], a["id"], "human")
+    ag.apply_decision(p, d["id"], [a["id"]], "human")
+    assert a["status"] == "合意済み"
+
+
+def test_changing_agreed_requirement_returns_to_recheck(p):
+    a = req(p)
+    d = agreed(p, a)
+    ag.apply_decision(p, d["id"], [a["id"]], "human")
+    pj.update_requirement(p, a["id"], {"body": "変更後"})
+    assert a["status"] == "確認待ち"
+
+
+def test_unrelated_requirement_is_rejected(p):
+    a, b = req(p, "A"), req(p, "B")
+    d = agreed(p, a)
+    with pytest.raises(ValueError):
+        ag.apply_decision(p, d["id"], [b["id"]], "human")
+
+
+def test_legacy_decision_without_version_record_still_works(p):
+    a = req(p)
+    d = agreed(p, a)
+    d.pop("target_versions")
+    assert ag.decision_targets(p, d)[0]["same_version"]
+    ag.apply_decision(p, d["id"], [a["id"]], "human")
+
+
+# ---- 案件情報 ----
+def test_understanding_is_suggested_not_overwritten(p):
+    p["prep"]["understanding"] = INITIAL
+    s = next(x for x in intake.profile_suggestions(p) if x["field"] == "background")
+    assert p["profile"]["background"]["value"] is None
+    intake.apply_profile(p, s)
+    assert p["profile"]["background"]["value"] == INITIAL and p["profile"]["background"]["origin"] == s["origin"]
+    p["prep"]["understanding"] = "別の内容"
+    s = next(x for x in intake.profile_suggestions(p) if x["field"] == "background")
+    assert s["current"] == INITIAL
+    with pytest.raises(ValueError):
+        intake.apply_profile(p, s)
+    intake.apply_profile(p, s, "append")
+    assert INITIAL in p["profile"]["background"]["value"] and "別の内容" in p["profile"]["background"]["value"]
+
+
+def test_ai_profile_candidate_is_marked_unconfirmed(p):
+    run(p, "extract", [cand("案件情報", "月末集計に2日かかる", ask="課題")])
+    s = intake.profile_suggestions(p)[0]
+    assert s["field"] == "problem" and s["certainty"] == "未確認"
+    intake.apply_profile(p, s)
+    assert p["candidates"][0]["state"] == "採用"
+
+
+# ---- 出力 ----
+def scenario(p):
+    p["profile"]["background"].update(value="Excelの勤怠集計を見直す")
+    web = pj.add(p, "requirements", pj.new_requirement(title="Web打刻", body="従業員がWebで打刻できる", domain="app", kind="機能"))
+    csv = pj.add(p, "requirements", pj.new_requirement(title="給与CSV連携", body="給与ソフトへCSVで連携する", domain="app", kind="連携", open_items="項目と形式は未確認"))
+    ag.apply_decision(p, agreed(p, web)["id"], [web["id"]], "human")
+    return web, csv
+
+
+def test_precheck_counts_come_from_data(p):
+    scenario(p)
+    run(p, "extract", [cand("要点", "未処理の候補")])
+    c = share.precheck(p)
+    rows = {k: n for k, n, _ in c["rows"]}
+    assert rows["合意済みの要件"] == 1 and rows["未合意の要件"] == 1 and rows["受入条件未設定の要件"] == 2 and rows["未処理のAI候補（文書には入りません）"] == 1
+    assert c["missing_profile"] == ["目的"] and c["is_draft"] and len(c["targets"]) == 2
+
+
+def test_spec_separates_agreed_and_excludes_pending_candidates(p):
+    scenario(p)
+    run(p, "extract", [cand("要望", "勤務形態の管理を入れたい")])
+    secs = share.build(p, share.Options(doc_type="spec"))
+    text = str([s.__dict__ for s in secs])
+    assert "決定（合意済み）" in text and "提案" in text and "勤務形態の管理" not in text and "REQ-001 v1" in text
+    assert "分類未設定の要件" not in [s.heading for s in secs]
+    assert "Excelの勤怠集計を見直す" in text
+
+
+def test_unclassified_requirement_has_own_section(p):
+    pj.add(p, "requirements", pj.new_requirement(title="未分類", body="B"))
+    heads = [s.heading for s in share.build(p, share.Options(doc_type="spec"))]
+    assert "分類未設定の要件" in heads and "その他の要件" not in heads
+
+
+def test_scope_label_is_not_confused_with_agreement(p):
+    pj.add(p, "requirements", pj.new_requirement(title="X", body="B"))
+    text = str([s.table for s in share.build(p, share.Options(doc_type="spec")) if s.table])
+    assert "未確定" in text
+
+
+def test_reflecting_decision_is_recorded_in_history(p):
+    a = req(p)
+    d = agreed(p, a)
+    ag.apply_decision(p, d["id"], [a["id"]], "human")
+    h = p["history"][-1]
+    assert h["requirement_id"] == a["id"] and h["decision_id"] == d["id"] and h["decider"] == "人事責任者"
+
+
+def test_id_and_date_columns_keep_minimum_width():
+    from definereq.export.wordx import MIN_WIDTH, fit_widths
+
+    cols = ["ID", "論点", "判断日", "状態"]
+    w = fit_widths(cols, [1, 8, 1, 1], 17.0)
+    assert round(sum(w), 3) == 17.0 and w[0] >= MIN_WIDTH["ID"] and w[2] >= MIN_WIDTH["判断日"]
+
+
+def test_scope_table_uses_clear_label(p):
+    pj.add(p, "requirements", pj.new_requirement(title="X", body="B"))
+    sec = next(s for s in share.build(p, share.Options(doc_type="spec")) if s.heading == "範囲・対象外")
+    assert sec.table["rows"][0][0] == "未確定"
+
+
+def test_word_opens_with_japanese(p):
+    scenario(p)
+    data = wordx.render(p, share.Options(doc_type="spec"), "DOC-001", 1, pj.now_iso())
+    d = Document(io.BytesIO(data))
+    assert "勤怠システムの更新" in "\n".join(x.text for x in d.paragraphs) and d.tables
+
+
+# ---- JSON ----
+def test_old_json_without_new_fields_loads(p):
+    raw = json.loads(jsonio.dumps(p))
+    raw["profile"].pop("users")
+    q = jsonio.loads(json.dumps(raw).encode())
+    assert q["profile"]["users"]["value"] is None and gd.phase(q) == "empty"
+
+
+def test_round_trip_keeps_routes_and_versions(p):
+    a = req(p)
+    agreed(p, a)
+    c = run(p, "prep", [cand("質問", "Q")])[0]
+    intake.apply(p, c["id"])
+    q = jsonio.loads(jsonio.dumps(p))
+    assert q["decisions"][0]["target_versions"] == {a["id"]: 1} and q["questions"][0]["from_candidate"] == c["id"]
+
+
+# ---- 画面 ----
+def open_app(p, page="overview"):
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.session_state["project"] = p
+    at.session_state["page"] = page
+    return at.run()
+
+
+def html(at):
+    return "".join(h.proto.body for h in at.get("html"))
+
+
+def key(at, k):
+    return next(b for b in at.button if b.key == k)
+
+
+def test_new_project_shows_start_screen_without_zero_stats(p):
+    at = open_app(p)
+    text = html(at)
+    assert "の準備を始めましょう" in text and 'class="dr-stat"' not in text and "基準版なし" not in text
+    assert not at.exception
+    at = key(at, "start_input").click().run()
+    assert any(t.label == "現在、何に困っていますか" for t in at.text_area)
+
+
+def test_start_from_records(p):
+    at = key(open_app(p), "start_records").click().run()
+    assert at.session_state["page"] == "sources"
+
+
+def test_carryover_hidden_on_first_use(p):
+    at = open_app(p, "prep")
+    assert not any("前回からの引き継ぎ" in s.value for s in at.subheader)
+
+
+def test_prep_candidates_are_shown_on_prep_page_with_matching_button(p):
+    run(p, "prep", [cand("質問", "利用人数は？"), cand("議題", "打刻方法")])
+    at = open_app(p, "prep")
+    assert not at.exception
+    labels = [b.label for b in at.button]
+    assert "会議の質問に追加" in labels and "議題に追加" in labels and "振り分けて採用" not in labels
+    at = next(b for b in at.button if b.label == "会議の質問に追加").click().run()
+    assert at.session_state["project"]["questions"] and not at.session_state["project"]["requirements"]
+
+
+def test_question_candidate_has_no_new_requirement_option(p):
+    run(p, "extract", [cand("質問", "Q")])
+    at = open_app(p, "candidates")
+    assert not at.exception and "要件候補として採用" not in [b.label for b in at.button]
+
+
+def test_reflect_prompt_after_agreement_and_manual_choice(p):
+    a = req(p, "Web打刻")
+    d = agreed(p, a)
+    at = open_app(p, "decisions")
+    assert not at.exception and d
+    assert any("判断を合意済みとして記録しました" in m.value for m in at.markdown)
+    assert key(at, f"rf_go_{d['id']}").disabled
+    at = next(c for c in at.checkbox if c.label == "この要件に反映する").check().run()
+    at = key(at, f"rf_go_{d['id']}").click().run()
+    assert not at.exception and at.session_state["project"]["requirements"][0]["status"] == "合意済み"
+
+
+def test_requirement_label_has_no_status_and_chips_are_named(p):
+    from definereq.ui.pages.organize import _req_label
+
+    r = req(p, "Web打刻")
+    assert "下書き" not in _req_label(r)
+    assert "対象範囲：未確定" in html(open_app(p, "requirements")) and "合意状態：下書き" in html(open_app(p, "requirements"))
+
+
+def test_scroll_frame_stays_in_place_between_reruns(p):
+    """枠の有無で部品の位置がずれると、開いているタブが閉じる。"""
+    run(p, "prep", [cand("質問", "Q")])
+    at = open_app(p, "requirements")
+    first = len(at.get("iframe"))
+    at.run()
+    assert first == len(at.get("iframe")) == 1
+
+
+def test_precheck_on_share_page(p):
+    scenario(p)
+    at = open_app(p, "share")
+    assert not at.exception
+    next(r for r in at.radio if r.key == "sh_type").set_value("spec").run()
+    assert any("出力前確認" in m.value for m in at.markdown) and key(at, "share_word").label == "下書きとしてWordを作成する"
+    at = key(at, "share_word").click().run()
+    assert not at.exception and any("要件定義書を作成しました" in s.value for s in at.success)
