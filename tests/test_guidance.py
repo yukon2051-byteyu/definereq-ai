@@ -235,7 +235,7 @@ def test_every_step_has_scene_and_real_detail_label(demo):
     assert len(steps) == 8
     for s in steps:
         ctx = guide.Ctx(builder.build(demo, s["stage"]))
-        assert s["scene"] and s["check"]
+        assert s["scene"]
         assert s["detail"](ctx) != "詳細画面を見る"
         if s.get("move"):
             assert s["move"](ctx)
@@ -272,6 +272,43 @@ def test_option_verdict_short_labels():
     assert {r["verdict"] for r in d["rows"]} == {"未判断"}
     d = guide.Ctx(builder.build("d1", 2)).decision("承認後の金額訂正の方式")
     assert [r["verdict"] for r in d["rows"]] == ["不採用", "不採用", "採用"]
+
+
+@pytest.mark.parametrize("demo", DEMOS)
+def test_first_screen_story_matches_records(demo):
+    """背景の説明が資料・発言と一致する（一致しなければ例外になる）。"""
+    s = guide.load(demo)[0]
+    assert s["main"](guide.Ctx(builder.build(demo, s["stage"])))[0]["type"] == "story"
+
+
+@pytest.mark.parametrize("demo,later", [("d1", ["再申請", "代行"]), ("d2", ["8時30分", "4時間", "翌営業日"]), ("d3", ["現地対応とする", "常時接続"])])
+def test_first_screen_does_not_reveal_later_conclusions(demo, later):
+    s = guide.STORIES[demo]
+    text = str([s["title"], s["rows"], s["people"], s["issue"], s["demo"]])
+    assert not [w for w in later if w in text]
+
+
+@pytest.mark.parametrize("demo", DEMOS)
+def test_background_can_be_rechecked_on_every_step(demo):
+    for s in guide.load(demo):
+        assert guide.Ctx(builder.build(demo, s["stage"])).background()
+
+
+def test_story_rejects_text_not_in_records(monkeypatch):
+    bad = {**guide.STORIES["d1"], "checks": ["資料に存在しない文"]}
+    monkeypatch.setitem(guide.STORIES, "d1", bad)
+    with pytest.raises(KeyError):
+        guide.Ctx(builder.build("d1", 2)).story("d1")
+
+
+def test_recheck_background_keeps_step():
+    at = button(button(app(), "tour_d1").click().run(), "tour_next").click().run()
+    at = button(at, "tour_next").click().run()
+    assert at.session_state["tour_index"] == 2 and any("現在の業務" in m.value for e in at.expander if e.label == "案件の背景を確認" for m in e.markdown)
+
+
+def test_cloud_reason_is_in_records():
+    assert guide.Ctx(builder.build("d2", 1)).has("基盤の保守をベンダーへ任せられるクラウドへの移行も検討している")
 
 
 # ---- 成果物 ----
@@ -323,17 +360,19 @@ def to_end(at):
 def test_home_cards_show_situation_and_highlights():
     at = app()
     html = "".join(h.proto.body for h in at.get("html"))
-    assert "どんな状況か" in html and "このデモの見どころ" in html and "経理は直接変更を認めていません" in html
+    assert "どんな案件か" in html and "誰が何に困っているか" in html and "このデモの見どころ" in html and "経理は直接変更を認めていません" in html
     assert "3分" not in html
 
 
 def test_first_and_later_banner():
     at = button(app(), "tour_d1").click().run()
     first = "".join(h.proto.body for h in at.get("html"))
-    assert "デモ体験中｜申請・承認アプリの刷新" in first and "デモ用の役割" in first and "現場と経理の要望を取りまとめる" in first and "現在の場面" in first
+    assert "デモ体験中｜経費申請アプリの刷新" in first and "デモ用の役割" in first and "現場と経理の要望を取りまとめる" in first
+    assert first.index("現在の業務") < first.index("困りごと") < first.index("今回、変えたいこと") < first.index("関係者が重視すること") < first.index("検討中の論点") < first.index("このデモで確認すること")
     at = button(at, "tour_next").click().run()
     later = "".join(h.proto.body for h in at.get("html"))
-    assert "現場と経理の要望を取りまとめる" not in later and "ガイド 2/8" in later and "第1回会議の前" in later
+    assert "現場と経理の要望を取りまとめる" not in later and "ガイド 2/8" in later and "経費申請アプリの刷新｜第1回会議の前" in later
+    assert any(e.label == "案件の背景を確認" for e in at.expander)
 
 
 def test_final_screen_flow():

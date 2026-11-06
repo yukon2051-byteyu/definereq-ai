@@ -82,7 +82,16 @@ with sync_playwright() as pw:
                 g.wait_for_selector(".dr-g-h", timeout=60000)
                 g.wait_for_timeout(1500)
                 body = g.inner_text("body")
-                check(g.locator(".dr-sit").count() == 1 and "現在の場面" in body and g.locator(f"text={g.locator('.dr-sit-tag').inner_text()}").count() >= 1, f"{name}_{i} 状況案内")
+                tag = g.locator(".dr-sit-tag").inner_text()
+                check(g.locator(".dr-sit").count() == 1 and "｜" in tag and "ガイド" in body, f"{name}_{i} 状況案内（{tag[:36]}）")
+                if i == 0:
+                    check(all(w in body for w in ("現在の業務", "困りごと", "今回、変えたいこと", "関係者が重視すること", "検討中の論点", "このデモで確認すること")), f"{name} 背景の6項目")
+                elif i < 7:
+                    g.get_by_text("案件の背景を確認").click()
+                    g.wait_for_timeout(600)
+                    check("現在の業務" in g.inner_text("body") and g.locator(".dr-g-h").count() == 1, f"{name}_{i} 背景を再確認")
+                    g.get_by_text("案件の背景を確認").click()
+                    g.wait_for_timeout(300)
                 over = g.evaluate("document.documentElement.scrollWidth-document.documentElement.clientWidth")
                 check(over <= 0 and g.locator(ERRORS).count() == 0, f"{name}_{i} はみ出し{over}・エラーなし")
                 check(" 0件" not in (g.locator(".dr-open").inner_text() if g.locator(".dr-open").count() else ""), f"{name}_{i} 未決に0件なし")

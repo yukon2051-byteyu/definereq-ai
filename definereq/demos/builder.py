@@ -191,5 +191,5 @@ def catalog() -> list[dict]:
     from . import d1, d2, d3
 
     return [{"id": m.ID, "name": m.NAME, "lead": m.LEAD, "strength": m.STRENGTH, "domains": m.DOMAINS, "tour": m.TOUR,
-             "situation": m.SITUATION, "highlights": m.HIGHLIGHTS, "feature": m.FEATURE}
+             "summary": m.SUMMARY, "situation": m.SITUATION, "highlights": m.HIGHLIGHTS}
             for m in (d1, d2, d3)]

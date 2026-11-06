@@ -8,14 +8,14 @@ from ..export import share
 from .builder import accept, action, issue, measure, opt, risk, scenario
 
 ID = "d1"
-NAME = "申請・承認アプリの刷新"
+NAME = "経費申請アプリの刷新"
 DOMAINS = ["app"]
 TRAITS = ["approval", "data", "confidential"]
 LEAD = "承認後の金額訂正をめぐる現場と管理部門の対立を、比較・判断・履歴までつなぐ。"
 STRENGTH = "合意・変更・矛盾・理由の追跡"
+SUMMARY = "紙とExcelで運用している経費申請を、アプリへ刷新する案件です。"
 SITUATION = "現場は承認後の金額訂正を希望していますが、経理は直接変更を認めていません。"
 HIGHLIGHTS = ["対立する条件を整理し、訂正方法を比較する", "判断理由を残し、後から出た変更要望まで追跡する"]
-FEATURE = "部門間の対立を判断と履歴につなぐ例です。"
 TOUR = [
     {"stage": 1, "page": "prep", "title": "会議前に質問を準備する", "input": "要望メモと経費申請規程", "ai": "質問と不足情報の候補（準備済み）", "human": "質問を選び、確認相手を決める", "result": "確認観点ごとの質問リスト"},
     {"stage": 2, "page": "recordings", "title": "会議での発言", "input": "議事録と第2回の字幕", "ai": "なし（字幕の取込）", "human": "話者を確認する。最後の発言は未確認のまま", "result": "話者と確認状態のついた発言"},

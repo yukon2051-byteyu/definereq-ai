@@ -60,10 +60,10 @@ def _sections() -> None:
             seen = d["id"] in done
             badge = chip("✓ 体験済み", "ok") if seen else ""
             points = "".join(f"<li>{esc(x)}</li>" for x in d["highlights"])
-            note = "" if seen else f'<div class="dr-demo-f">{esc(d["feature"])}</div>'
             st.html(f'<div class="dr-demo-n"><span>DEMO {i}　{esc("＋".join(DOMAINS[x] for x in d["domains"]))}</span>{badge}</div><div class="dr-demo-t">{esc(d["name"])}</div>'
-                    f'<div class="dr-demo-l">どんな状況か</div><div class="dr-demo-s">{esc(d["situation"])}</div>'
-                    f'<div class="dr-high"><b>このデモの見どころ</b><ul>{points}</ul></div>{note}')
+                    f'<div class="dr-demo-l">どんな案件か</div><div class="dr-demo-s">{esc(d["summary"])}</div>'
+                    f'<div class="dr-demo-l">誰が何に困っているか</div><div class="dr-demo-s">{esc(d["situation"])}</div>'
+                    f'<div class="dr-high"><b>このデモの見どころ</b><ul>{points}</ul></div>')
             st.space("stretch")  # 文章の行数が違っても、ボタンと下端の線を揃える
             if st.button("もう一度見る" if seen else "案内付きでデモを見る", key=f"tour_{d['id']}", type="primary", width="stretch"):
                 state.open_demo(d["id"], tour=True)

@@ -102,6 +102,15 @@ def _convert(c: dict) -> None:
     st.html(f'<div class="dr-m">{rows}</div>')
 
 
+def _story(c: dict) -> None:
+    """最初の画面の背景。カードに分けず、上から順に読める形にする。"""
+    rows = "".join(f'<section><h2>{esc(label)}</h2><p>{esc(text)}</p></section>' for label, text in c["rows"])
+    people = "".join(f"<li><b>{esc(who)}</b><span>{esc(what)}</span></li>" for who, what in c["people"])
+    st.html(f'<div class="dr-story"><div>{rows}</div><div><section><h2>関係者が重視すること</h2><ul>{people}</ul></section>'
+            f'<section class="dr-story-issue"><h2>検討中の論点</h2><p>{esc(c["issue"])}</p></section>'
+            f'<section><h2>このデモで確認すること</h2><p>{esc(c["demo"])}</p></section></div></div>')
+
+
 def _timeline(c: dict) -> None:
     if not c["rows"]:
         return
@@ -109,7 +118,7 @@ def _timeline(c: dict) -> None:
     st.html(f'<div class="dr-tl"><div class="dr-v-lab">仕様の変遷</div><ul>{rows}</ul></div>')
 
 
-RENDER = {"versus": _versus, "decision": _decision, "flow3": _flow3, "conflict": _conflict, "convert": _convert, "timeline": _timeline}
+RENDER = {"story": _story, "versus": _versus, "decision": _decision, "flow3": _flow3, "conflict": _conflict, "convert": _convert, "timeline": _timeline}
 
 
 def _more(step: dict, ctx: guide.Ctx) -> None:

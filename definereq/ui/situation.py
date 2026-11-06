@@ -30,18 +30,16 @@ def frame(tag: str, rows: list[tuple[str, str]], lead: str = "", kind: str = "de
     return f'<div class="dr-sit dr-sit-{kind}"><div class="dr-sit-tag">{esc(tag)}</div>{intro}{body}</div>'
 
 
-def demo_banner(name: str, intro: dict, step: dict, first: bool, move: str | None, background: list[str]) -> None:
-    """デモの状況案内。初回は前提を示し、2画面目以降は短くする。詳しい背景は開いて確認できる。"""
-    lead = f"あなたは、{intro['role']}です（デモ用の役割）。{intro['mission']}" if first else ""
-    rows = [] if first else [("役割", f"{intro['short_role']}（デモ用の役割）")]
-    rows += [("現在の場面", step["scene"]), ("この画面で確認すること", step["check"])]
-    if move:
-        rows.append(("場面の移り変わり", move))
-    st.html(frame(f"デモ体験中｜{name}", rows, lead))
-    if not first:
-        with st.expander("案件の背景をもう一度見る"):
-            for line in background:
-                st.write(line)
+def demo_banner(name: str, intro: dict, step: dict, first: bool, move: str | None, background: list[tuple[str, str]]) -> None:
+    """デモの状況案内。背景は最初の画面の本文で説明し、ここでは時点と行うことだけを短く示す。"""
+    if first:
+        st.html(frame(f"デモ体験中｜{name}", [], f"あなたは、{intro['role']}です（デモ用の役割）。"))
+        return
+    st.html(frame(f"{name}｜{step['scene']}", [], " ".join(x for x in (move, step["check"]) if x)))
+    with st.expander("案件の背景を確認"):  # 開いても画面は移動しないため、同じ場面のまま確認できる
+        for label, text in background:
+            st.markdown(f"**{label}**")
+            st.write(text)
 
 
 def _advice_html(a: gd.Advice) -> str:
