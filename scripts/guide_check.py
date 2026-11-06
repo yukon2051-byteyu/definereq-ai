@@ -121,7 +121,8 @@ with sync_playwright() as pw:
     label = play.first.inner_text()
     play.first.click()
     g.wait_for_selector("video", timeout=30000)
-    g.wait_for_timeout(2500)
+    g.wait_for_function("document.querySelector('video').readyState>=1", timeout=60000)  # 公開環境では読み込みに時間がかかる
+    g.wait_for_timeout(1500)
     state = g.evaluate("(()=>{const v=document.querySelector('video');return {t:v.currentTime,err:v.error&&v.error.code,dur:v.duration}})()")
     want = int(label.split("▶")[-1].strip()[:2]) * 60 + int(label.split("▶")[-1].strip()[3:5])
     check(state["err"] is None and state["t"] >= want - 1 and state["dur"] > want, f"録画の再生 {label} → 位置 {state['t']:.1f}秒／長さ {state['dur']:.1f}秒")

@@ -204,7 +204,11 @@ button:focus-visible,a:focus-visible{outline:2px solid #2A5DB0;outline-offset:2p
  .dr-v-mid,.dr-m-arrow{display:none}
 }
 .stMainBlockContainer{padding-top:1.6rem}
-[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{padding-top:1mm}
+/* 画面先頭へ戻す埋め込み枠は高さを持たせない（有無で本文の位置が動かないように） */
+[data-testid="stMain"] .stElementContainer:has(>.stIFrame){position:absolute;height:0;overflow:hidden}
+/* デモの案内欄の上端を、サイドバーのロゴの図形の上端（ボタンの上端＋8px）に揃える */
+@media (min-width:761px){.stMainBlockContainer:has(.dr-sit-demo),.stMainBlockContainer:has(.dr-end){padding-top:calc(1mm + 1cm + 8px)}}
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"]{padding-top:calc(1mm + 1cm)}
 [data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:.12rem}
 [data-testid="stSidebar"] .stCaption{margin-top:.55rem}
 [data-testid="stSidebar"] .stButton button{justify-content:flex-start;text-align:left;border:none;background:transparent;color:#F5F5F7;padding:2px 10px;min-height:30px}
@@ -214,7 +218,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #2A5DB0;outline-offset:2p
 [data-testid="stSidebar"] .stButton button[kind="primary"]{background:#fff;color:#161618}
 [data-testid="stSidebar"] .stButton button[kind="primary"] p{font-weight:700;color:#161618}
 /* サイドバーのロゴ（トップへのリンク） */
-[data-testid="stSidebarHeader"]{position:absolute;top:0;right:0;z-index:2;width:auto;height:auto;min-height:0;padding:calc(6px + 1mm) 12px 0}
+[data-testid="stSidebarHeader"]{position:absolute;top:0;right:0;z-index:2;width:auto;height:auto;min-height:0;padding:calc(6px + 1mm + 1cm) 12px 0}
 [data-testid="stSidebar"] .st-key-nav_logo button{background:url("__MARK_DARK__") 8px center/24px 24px no-repeat transparent;padding:2px 10px 2px 42px;min-height:40px}
 [data-testid="stSidebar"] .st-key-nav_logo button:hover,[data-testid="stSidebar"] .st-key-nav_logo button:focus,[data-testid="stSidebar"] .st-key-nav_logo button:active{background:url("__MARK_DARK__") 8px center/24px 24px no-repeat #26262B}
 [data-testid="stSidebar"] .st-key-nav_logo button p{font-size:17px;font-weight:900;color:#fff;letter-spacing:.01em}
