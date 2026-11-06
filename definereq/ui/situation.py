@@ -150,7 +150,8 @@ def _stage_question(p: dict) -> None:
     """作業の段階は利用者が選び直せる。選んだ段階はAIが変更しない。"""
     current = gd.user_stage(p)
     keys = list(gd.STAGE_LABELS)
-    with st.expander("作業の段階を選び直す"):
+    # 見出しに現在の段階を入れる。選び直すと見出しが変わり、欄が閉じて本文が上に戻る
+    with st.expander(f"作業の段階を選び直す（現在：{gd.STAGE_LABELS.get(current, gd.STAGE_LABELS[None])}）"):
         st.caption("選ぶと、その作業の画面へ移動します。")
         choice = st.radio("今の作業", keys, index=keys.index(current) if current in keys else 0, format_func=gd.STAGE_LABELS.get, key="guide_stage")
     if choice != current:
