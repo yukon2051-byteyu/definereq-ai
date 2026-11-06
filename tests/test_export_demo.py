@@ -358,7 +358,7 @@ def test_meeting_summary_step_keeps_method_undecided():
     step = next(s for s in demo_guide.load("d1") if s["process"] == "会議後の整理")
     ctx = demo_guide.Ctx(builder.build("d1", step["stage"]))
     assert "再申請" not in str(step["main"](ctx))
-    assert "未確定" in str(step["open"](ctx))
+    assert "判断待ち" in str(step["open"](ctx))
     assert "関係者の発言ではありません" in str(step["main"](ctx))
     assert "5回" in str(step["more"](ctx))
 

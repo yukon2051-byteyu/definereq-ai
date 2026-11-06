@@ -30,16 +30,20 @@ def frame(tag: str, rows: list[tuple[str, str]], lead: str = "", kind: str = "de
     return f'<div class="dr-sit dr-sit-{kind}"><div class="dr-sit-tag">{esc(tag)}</div>{intro}{body}</div>'
 
 
-def demo_banner(name: str, intro: dict, step: dict, first: bool, move: str | None, background: list[tuple[str, str]]) -> None:
+NOTE = "このガイドは、記録された内容を時系列で表示しています。画面を移動しても、判断や合意は発生しません。判断と合意は関係者が行ったものです。"
+
+
+def demo_banner(name: str, intro: dict, step: dict, first: bool, when: str | None, point: str, background: list[tuple[str, str]]) -> None:
     """デモの状況案内。背景は最初の画面の本文で説明し、ここでは時点と行うことだけを短く示す。"""
     if first:
         st.html(frame(f"デモ体験中｜{name}", [], f"あなたは、{intro['role']}です（デモ用の役割）。"))
         return
-    st.html(frame(f"{name}｜{step['scene']}", [], " ".join(x for x in (move, step["check"]) if x)))
+    st.html(frame(f"{name}｜{step['scene']}" + (f"（{when}）" if when else ""), [], point))
     with st.expander("案件の背景を確認"):  # 開いても画面は移動しないため、同じ場面のまま確認できる
         for label, text in background:
             st.markdown(f"**{label}**")
             st.write(text)
+        st.caption(NOTE)
 
 
 def _advice_html(a: gd.Advice) -> str:

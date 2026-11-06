@@ -17,6 +17,10 @@ from ..logic import evidence as ev
 from ..logic.checks import conflict_view
 
 
+# 残っている項目の見出し。「まだ決まっていない」に一律でまとめず、意味で分ける
+DOCUMENT, REPORTED, UNKNOWN, MEASURE, DECIDE, VERIFY, HUMAN, LEFT = "資料に記載", "関係者の申告", "未確認の情報", "計測が必要", "判断待ち", "未検証（実装や試験で確認）", "人の確認待ち", "残っている項目"
+
+
 class Ctx:
     """案件データから代表例を取り出す。見つからなければ例外にする。"""
 
@@ -63,28 +67,15 @@ class Ctx:
         r = self.req(req_title)
         m = self._find(r["measures"], lambda x: metric in x["metric"], metric)
         value = "値なし" if m.get("value") is None else f"{m['value']}{m.get('unit') or ''}"
-        return {"said": said, "metric": m["metric"], "value": value, "kind": m["kind"], "condition": m.get("condition") or "未設定", "status": m["status"], "basis": m.get("basis") or "未設定",
-                "origin": m.get("origin") or "未設定", "path": self._path(r, m, said)}
+        term = next((g for g in self.p["glossary"] if g["term"] in m["metric"]), None)
+        origin = m.get("origin") or "未設定"
+        return {"said": said, "metric": m["metric"], "value": value, "kind": m["kind"], "condition": m.get("condition") or "未設定", "basis": m.get("basis") or "未設定",
+                "origin": f"{origin}（{m['basis']}）" if m.get("basis") and origin in ("関係者が提示", "資料に記載") else origin, "help": term["meaning"].split("。", 1)[-1] if term else None,
+                "ai_asked": self._ai_asked(said), **checks.measure_view(self.p, r, m)}
 
-    def _path(self, r: dict, m: dict, said: str | None) -> list[str]:
-        """言葉が数値になるまでの経過。案件の記録にあることだけを並べる。"""
-        steps = []
-        if said and any(c["kind"] == "質問" and any(e.get("quote") == said for e in c.get("evidence", [])) for c in self.p["candidates"]):
-            steps.append("AIが確認用の質問を提示（数値は提示していない）")
-        origin = m.get("origin")
-        if origin == "関係者が提示":
-            steps.append(f"{m.get('basis') or '会議'}で関係者が値を提示")
-        elif origin == "資料に記載":
-            steps.append(f"資料の記録（{m.get('basis') or '資料名の記録なし'}）")
-        else:
-            steps.append("値の出所は未確認")
-        agreed = [d for d in self.p["decisions"] if d["state"] == "合意済み" and r["id"] in (d.get("related_requirements") or [])]
-        steps.append(f"判断 {agreed[0]['id']} で合意を記録" if agreed else f"要件は「{r['status']}」で未合意")
-        if m["status"] == "確認待ち":
-            steps.append("値の達成は確認待ち")
-        elif m["status"] == "未計測":
-            steps.append("未計測のため値はない")
-        return steps
+    def _ai_asked(self, said: str | None) -> bool:
+        """この発言について、AIが確認用の質問を出したか。AIは数値を出していない。"""
+        return bool(said) and any(c["kind"] == "質問" and any(e.get("quote") == said for e in c.get("evidence", [])) for c in self.p["candidates"])
 
     def options(self, topic: str) -> dict:
         d = self.dec(topic)
@@ -104,9 +95,11 @@ class Ctx:
                 rows.append(("現在の状態", view["summary"], c["state"]))
         return rows
 
-    def open_counts(self) -> list[str]:
+    def open_summary(self) -> list[tuple[str, str]]:
+        """残件の主な内容。件数は最終画面と同じく、重複を除いた対象の数を使う。"""
         bl = checks.backlog(self.p)
-        return [f"{k} {v}件" for k, v in bl["counts"].items() if v]
+        out = [(LEFT, f"確認が必要な項目 全{bl['unique_total']}件（内容は最後の画面で確認できます）")] if bl["unique_total"] else []
+        return out + [(DECIDE, f"{d['topic']}（{d['state']}）") for d in self.p["decisions"] if d["state"] == "保留"]
 
     def unconfirmed(self) -> int:
         return sum(1 for r in self.p["recordings"] for s in r["segments"] if s["speaker_status"] != "確認済み")
@@ -284,7 +277,7 @@ STORIES = {
     "d1": dict(
         title="承認後の金額間違いに対応できる経費申請アプリへ",
         rows=[("現在の業務", "社員は紙の申請書で経費を申請し、承認者の承認を受けます。申請の管理はExcelの台帳で行っています。"),
-              ("困りごと", "承認までの状況が見えません。また、金額を1桁間違えたまま承認されることが月に数件あり、今は担当者が台帳を手で直しています。"),
+              ("困りごと", "承認までの状況が見えません。また、現場の申告では金額を1桁間違えたまま承認されることが月に数件あり、今は担当者が台帳を手で直しています。"),
               ("今回、変えたいこと", "申請から精算までを一つのアプリで追えるようにします。あわせて、承認後に金額の誤りが見つかったときの扱いを決めます。")],
         people=[("現場（営業部）", "承認後でも金額を訂正したい。精算が終わった申請まで直す必要はない。"),
                 ("経理（経理課）", "金額の直接変更は、変更履歴があっても認めない。監査で説明できなくなるため。"),
@@ -336,36 +329,36 @@ def _d1() -> dict:
              lead=None,
              main=lambda g: [g.versus(("規程に書いてあること", "承認された申請の内容は変更できない"), ("会議で確認すること", g.question("承認後に金額の誤り")["text"], False), None)],
              more=lambda g: [("質問の詳細を見る", [f"確認する理由：{g.question('承認後に金額の誤り')['why']}", f"確認相手：{g.question('承認後に金額の誤り')['ask']}", f"質問の状態：{g.question('承認後に金額の誤り')['status']}", g.where("承認された申請の内容は変更できない")])],
-             open=lambda g: g.p["prep"]["gaps"][:3], count=lambda g: f"代表例1件／質問 全{len(g.p['questions'])}件"),
+             open=lambda g: [(REPORTED, "金額の誤りは月に数件（現場の申告）"), (UNKNOWN, "金額の誤りの正確な件数・集計期間・発生しやすい条件"), (UNKNOWN, "台帳を直すときの具体的な手順"), (UNKNOWN, "代理承認の運用")], count=lambda g: f"代表例1件／質問 全{len(g.p['questions'])}件"),
         dict(process="会議後の整理", short="要望と制約の整理", stage=2, page="candidates", title="現場の要望と、経理の制約を分けて整理",
              lead=None,
              main=lambda g: [g.versus(("現場の要望", "承認後でも金額を訂正できるようにしたい"), ("経理の制約", "直接変更は認めない"),
                                       ("アプリの整理（関係者の発言ではありません）", "訂正は必要。ただし、直接変更以外の方法を検討する。"))],
              more=lambda g: [("発言の根拠を見る", [g.full("承認後でも金額を訂正できるようにしたい"), g.full("変更履歴があっても直接変更は認めない")]),
                              ("AI候補を確認する仕組みを見る", [f"AI候補「{g.candidate('5回')['text']}」は、資料にない数値（{'、'.join(g.candidate('5回')['unsupported_numbers'])}）に印が付き、担当者が「{g.candidate('5回')['state']}」としました。"])],
-             open=lambda g: ["訂正の方式は未確定（次の工程で比較）"], count=lambda g: f"代表例2件／候補 全{len(g.p['candidates'])}件"),
+             open=lambda g: [(DECIDE, "訂正の方式（次の工程で比較）")], count=lambda g: f"代表例2件／候補 全{len(g.p['candidates'])}件"),
         dict(process="会議での発言", short="第2回の発言", stage=2, page="recordings", title="話者の確認が未実施の発言は、判断の根拠にしない",
              lead=None,
              main=lambda g: [g.speech("金額の訂正は再申請で進めます", "話者の確認が未実施のため、判断の根拠には使っていません。")],
              more=lambda g: [("他の発言を見る", [g.line("元の内容を引き継げるなら"), g.line("元の記録が残る"), g.line("再申請でも金額の基準は同じです")]),
                              ("判断の根拠を見る", [g.dec("承認後の金額訂正の方式").get("confirmation") or "記録なし"])],
-             open=lambda g: g.unconfirmed_open(), count=lambda g: f"代表例1件／発言 全{sum(len(r['segments']) for r in g.p['recordings'])}件",
+             open=lambda g: [(HUMAN, x) for x in g.unconfirmed_open()], count=lambda g: f"代表例1件／発言 全{sum(len(r['segments']) for r in g.p['recordings'])}件",
              media_note="第2回は会議ツールの字幕を取り込んだ記録で、録画の再生はありません。"),
         dict(process="判断", short="訂正方法の比較", stage=2, page="decisions", title="3案を比べて、再申請を採用した",
              lead=None,
              main=lambda g: [g.decision("承認後の金額訂正の方式")],
              more=lambda g: [("判断の根拠を見る", g.citations("承認後の金額訂正の方式"))],
-             open=lambda g: [f"{d['topic']}（{d['state']}：{d.get('hold_reason')}）" for d in g.p["decisions"] if d["state"] == "保留"], count=lambda g: f"代表例1件／判断 全{len(g.p['decisions'])}件"),
+             open=lambda g: [(DECIDE, f"{d['topic']}（{d['state']}：{d.get('hold_reason')}）") for d in g.p["decisions"] if d["state"] == "保留"], count=lambda g: f"代表例1件／判断 全{len(g.p['decisions'])}件"),
         dict(process="追加要望と影響", short="追加要望の影響", stage=3, page="changes", title="経理の直接訂正の要望が、過去の判断と衝突する",
-             lead="要望は受け付けただけで、要件はまだ変わっていません。",
+             lead=lambda g: _request_lead(g, "直接訂正"),
              main=lambda g: [_flow3(g, "金額の誤り", "直接訂正"), g.table_conflict(g.chg("直接訂正"))],
              more=lambda g: [("影響の調査を見る", g.impact_lines(g.chg("直接訂正")))],
-             open=lambda g: ["直接訂正を認めるかの判断", f"未調査の領域 {g.impacts(g.chg('直接訂正'))[1]}件"], count=lambda g: f"代表例1件／追加要望 全{len(g.p['changes'])}件"),
-        dict(process="判断後の仕様", short="判断後の仕様", stage=4, page="trail", title="直接訂正は却下し、経理の代行作成を採用",
+             open=lambda g: [(DECIDE, "直接訂正を認めるか"), (UNKNOWN, f"影響を未調査の領域 {g.impacts(g.chg('直接訂正'))[1]}件")], count=lambda g: f"代表例1件／追加要望 全{len(g.p['changes'])}件"),
+        dict(process="判断後の仕様", short="判断後の仕様", stage=4, page="trail", title="追加要望への判断と、変更された仕様",
              lead=None,
              main=lambda g: [g.decision("経理担当者による直接訂正"), _after(g, "金額の誤り"), g.timeline("金額の誤り")],
              more=lambda g: [("「なぜ再申請か」の回答を見る", [g.why("なぜ再申請なのか")["reason"]]), ("判断の根拠を見る", g.citations("経理担当者による直接訂正"))],
-             open=lambda g: [f"{d['topic']}（{d['state']}）" for d in g.p["decisions"] if d["state"] == "保留"], count=lambda g: f"履歴 全{len(g.p['history'])}件"),
+             open=lambda g: [(DECIDE, f"{d['topic']}（{d['state']}）") for d in g.p["decisions"] if d["state"] == "保留"], count=lambda g: f"履歴 全{len(g.p['history'])}件"),
         FINAL,
     ]
     return steps
@@ -378,38 +371,38 @@ def _d2() -> dict:
              main=lambda g: [g.story("d2")],
              more=lambda g: [],
              open=lambda g: [], count=lambda g: None),
-        dict(process="会議前の準備", short="資料の確認", stage=1, page="sources", title="資料から読めたことと、読めなかったことを分ける",
+        dict(process="会議前の準備", short="資料の確認", stage=1, page="sources", title="資料から読めたことと、読めなかったこと",
              lead=None,
              main=lambda g: [g.versus(("読めたこと", "約90分"), ("読めなかったこと", "データ増加率は未計測", False), None)],
              more=lambda g: [("図の扱いを見る", [next(w for s in g.p["sources"] for w in s["warnings"] if "理解していません" in w), f"人の補足：{next(s['supplement'] for s in g.p['sources'] if s.get('supplement'))}"]),
                              ("資料の位置を見る", [g.where("約90分"), g.where("データ増加率")])],
-             open=lambda g: g.p["prep"]["gaps"], count=lambda g: f"資料 全{len(g.p['sources'])}件"),
+             open=lambda g: [(MEASURE, "データの増加率"), (DECIDE, "障害の一次受付の担当"), (UNKNOWN, "復旧の手順の有無"), (VERIFY, "復旧できるか（復旧試験は未実施）")], count=lambda g: f"資料 全{len(g.p['sources'])}件"),
         dict(process="具体化", short="条件への具体化", stage=2, page="refine", title="「毎朝すぐ」「失いたくない」を測れる条件に分ける",
              lead=None,
              main=lambda g: [g.convert([g.measure("毎朝8時30分", "集計の完了時刻", "毎朝すぐに売上の数字を見たい"), g.measure("4時間以内", "目標復旧時間", "データを失いたくない"), g.measure("1日分まで", "許容データ損失", "データを失いたくない")])],
              more=lambda g: [("発言の根拠を見る", [g.full("毎朝すぐに売上の数字を見たい"), g.full("データを失いたくない"), g.full("毎朝8時30分までに")])],
-             open=lambda g: [f"{m['metric']}：未計測" for r in g.p["requirements"] for m in r["measures"] if m["status"] == "未計測"], count=lambda g: f"代表例3件／数値条件 全{sum(len(r['measures']) for r in g.p['requirements'])}件"),
+             open=lambda g: [(MEASURE, m["metric"]) for r in g.p["requirements"] for m in r["measures"] if m["status"] == "未計測"], count=lambda g: f"代表例3件／数値条件 全{sum(len(r['measures']) for r in g.p['requirements'])}件"),
         dict(process="アプリと基盤の境界", short="アプリと基盤の境界", stage=2, page="nfr", title="アプリと基盤の担当を分け、未決を残す",
              lead=None,
              main=lambda g: [g.versus(("アプリの保守", "情報システム課", False, "アプリの保守は情報システム課"), ("クラウド基盤の保守", "ベンダー", False, "クラウド基盤の保守はベンダー"),
                                       ("まだ決まっていないこと", "障害の一次受付の担当は未定です。"))],
              more=lambda g: [("リスクを見る", [f"{g.p['risks'][0]['content']}（{g.p['risks'][0]['nature']}）"]), ("資料の位置を見る", [g.where("アプリの保守は情報システム課")])],
-             open=lambda g: [f"{r['title']}：{r['open_area']}" for r in g.p["requirements"] if r.get("open_area")], count=lambda g: f"リスク 全{len(g.p['risks'])}件"),
+             open=lambda g: [(VERIFY, "4時間以内に復旧できるか（復旧試験は未実施）"), (DECIDE, "障害の一次受付の担当"), (DECIDE, "切戻しの条件")], count=lambda g: f"リスク 全{len(g.p['risks'])}件"),
         dict(process="意見調整", short="停止の調整", stage=2, page="issues", title="朝の集計を止めずに、保守の停止を認めた",
              lead=None,
              main=lambda g: [g.versus(("業務の希望", "朝の集計は止めないでほしい"), ("基盤の条件", "保守の計画停止は月1回の日曜夜に限る案", False, "保守の計画停止は月1回の日曜夜に限る案"), None), g.decision("計画停止の扱い")],
              more=lambda g: [("判断の根拠を見る", g.citations("計画停止の扱い"))],
-             open=lambda g: [i["topic"] for i in g.p["issues"] if i["state"] != "結論あり"], count=lambda g: f"論点 全{len(g.p['issues'])}件"),
+             open=lambda g: [(DECIDE, i["topic"]) for i in g.p["issues"] if i["state"] != "結論あり"], count=lambda g: f"論点 全{len(g.p['issues'])}件"),
         dict(process="追加要望と影響", short="再集計の要望", stage=3, page="changes", title="締め後の再集計の要望が、固定のルールと衝突する",
-             lead="要望は受け付けただけで、要件はまだ変わっていません。",
+             lead=lambda g: _request_lead(g, "再集計"),
              main=lambda g: [_flow3(g, "締め後の数字", "再集計"), g.table_conflict(g.chg("再集計"))],
              more=lambda g: [("影響の調査を見る", g.impact_lines(g.chg("再集計")))],
-             open=lambda g: ["当月の再集計を認めるかの判断", f"未調査の領域 {g.impacts(g.chg('再集計'))[1]}件"], count=lambda g: f"代表例1件／追加要望 全{len(g.p['changes'])}件"),
-        dict(process="判断後の仕様", short="判断と理由", stage=4, page="why", title="訂正版で対応すると判断し、理由を残した",
+             open=lambda g: [(DECIDE, "当月の再集計を認めるか"), (UNKNOWN, f"影響を未調査の領域 {g.impacts(g.chg('再集計'))[1]}件")], count=lambda g: f"代表例1件／追加要望 全{len(g.p['changes'])}件"),
+        dict(process="判断後の仕様", short="判断と理由", stage=4, page="why", title="再集計の要望への判断と、変更された仕様",
              lead=None,
              main=lambda g: [g.decision("締め後の再集計"), _after(g, "締め後の数字"), g.timeline("締め後の数字")],
              more=lambda g: [("理由が未記録の例を見る", [f"質問「{g.why('なぜ保存期間は3年なのか')['question']}」への回答：{g.why('なぜ保存期間は3年なのか')['reason']}（AIで補っていません）"]), ("判断の根拠を見る", g.citations("締め後の再集計"))],
-             open=lambda g: g.open_counts()[:3], count=lambda g: f"履歴 全{len(g.p['history'])}件"),
+             open=lambda g: g.open_summary(), count=lambda g: f"履歴 全{len(g.p['history'])}件"),
         FINAL,
     ]
 
@@ -426,33 +419,33 @@ def _d3() -> dict:
              main=lambda g: [g.versus(("資料から分かること", "拠点間は主回線1本で接続している"), ("未確認のまま残すこと", "保守会社の通信のポートは未確認", False), None)],
              more=lambda g: [("図の扱いを見る", [next(w for s in g.p["sources"] for w in s["warnings"] if "理解していません" in w), f"人の補足：{next(s['supplement'] for s in g.p['sources'] if s.get('supplement'))}"]),
                              ("通信一覧の原文を見る", [g.full("F03")])],
-             open=lambda g: g.p["prep"]["gaps"], count=lambda g: f"資料 全{len(g.p['sources'])}件"),
+             open=lambda g: [(MEASURE, "通信量"), (MEASURE, "ピークの時間帯"), (MEASURE, "切替時間"), (DECIDE, "許容できる停止時間")], count=lambda g: f"資料 全{len(g.p['sources'])}件"),
         dict(process="録画の発言", short="録画の発言", stage=2, page="recordings", title="保守会社の発言は「提案」であり、決定ではない",
              lead=None,
              main=lambda g: [g.speech("外部からの遠隔保守を提案します", "区分は「提案」です。この発言だけでは合意になりません。")],
              more=lambda g: [("他の発言を見る", [g.line("現場の要望は、速くて止まりにくい回線です"), g.line("外部からの接続は禁止です"), g.line("遠隔保守はまだ提案の段階")])],
-             open=lambda g: g.unconfirmed_open() + ["例外の手続きの有無"], done=lambda g: g.confirmed_note(), count=lambda g: f"代表例1件／発言 全{sum(len(r['segments']) for r in g.p['recordings'])}件"),
+             open=lambda g: [(DOCUMENT, g.fact("事前承認により例外を認める")["full"]), (UNKNOWN, "今回の遠隔保守が例外の対象になるか"), (UNKNOWN, "例外の申請先と承認の手順")] + [(HUMAN, x) for x in g.unconfirmed_open()], done=lambda g: g.confirmed_note(), count=lambda g: f"代表例1件／発言 全{sum(len(r['segments']) for r in g.p['recordings'])}件"),
         dict(process="具体化", short="条件への具体化", stage=2, page="refine", title="「速く、止まりにくく」を条件と未計測に分ける",
              lead=None,
              main=lambda g: [g.convert([g.measure("受発注の画面", "画面の表示時間", "朝九時の受発注の時間帯に画面が遅くなります"), g.measure("受発注の画面", "ピーク時の通信量"),
                                         g.measure("回線断", "許容停止時間"), g.measure("回線断", "代替回線への切替時間")])],
              more=lambda g: [("発言の根拠を見る", [g.full("朝9時の受発注の画面は3秒以内"), g.full("受発注の停止は30分まで")])],
-             open=lambda g: [f"{m['metric']}：未計測" for r in g.p["requirements"] for m in r["measures"] if m["status"] == "未計測"], count=lambda g: f"代表例4件／数値条件 全{sum(len(r['measures']) for r in g.p['requirements'])}件"),
+             open=lambda g: [(MEASURE, m["metric"]) for r in g.p["requirements"] for m in r["measures"] if m["status"] == "未計測"], count=lambda g: f"代表例4件／数値条件 全{sum(len(r['measures']) for r in g.p['requirements'])}件"),
         dict(process="合意前の確認", short="提案の状態", stage=2, page="decisions", title="遠隔保守の扱いは、まだ合意していない",
              lead=None,
              main=lambda g: [g.decision("遠隔保守の扱い")],
              more=lambda g: [("確認する質問を見る", g.p["issues"][0]["extra_questions"])],
-             open=lambda g: ["判断者の判断の記録"], count=lambda g: f"判断 全{len(g.p['decisions'])}件"),
+             open=lambda g: [(DECIDE, "遠隔保守の扱い（判断者：" + (g.dec("遠隔保守の扱い").get("decider") or "未設定") + "）")], count=lambda g: f"判断 全{len(g.p['decisions'])}件"),
         dict(process="追加要望と影響", short="常時接続の要望", stage=3, page="changes", title="常時接続の要望が、外部接続の禁止と衝突する",
-             lead="要望は受け付けただけで、要件はまだ変わっていません。",
+             lead=lambda g: _request_lead(g, "常時接続"),
              main=lambda g: [_flow3(g, "遠隔保守", "常時接続"), g.table_conflict(g.chg("常時接続"))],
              more=lambda g: [("影響の調査を見る", g.impact_lines(g.chg("常時接続")))],
-             open=lambda g: ["保守の方式の判断", f"未調査の領域 {g.impacts(g.chg('常時接続'))[1]}件"], count=lambda g: f"代表例1件／追加要望 全{len(g.p['changes'])}件"),
-        dict(process="判断後の仕様", short="判断と理由", stage=4, page="why", title="今回は現地対応とし、時間限定の接続は次回以降に検討",
+             open=lambda g: [(DECIDE, "保守の方式"), (UNKNOWN, f"影響を未調査の領域 {g.impacts(g.chg('常時接続'))[1]}件")], count=lambda g: f"代表例1件／追加要望 全{len(g.p['changes'])}件"),
+        dict(process="判断後の仕様", short="判断と理由", stage=4, page="why", title="常時接続の要望への判断と、変更された仕様",
              lead=None,
              main=lambda g: [g.decision("遠隔保守の扱い"), _after(g, "現地対応"), g.timeline("現地対応")],
              more=lambda g: [("過去の指摘を見る", [f"{a}：{b}" for a, b, _ in g.conflict(g.chg("常時接続"))] + g.impact_lines(g.chg("常時接続"))[:2]), ("判断の根拠を見る", g.citations("遠隔保守の扱い"))],
-             open=lambda g: g.open_counts()[:3], count=lambda g: f"履歴 全{len(g.p['history'])}件"),
+             open=lambda g: g.open_summary(), count=lambda g: f"履歴 全{len(g.p['history'])}件"),
         FINAL,
     ]
 
@@ -473,56 +466,68 @@ INTRO = {
 }
 
 
-def _report(g: Ctx, text: str, lead: str) -> str:
+def _request_lead(g: Ctx, text: str) -> str:
     r = g.requests(text)
-    return f"{lead}{r['date']}に{r['who']}から追加要望が届きました。背景：{r['why']}"
+    return f"要望者：{r['who']}。背景：{r['why']} 要望は受け付けただけで、要件はまだ変わっていません。"
 
 
-# 各画面の場面。scene は案件の時点、check はこの場面で行うこと（ガイドの何画面目かとは別の情報）
+def _adopted(g: Ctx, topic: str) -> str:
+    return g.decision(topic)["adopted"]
+
+
+AI, PROGRAM = "AIの支援（準備済みの結果）", "プログラムの処理"
+AFTER = "判断後の仕様を要件の新しい版として記録し、変更前後の差分と履歴を残す"
+
+# 各画面の場面。scene は案件の時点、date はその日付、check はこの場面の要点（1〜2文）。
+# support は入力・根拠／AI／プログラム／人の役割で、実際に動く機能だけを書く。
 SCENES = {
     "d1": [
-        dict(scene="案件の背景", check="", move=None, detail=lambda g: "案件の概要と残件を見る"),
-        dict(scene="第1回会議の前", check="訂正の扱いを確かめるため、会議で誰に何を聞くかを準備します。",
-             move=lambda g: "ここから時系列で追います。現状を確認したところ、承認後の訂正の手順が規程に書かれていませんでした。", detail=lambda g: f"質問{g.count('questions')}件を確認する"),
-        dict(scene="第1回会議の後", check="発言を、現場の要望・経理の制約・アプリの整理に分けます。",
-             move=lambda g: f"第1回打ち合わせ（{g.on('第1回')}）が終わりました。", detail=lambda g: f"候補{g.count('candidates')}件を確認する"),
-        dict(scene="第2回会議の記録", check="訂正方法についての発言を、誰の発言として確認できているか見ます。",
-             move=lambda g: f"初回会議で要望と制約を整理しました。続いて、第2回打ち合わせ（{g.on('第2回打ち合わせ')}）の記録を確認します。", detail=lambda g: f"発言{sum(len(r['segments']) for r in g.p['recordings'])}件と確認状態を見る"),
-        dict(scene="第2回会議の後", check="3つの訂正方法の比較と、判断者が記録した理由を確認します。", move=None, detail=lambda g: f"判断{g.count('decisions')}件と根拠を見る"),
-        dict(scene="追加要望の受付", check="要望と過去の判断がどこで衝突し、何が未調査かを確認します。",
-             move=lambda g: _report(g, "直接訂正", "第2回では、経理の田中課長が直接変更を認めませんでした。その後、"), detail=lambda g: "変更影響の詳細を見る"),
-        dict(scene="第3回会議の後", check="要望の採否、変更された部分、判断の理由を確認します。",
-             move=lambda g: f"ここからは、影響を確認した後に関係者が判断した結果を見ます（第3回打ち合わせ {g.on('第3回')}）。画面の移動で合意や変更が起きたのではなく、判断の記録を表示しています。", detail=lambda g: "仕様の変遷と理由を見る"),
-        dict(scene="デモの終了", check="", move=None, detail=lambda g: "機能画面を見る"),
+        dict(scene="案件の背景", check="", support=None, detail=lambda g: "案件の概要と残件を見る"),
+        dict(scene="第1回会議の前", check="規程に訂正の手順がないため、会議で誰に何を聞くかを準備します。", detail=lambda g: f"質問{g.count('questions')}件を確認する",
+             support=[("入力・根拠", "要望メモと経費申請規程"), (AI, "規程から確認すべき質問と不足情報の候補を作成"), (PROGRAM, "分野別の確認観点から質問候補を作成"), ("人が行うこと", "質問を選び、確認相手を決める")]),
+        dict(scene="第1回会議の後", date=lambda g: g.on("第1回"), check="第1回の発言を、現場の要望と経理の制約に分けます。", detail=lambda g: f"候補{g.count('candidates')}件を確認する",
+             support=[("入力・根拠", "第1回議事録と第2回の字幕"), (AI, "要望・制約・決定の候補を抽出"), (PROGRAM, "引用を原文と照合し、資料にない数値に印を付ける"), ("人が行うこと", "候補を読み、採用か却下かを決める")]),
+        dict(scene="第2回会議の記録", date=lambda g: g.on("第2回打ち合わせ"), check="初回で整理した要望と制約を受け、訂正方法についての発言を確認します。", detail=lambda g: f"発言{sum(len(r['segments']) for r in g.p['recordings'])}件と確認状態を見る",
+             support=[("入力・根拠", "会議ツールの字幕"), (PROGRAM, "発言ごとに話者と内容の確認状態を記録し、未確認の情報だけでは合意できないようにする"), ("人が行うこと", "話者と内容を確認する")]),
+        dict(scene="第2回会議の後", date=lambda g: g.dec("承認後の金額訂正の方式")["decided_on"], check="発言の確認を受け、判断者が訂正方法を選びました。", detail=lambda g: f"判断{g.count('decisions')}件と根拠を見る",
+             support=[("入力・根拠", "3つの案、第2回の発言、確認メール"), (PROGRAM, "採用案・判断者・判断日がそろわない記録は合意にしない"), ("人が行うこと", "案を比べ、採否と理由を判断する（AIは比較も判断もしていません）")]),
+        dict(scene="追加要望の受付", date=lambda g: g.requests("直接訂正")["date"], check="判断の後、経理担当者から直接訂正の要望が届きました。過去の判断と衝突していないかを確認します。", detail=lambda g: "変更影響の詳細を見る",
+             support=[("入力・根拠", "追加要望のメールと過去の判断"), (AI, "影響しそうな点の候補を作成"), (PROGRAM, "登録済みの関連から影響をたどり、文型の照合で矛盾の候補を検出し、未調査の領域を示す"), ("人が行うこと", "影響を確認し、採否を判断する")]),
+        dict(scene="第3回会議の後", date=lambda g: g.on("第3回"), check=lambda g: f"関係者の判断で、直接訂正は認めず「{_adopted(g, '経理担当者による直接訂正')}」を採用しました。変更された部分と理由を確認します。", detail=lambda g: "仕様の変遷と理由を見る",
+             support=[("入力・根拠", "第3回打ち合わせメモと判断の記録"), (PROGRAM, AFTER), ("人が行うこと", "採否を判断し、要件への反映を確認する")]),
+        dict(scene="デモの終了", check="", support=None, detail=lambda g: "機能画面を見る"),
     ],
     "d2": [
-        dict(scene="案件の背景", check="", move=None, detail=lambda g: "案件の概要と残件を見る"),
-        dict(scene="第1回会議の前", check="資料から読めたことと、読めなかったことを分けます。",
-             move=lambda g: "ここから時系列で追います。まず、第1回会議の前に戻って資料を確認します。", detail=lambda g: f"資料{g.count('sources')}件を確認する"),
-        dict(scene="第2回会議の後", check="数値を誰が示したか、確認が済んでいるかを見ます。",
-             move=lambda g: f"第1回（{g.on('第1回')}）の「毎朝すぐ」「失いたくない」という発言を受け、第2回（{g.on('第2回')}）で条件を確認しました。", detail=lambda g: "数値条件と受入条件を見る"),
-        dict(scene="第2回会議の後", check="アプリと基盤の担当を分け、決まっていないことを残します。", move=None, detail=lambda g: "非機能の確認状況を見る"),
-        dict(scene="第2回会議の後", check="朝の集計を止めたくない希望と、保守の停止をどう両立させたかを見ます。", move=None, detail=lambda g: f"論点{g.count('issues')}件を確認する"),
-        dict(scene="追加要望の受付", check="要望と固定のルールがどこで衝突し、何が未調査かを確認します。",
-             move=lambda g: _report(g, "再集計", "合意の後、"), detail=lambda g: "変更影響の詳細を見る"),
-        dict(scene="第3回会議の後", check="要望の採否、変更された部分、判断の理由を確認します。",
-             move=lambda g: f"ここからは、影響を確認した後に関係者が判断した結果を見ます（第3回打ち合わせ {g.on('第3回')}）。画面の移動で合意や変更が起きたのではなく、判断の記録を表示しています。", detail=lambda g: "「なぜこの仕様か」を試す"),
-        dict(scene="デモの終了", check="", move=None, detail=lambda g: "機能画面を見る"),
+        dict(scene="案件の背景", check="", support=None, detail=lambda g: "案件の概要と残件を見る"),
+        dict(scene="第1回会議の前", check="計画案・処理量の表・運用メモを読み、会議で確認することを洗い出します。", detail=lambda g: f"資料{g.count('sources')}件を確認する",
+             support=[("入力・根拠", "移行計画案、現状の処理量、運用メモ"), (AI, "不足情報と質問の候補を作成"), (PROGRAM, "資料の位置を保って読み取り、内容を読めない図に印を付ける"), ("人が行うこと", "図の意味を補足し、質問を選ぶ")]),
+        dict(scene="第2回会議の後", date=lambda g: g.on("第2回"), check="第1回の曖昧な言葉を、第2回の発言をもとに確認できる条件へ分けます。", detail=lambda g: "数値条件と受入条件を見る",
+             support=[("入力・根拠", "第1回議事録と第2回打ち合わせメモ"), (AI, "曖昧な言葉を確認する質問を作成（数値は出していません）"), (PROGRAM, "資料にない数値に印を付け、未計測の項目を残件にする"), ("人が行うこと", "数値を確認して登録する")]),
+        dict(scene="第2回会議の後", date=lambda g: g.on("第2回"), check="条件を受けて、誰が何を担当するかを整理します。", detail=lambda g: "非機能の確認状況を見る",
+             support=[("入力・根拠", "運用メモと要件"), (PROGRAM, "非機能の確認状況を一覧にし、未確認の項目を残す"), ("人が行うこと", "担当範囲を確認し、未定の項目の判断者を決める")]),
+        dict(scene="第2回会議の後", date=lambda g: g.on("第2回"), check="朝の集計を止めたくない希望と、保守の停止の調整を見ます。", detail=lambda g: f"論点{g.count('issues')}件を確認する",
+             support=[("入力・根拠", "業務の希望と基盤の条件"), (PROGRAM, "意見の立場と根拠を分けて記録する"), ("人が行うこと", "条件を調整し、判断する（AIは判断していません）")]),
+        dict(scene="追加要望の受付", date=lambda g: g.requests("再集計")["date"], check="合意の後、福岡拠点から当月の再集計の要望が届きました。固定のルールと衝突していないかを確認します。", detail=lambda g: "変更影響の詳細を見る",
+             support=[("入力・根拠", "拠点からの要望と過去の判断"), (AI, "朝の集計と重なる可能性を影響の候補として提示（未計測）"), (PROGRAM, "登録済みの関連から影響をたどり、文型の照合で矛盾の候補を検出し、未調査の領域を示す"), ("人が行うこと", "影響を確認し、採否を判断する")]),
+        dict(scene="第3回会議の後", date=lambda g: g.on("第3回"), check=lambda g: f"関係者の判断で、当月の再集計は認めず「{_adopted(g, '締め後の再集計')}」を採用しました。変更された部分と理由を確認します。", detail=lambda g: "「なぜこの仕様か」を試す",
+             support=[("入力・根拠", "第3回打ち合わせメモと判断の記録"), (PROGRAM, AFTER + "。「なぜこの仕様か」には登録情報から回答する"), ("人が行うこと", "採否を判断し、要件への反映を確認する")]),
+        dict(scene="デモの終了", check="", support=None, detail=lambda g: "機能画面を見る"),
     ],
     "d3": [
-        dict(scene="案件の背景", check="", move=None, detail=lambda g: "案件の概要と残件を見る"),
-        dict(scene="初回の定例の前", check="資料から分かることと、未確認のまま残すことを分けます。",
-             move=lambda g: "ここから時系列で追います。まず、初回の定例の前に戻って資料を確認します。", detail=lambda g: f"資料{g.count('sources')}件を確認する"),
-        dict(scene="初回の定例の後", check="発言が提案か決定かを、録画の該当箇所とあわせて確認します。",
-             move=lambda g: f"定例（{g.on('定例（録画）')}）の録画を確認します。", detail=lambda g: f"発言{sum(len(r['segments']) for r in g.p['recordings'])}件と確認状態を見る"),
-        dict(scene="第2回定例の後", check="数値を誰が示したか、未計測の項目は何かを見ます。",
-             move=lambda g: f"第2回定例（{g.on('第2回定例')}）で、「速く、止まりにくく」の条件を確認しました。", detail=lambda g: "数値条件と受入条件を見る"),
-        dict(scene="第2回定例の後", check="案の比較と、判断がまだ記録されていないことを確認します。", move=None, detail=lambda g: f"判断{g.count('decisions')}件と根拠を見る"),
-        dict(scene="追加要望の受付", check="要望と規程がどこで衝突し、何が未調査かを確認します。",
-             move=lambda g: _report(g, "常時接続", "遠隔保守の判断が決まらないうちに、"), detail=lambda g: "変更影響の詳細を見る"),
-        dict(scene="第3回定例の後", check="要望の採否、変更された部分、判断の理由を確認します。",
-             move=lambda g: f"ここからは、影響を確認した後に関係者が判断した結果を見ます（第3回定例 {g.on('第3回定例')}）。画面の移動で合意や変更が起きたのではなく、判断の記録を表示しています。", detail=lambda g: "「なぜこの仕様か」を試す"),
-        dict(scene="デモの終了", check="", move=None, detail=lambda g: "機能画面を見る"),
+        dict(scene="案件の背景", check="", support=None, detail=lambda g: "案件の概要と残件を見る"),
+        dict(scene="初回の定例の前", check="通信一覧と構成の資料を読み、会議で確認することを洗い出します。", detail=lambda g: f"資料{g.count('sources')}件を確認する",
+             support=[("入力・根拠", "通信一覧、構成説明、規程抜粋、保守の現状メモ"), (AI, "質問と不足情報の候補を作成"), (PROGRAM, "資料の位置を保って読み取り、内容を読めない図に印を付ける"), ("人が行うこと", "図の意味を補足し、質問を選ぶ")]),
+        dict(scene="初回の定例の後", date=lambda g: g.on("定例（録画）"), check="定例の録画から、発言が提案か決定かを確認します。", detail=lambda g: f"発言{sum(len(r['segments']) for r in g.p['recordings'])}件と確認状態を見る",
+             support=[("入力・根拠", "定例の録画"), (AI, "発言の文字起こし"), (PROGRAM, "発言と時刻を結び付け、指定の時刻から再生できるようにする"), ("人が行うこと", "話者と発言の区分を確認する")]),
+        dict(scene="第2回定例の後", date=lambda g: g.on("第2回定例"), check="録画の要望を、第2回定例の発言をもとに確認できる条件へ分けます。", detail=lambda g: "数値条件と受入条件を見る",
+             support=[("入力・根拠", "録画の発言と第2回定例メモ"), (AI, "曖昧な言葉を確認する質問を作成（数値は出していません）"), (PROGRAM, "未計測の項目を値のないまま残件にする"), ("人が行うこと", "数値を確認して登録する")]),
+        dict(scene="第2回定例の後", date=lambda g: g.on("第2回定例"), check="条件を踏まえて案を比べます。判断はまだ記録されていません。", detail=lambda g: f"判断{g.count('decisions')}件と根拠を見る",
+             support=[("入力・根拠", "保守会社の提案、規程、第2回定例メモ"), (AI, "「遠隔保守を採用する」という候補を出したが、提案のため人が却下"), (PROGRAM, "採用案・判断者・判断日がそろわない記録は合意にしない"), ("人が行うこと", "案を比べ、判断する")]),
+        dict(scene="追加要望の受付", date=lambda g: g.requests("常時接続")["date"], check="判断が決まらないうちに、保守会社から常時接続の要望が届きました。規程と衝突していないかを確認します。", detail=lambda g: "変更影響の詳細を見る",
+             support=[("入力・根拠", "保守会社の要望と規程"), (AI, "影響しそうな点の候補を作成"), (PROGRAM, "登録済みの関連から影響をたどり、文型の照合で矛盾の候補を検出し、未調査の領域を示す"), ("人が行うこと", "影響を確認し、採否を判断する")]),
+        dict(scene="第3回定例の後", date=lambda g: g.on("第3回定例"), check=lambda g: f"関係者の判断で、常時接続は認めず「{_adopted(g, '遠隔保守の扱い')}」を採用しました。変更された部分と理由を確認します。", detail=lambda g: "「なぜこの仕様か」を試す",
+             support=[("入力・根拠", "第3回定例メモと判断の記録"), (PROGRAM, AFTER), ("人が行うこと", "採否を判断し、要件への反映を確認する")]),
+        dict(scene="デモの終了", check="", support=None, detail=lambda g: "機能画面を見る"),
     ],
 }
 

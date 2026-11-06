@@ -138,12 +138,13 @@ def _req_rows(reqs: list[dict]) -> list[list[str]]:
 REQ_COLS = {"columns": ["ID", "版", "種類", "名称", "内容", "範囲", "状態"], "widths": [1.7, 0.9, 1.5, 3, 5.3, 1.6, 2]}
 
 
-def _measures(reqs: list[dict]) -> list[list[str]]:
+def _measures(p: dict, reqs: list[dict]) -> list[list[str]]:
     rows = []
     for r in reqs:
         for m in r.get("measures", []):
-            rows.append([r["id"], m.get("metric", ""), f"{display(m.get('value'))}{m.get('unit') or ''}",
-                         m.get("kind", ""), display(m.get("origin")), display(m.get("condition")), display(m.get("basis")), display(m.get("status"))])
+            v = checks.measure_view(p, r, m)
+            rows.append([r["id"], m.get("metric", ""), f"{display(m.get('value'))}{m.get('unit') or ''}", m.get("kind", ""), display(m.get("origin")), v["agreement"], v["verify"],
+                         f"{display(m.get('condition'))}（根拠：{display(m.get('basis'))}）"])
     return rows
 
 
@@ -244,8 +245,8 @@ def build_spec(p: dict, opt: Options) -> list[Section]:
         sections.append(Section("分類未設定の要件", level=2, paragraphs=["分野や種類が確認されていない要件です。"], table={**REQ_COLS, "rows": _req_rows(unclassified)}))
     if empty_chapters:  # 空の表を章の数だけ並べず、未登録の章としてまとめる
         sections.append(Section("要件が未登録の章", level=2, paragraphs=["次の章には要件が登録されていません。該当しないと確認されたものではありません。", "、".join(empty_chapters)]))
-    sections.append(Section("数値条件と区分", paragraphs=["必要条件・現状の計測値・仮定・実現方式の候補・人が確定した設計制約を区別しています。出所は誰が示した値か、状態はその値の確認が済んだかを表します。"],
-                            table={"columns": ["要件", "指標", "値", "区分", "出所", "測定条件", "根拠", "状態"], "rows": _measures(reqs), "widths": [1.4, 2.7, 1.8, 2.2, 1.9, 2.6, 2.6, 1.3]}))
+    sections.append(Section("数値条件と区分", paragraphs=["必要条件・現状の計測値・仮定・実現方式の候補・人が確定した設計制約を区別しています。出所は誰が示した値か、要求値の合意は値に合意したか、達成の検証は実際に達成できると確かめたかを表します。合意済みの値でも、達成できるとは限りません。"],
+                            table={"columns": ["要件", "指標", "値", "区分", "出所", "要求値の合意", "達成の検証", "測定条件・根拠"], "rows": _measures(p, reqs), "widths": [1.5, 2.4, 1.5, 1.9, 1.7, 2.0, 2.0, 3.5]}))
     nfr_rows = [[n["label"], n["state"], display(n.get("note")), "、".join(n["requirements"]) or "未設定"] for n in checks.nfr_overview(p)]
     sections.append(Section("非機能", paragraphs=["状態が未確認の項目は、問題がないことを示すものではありません。"], table={"columns": ["項目", "状態", "補足", "関連要件"], "rows": nfr_rows, "widths": [3, 2, 8, 3]}))
     sections.append(Section("シナリオ", table={"columns": ["ID", "名称", "種類", "開始条件", "流れ", "終了・失敗時", "関連要件"], "rows": [[s["id"], s["title"], s.get("kind", ""), display(s.get("start")), " → ".join(s.get("steps", [])), display(s.get("end")), "、".join(s.get("related_requirements", []))] for s in p["scenarios"]], "widths": [1.4, 3, 1.4, 2.6, 4.2, 2.4, 1.5]}))

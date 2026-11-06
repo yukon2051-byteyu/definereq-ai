@@ -9,8 +9,10 @@ import io
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.properties import PageSetupProperties
 
 from .. import project as pj
+from .. import schema
 from ..logic import checks
 from ..project import display
 
@@ -51,6 +53,13 @@ def _sheet(wb: Workbook, title: str, cols: list[tuple[str, int]], rows: list[lis
     ws.auto_filter.ref = f"A1:{get_column_letter(len(cols))}{max(1, len(rows) + 1)}"
     ws.sheet_view.showGridLines = False
     ws.oddFooter.center.text = "&P / &N"
+    # 列が多いため、横向きで幅を1ページに収めて印刷する
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.print_title_rows = "1:1"
     return ws
 
 
@@ -66,7 +75,7 @@ def render(p: dict, include_internal: bool = False) -> bytes:
     wb = Workbook()
     info = wb.active
     info.title = "表紙"
-    for i, (k, v) in enumerate((("案件", p["name"]), ("案件ID", p["id"]), ("分野", "、".join(p["domains"])),
+    for i, (k, v) in enumerate((("案件", p["name"]), ("案件ID", p["id"]), ("分野", "、".join(schema.DOMAINS[d] for d in p["domains"])),
                                 ("出力日時", pj.now_iso()), ("形式版", p["format_version"]),
                                 ("範囲", "内部メモ含む" if include_internal else "内部メモ除外"),
                                 ("データ", "【サンプル】架空の案件データ。実在の組織・案件とは関係ありません" if p.get("is_demo") or p.get("from_demo") else "利用者の登録データ")), 1):

@@ -95,10 +95,12 @@ def _convert(c: dict) -> None:
     rows = ""
     for r in c["rows"]:
         said = f'<div class="dr-g-sub">「{esc(r["said"])}」</div>' if r.get("said") else '<div class="dr-g-sub">発言の記録なし</div>'
-        path = " → ".join(r["path"])
-        rows += (f'<div class="dr-m-row"><div>{said}</div><div class="dr-m-arrow">→</div><div><div class="dr-v-lab">{esc(r["metric"])}</div><div class="dr-key">{esc(r["value"])}</div>'
-                 f'<div class="dr-chips">{tag(r["kind"])}{chip("出所：" + r["origin"], "info" if r["origin"] != "未確認" else "warn")}{chip("確認：" + r["status"], STATUS_TONE.get(r["status"], "plain"))}</div>'
-                 f'<div class="dr-meta">経過：{esc(path)}</div></div></div>')
+        plain = f'<div class="dr-meta">{esc(r["help"])}</div>' if r.get("help") else ""
+        items = [("値の出所", r["origin"]), ("要求値の合意", r["agreement"]), ("達成の検証", r["verify"])]
+        state = "".join(f"<dt>{esc(k)}</dt><dd>{esc(v)}</dd>" for k, v in items)
+        asked = '<div class="dr-meta">AIは確認用の質問を出しただけで、数値は提示していません。</div>' if r.get("ai_asked") else ""
+        rows += (f'<div class="dr-m-row"><div>{said}</div><div class="dr-m-arrow">→</div><div><div class="dr-v-lab">{esc(r["metric"])}</div><div class="dr-key">{esc(r["value"])}</div>{plain}'
+                 f'<dl class="dr-state">{state}</dl>{asked}</div></div>')
     st.html(f'<div class="dr-m">{rows}</div>')
 
 
@@ -132,6 +134,7 @@ def _finale(p: dict, ctx: guide.Ctx, steps: list[dict], i: int, intro: dict) -> 
     """最終画面：体験の終了 → 確認できたこと → 資料 → 決定と残件 → 次の行動。"""
     s = ctx.summary()
     total = s["todo_total"]
+    shown = 3  # 要約に出す件数
     rest = f"デモの体験は終わりましたが、案件には確認が必要な項目が{total}件残っています。要件定義の完了を示すものではありません。" if total else "デモの体験は終わりました。"
     st.html(f'<div class="dr-sit dr-end"><div class="dr-sit-tag">{esc(p["name"])}｜ガイド {i + 1}/{len(steps)}｜現在の場面：{esc(steps[i]["scene"])}</div><h1 class="dr-g-h dr-end-h">✓ デモ体験はここで終了です</h1>'
             f'<p>{esc(intro["done"])}</p><p>以下から、この案件のサンプル資料を確認・ダウンロードできます。</p><p class="dr-end-n">{esc(rest)}</p></div>')
@@ -139,17 +142,26 @@ def _finale(p: dict, ctx: guide.Ctx, steps: list[dict], i: int, intro: dict) -> 
     st.html(f'<h2 class="dr-end-sec">この体験で確認できたこと</h2><ul class="dr-g-list">{recap}</ul><h2 class="dr-end-sec">作成されたサンプル資料を見る・ダウンロードする</h2>')
     artifacts.cards(p)
 
-    decided = "".join(f"<li>{esc(x)}</li>" for x in s["decided"][:3]) or "<li>なし</li>"
-    top = "".join(f'<li>{esc(t["text"])}<span class="dr-meta-i">確認相手：{esc(display(t["ask"]))}／期限：{esc(display(t["due"]))}</span></li>' for t in s["todo"][:3]) or "<li>なし</li>"
-    st.html(f'<h2 class="dr-end-sec">決まったことと残っていること</h2><div class="dr-end-g"><div><div class="dr-v-lab">決まったこと（{len(s["decided"])}件）</div><ul class="dr-g-list">{decided}</ul></div>'
-            f'<div><div class="dr-v-lab">残っていること（{total}件）</div><ul class="dr-g-list">{top}</ul></div></div>')
-    with st.expander("決定事項と残件の詳細を見る"):
-        st.markdown("**決まったこと**")
-        for x in s["decided"]:
-            st.write(f"・{x}")
-        st.markdown("**残っていること**")
-        for t in s["todo"]:
-            st.write(f"・{t['text']}（確認相手：{display(t['ask'])}／期限：{display(t['due'])}）")
+    st.html('<h2 class="dr-end-sec">決まったことと残っていること</h2>')
+    left, right = st.columns(2)
+
+    def todo_line(t: dict) -> str:
+        return f"{t['text']}（確認相手：{display(t['ask'])}／期限：{display(t['due'])}）"
+
+    def block(col, title: str, lines: list[str], empty: str, key: str) -> None:
+        """要約と全件を同じ一覧から作る。省略があるときだけ、そのことを示す。"""
+        n = len(lines)
+        head = f'<div class="dr-v-lab">{esc(title)}：全{n}件</div>' if n else f'<div class="dr-v-lab">{esc(title)}</div>'
+        body = "".join(f"<li>{esc(x)}</li>" for x in lines[:shown]) if n else ""
+        more = f'<div class="dr-meta">主な{shown}件を表示しています。</div>' if n > shown else ""
+        col.html(head + (f'{more}<ul class="dr-g-list">{body}</ul>' if n else f'<div class="dr-g-sub">{esc(empty)}</div>'))
+        if n > shown:
+            with col.expander(f"全{n}件を見る"):
+                for x in lines:
+                    st.write(f"・{x}")
+
+    block(left, "決まったこと", s["decided"], "合意済みの判断はまだありません。", "decided")
+    block(right, "残っていること", [todo_line(t) for t in s["todo"]], "登録された内容から検出された残件はありません。", "todo")
 
     st.html('<h2 class="dr-end-sec">次に見るもの</h2>')
     c1, c2 = st.columns(2)
@@ -165,6 +177,30 @@ def _finale(p: dict, ctx: guide.Ctx, steps: list[dict], i: int, intro: dict) -> 
         state.go_home()
 
 
+def _lead(step: dict, ctx: guide.Ctx) -> str:
+    lead = step.get("lead")
+    text = lead(ctx) if callable(lead) else lead
+    return f'<p class="dr-g-lead">{esc(text)}</p>' if text else ""
+
+
+def _support(step: dict) -> None:
+    """この場面でアプリが何を支援したか。AIとプログラムと人を分けて、短く示す。"""
+    if step.get("support"):
+        rows = "".join(f"<dt>{esc(k)}</dt><dd>{esc(v)}</dd>" for k, v in step["support"])
+        st.html(f'<div class="dr-help"><div class="dr-v-lab">アプリの支援</div><dl>{rows}</dl></div>')
+
+
+def _open(items: list[tuple[str, str]]) -> None:
+    """残っている項目を意味ごとの見出しで示す。"""
+    if not items:
+        return
+    groups: dict[str, list[str]] = {}
+    for kind, text in items:
+        groups.setdefault(kind, []).append(text)
+    body = "".join(f'<div class="dr-open-g"><div class="dr-v-lab">{esc(k)}</div><ul class="dr-g-list">{"".join(f"<li>{esc(x)}</li>" for x in v)}</ul></div>' for k, v in groups.items())
+    st.html(f'<div class="dr-open">{body}</div>')
+
+
 def render(p: dict) -> None:
     demo_id = p["demo"]["id"]
     steps = guide.load(demo_id)
@@ -176,10 +212,11 @@ def render(p: dict) -> None:
         st.session_state.setdefault("demo_done", set()).add(demo_id)
         _finale(p, ctx, steps, i, intro)
         return
-    situation.demo_banner(p["name"], intro, step, i == 0, step["move"](ctx) if step.get("move") else None, ctx.background())
+    point = step["check"](ctx) if callable(step["check"]) else step["check"]
+    situation.demo_banner(p["name"], intro, step, i == 0, step["date"](ctx) if step.get("date") else None, point, ctx.background())
     count = step["count"](ctx)
     st.html(f'<div class="dr-g-prog"><b>ガイド {i + 1}/{len(steps)}（要点を見る画面）：{esc(step["process"])}</b>' + (f"<span>{esc(count)}</span>" if count else "") + "</div>"
-            f'<h1 class="dr-g-h">{esc(step["title"])}</h1>' + (f'<p class="dr-g-lead">{esc(step["lead"])}</p>' if step.get("lead") else ""))
+            f'<h1 class="dr-g-h">{esc(step["title"])}</h1>' + _lead(step, ctx))
     for n, block in enumerate(step["main"](ctx)):
         if block["type"] == "speech":
             _speech(p, block, f"guide_{i}_{n}")
@@ -190,10 +227,8 @@ def render(p: dict) -> None:
     done = step["done"](ctx) if step.get("done") else None
     if done:
         st.caption(done)
-    remaining = step["open"](ctx)
-    if remaining:
-        items = "".join(f"<li>{esc(str(x))}</li>" for x in remaining)
-        st.html(f'<div class="dr-open"><div class="dr-v-lab">まだ決まっていないこと</div><ul class="dr-g-list">{items}</ul></div>')
+    _support(step)
+    _open(step["open"](ctx))
     _more(step, ctx)
     _nav(steps, i, step, ctx)
 

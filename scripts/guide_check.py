@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import io
+import re
 import sys
 from pathlib import Path
 
@@ -109,6 +110,14 @@ with sync_playwright() as pw:
             g.get_by_role("button", name="内容を見る").first.click()
             g.wait_for_timeout(2000)
             check("この文書について" in g.inner_text("body"), f"{name} 内容を見る")
+            more = g.get_by_text(re.compile(r"^全\d+件を見る$"))
+            for k in range(more.count()):
+                label = more.nth(k).inner_text()
+                more.nth(k).click()
+                g.wait_for_timeout(500)
+                want = int(re.search(r"\d+", label).group())
+                got = g.locator("[data-testid=stExpander]").filter(has_text=label).locator("[data-testid=stExpanderDetails] p").count()
+                check(got == want, f"{name} {label}（表示{got}件）")
             g.get_by_role("button", name="ほかのデモを見る").click()
             g.wait_for_selector(".dr-hero", timeout=60000)
             g.wait_for_timeout(2500)

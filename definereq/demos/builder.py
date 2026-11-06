@@ -136,8 +136,8 @@ def opt(id_, label, pros, cons):
     return {"id": id_, "label": label, "pros": pros, "cons": cons}
 
 
-def measure(metric, value, unit, kind, condition=None, basis=None, status="確認待ち", origin=None):
-    return {"metric": metric, "value": value, "unit": unit, "kind": kind, "condition": condition, "basis": basis, "status": status, "origin": origin}
+def measure(metric, value, unit, kind, condition=None, basis=None, status="確認待ち", origin=None, verify=None):
+    return {"metric": metric, "value": value, "unit": unit, "kind": kind, "condition": condition, "basis": basis, "status": status, "origin": origin, "verify": verify}
 
 
 def accept(given, when, then, how):

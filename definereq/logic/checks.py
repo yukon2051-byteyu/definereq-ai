@@ -258,6 +258,23 @@ def related_impacts(p: dict, req_ids: list[str]) -> list[dict]:
     return out
 
 
+# ---- 数値条件の状態 ----
+def measure_view(p: dict, r: dict, m: dict) -> dict:
+    """数値の「要求値の合意」と「達成の検証」を分けて返す。値に合意しても、達成できるとは限らないため。"""
+    if m.get("kind") == "現状の計測値":
+        agreement = "対象外（現状の値）"
+    else:
+        linked = [d for d in p["decisions"] if d["state"] == "合意済み" and r["id"] in (d.get("related_requirements") or []) and pj.covers_version(d, r)]
+        agreement = f"済み（{linked[0]['id']}）" if linked and r["status"] == "合意済み" else f"未合意（要件は{r['status']}）"
+    if m.get("verify"):
+        verify = m["verify"]
+    elif m.get("status") in ("計測済み", "未計測"):
+        verify = m["status"]
+    else:
+        verify = "未検証" if m.get("kind") == "必要条件" else "対象外"
+    return {"agreement": agreement, "verify": verify}
+
+
 # ---- 残件 ----
 def backlog(p: dict) -> dict:
     """残件を分類して返す。分類別件数と、重複を除いた総件数（対象の数）を分けて返す。

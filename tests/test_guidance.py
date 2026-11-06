@@ -237,9 +237,34 @@ def test_every_step_has_scene_and_real_detail_label(demo):
         ctx = guide.Ctx(builder.build(demo, s["stage"]))
         assert s["scene"]
         assert s["detail"](ctx) != "詳細画面を見る"
-        if s.get("move"):
-            assert s["move"](ctx)
+        check = s["check"](ctx) if callable(s["check"]) else s["check"]
+        assert len(check) <= 70, check  # 状況案内は短く保つ
+        assert not check or check not in s["title"]
         assert ctx.background()
+
+
+def test_known_facts_are_not_listed_as_unknown():
+    d1 = guide.load("d1")[1]
+    items = d1["open"](guide.Ctx(builder.build("d1", d1["stage"])))
+    assert ("関係者の申告", "金額の誤りは月に数件（現場の申告）") in items and not any("発生頻度" in x for _, x in items)
+    d3 = guide.load("d3")[2]
+    items = d3["open"](guide.Ctx(builder.build("d3", d3["stage"])))
+    assert any(k == "資料に記載" and "例外" in x for k, x in items) and not any("有無" in x for _, x in items)
+
+
+def test_support_describes_only_real_functions():
+    for demo in DEMOS:
+        for s in guide.load(demo)[1:-1]:
+            labels = [k for k, _ in s["support"]]
+            assert labels[0] == "入力・根拠" and labels[-1] == "人が行うこと"
+            assert "プログラムの処理" in labels
+
+
+def test_final_counts_match_lists():
+    for demo in DEMOS:
+        s = guide.Ctx(builder.build(demo, 4)).summary()
+        from definereq.logic import checks
+        assert s["todo_total"] == checks.backlog(builder.build(demo, 4))["unique_total"] == len(s["todo"])
 
 
 def test_no_zero_count_in_open_items():
@@ -257,8 +282,10 @@ def test_speech_separates_name_source_and_checks():
 def test_measure_shows_origin_and_does_not_claim_confirmation():
     g = guide.Ctx(builder.build("d2", 2))
     m = g.measure("1日分まで", "許容データ損失", "データを失いたくない")
-    assert m["origin"] == "関係者が提示" and m["status"] == "確認待ち"
-    assert "AIが確認用の質問を提示（数値は提示していない）" in m["path"] and "値の達成は確認待ち" in m["path"]
+    assert m["origin"].startswith("関係者が提示")
+    assert m["ai_asked"] and m["agreement"].startswith("済み") and m["verify"] == "復旧試験：未実施" and "どこまでのデータ損失" in m["help"]
+    t = g.measure("毎朝8時30分", "集計の完了時刻", "毎朝すぐに売上の数字を見たい")
+    assert t["agreement"].startswith("未合意") and t["verify"] != "未検証済み"
 
 
 def test_case_specific_wording():
@@ -371,7 +398,7 @@ def test_first_and_later_banner():
     assert first.index("現在の業務") < first.index("困りごと") < first.index("今回、変えたいこと") < first.index("関係者が重視すること") < first.index("検討中の論点") < first.index("このデモで確認すること")
     at = button(at, "tour_next").click().run()
     later = "".join(h.proto.body for h in at.get("html"))
-    assert "現場と経理の要望を取りまとめる" not in later and "ガイド 2/8" in later and "経費申請アプリの刷新｜第1回会議の前" in later
+    assert "現場と経理の要望を取りまとめる" not in later and "ガイド 2/8" in later and "経費申請アプリの刷新｜第1回会議の前" in later and "アプリの支援" in later
     assert any(e.label == "案件の背景を確認" for e in at.expander)
 
 
@@ -381,6 +408,8 @@ def test_final_screen_flow():
     html = "".join(h.proto.body for h in at.get("html"))
     assert "デモ体験はここで終了です" in html and "要件定義の完了を示すものではありません" in html and "作成されたサンプル資料" in html
     assert html.index("デモ体験はここで終了です") < html.index("作成されたサンプル資料") < html.index("決まったことと残っていること")
+    assert "残っていること：全4件" in html and "主な3件を表示しています" in html
+    assert any(e.label == "全4件を見る" for e in at.expander)
     assert len(at.get("download_button")) == 4 and "demo_done" in at.session_state and "d1" in at.session_state["demo_done"]
     assert at.session_state["tour_index"] == 7
     at = button(at, "tour_view_spec").click().run()
