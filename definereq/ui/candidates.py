@@ -13,6 +13,8 @@ from ..logic import continuity, intake
 from ..schema import CANDIDATE_INTAKE, DOMAINS, REQ_KINDS
 from .components import chip, edit_block, esc, evidence_block, guard, ok_rerun, touch
 
+# これから確認する内容で、事実の主張ではない種類。根拠がないのが普通なので注意を出さない
+PLANNING_KINDS = {"質問", "議題", "必要資料", "今回決めたいこと", "不足情報"}
 STATE_FILTER = {"未処理": ("候補", "要再確認"), "採用": ("採用", "修正して採用"), "却下": ("却下",), "すべて": None}
 
 
@@ -110,7 +112,7 @@ def _actions(p: dict, c: dict, meeting: str | None, key: str) -> None:
 def _row(p: dict, c: dict, meeting: str | None, key: str) -> None:
     run = _run_state(p, c)
     flags = chip(c["state"]) + chip(run, "ok" if run == "最新の解析" else "plain")
-    if c.get("no_evidence"):
+    if c.get("no_evidence") and c["kind"] not in PLANNING_KINDS:
         flags += chip("根拠なし（推測）", "warn")
     if c.get("unsupported_numbers"):
         flags += chip("資料にない数値：" + "、".join(c["unsupported_numbers"]), "bad")

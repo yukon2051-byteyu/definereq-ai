@@ -409,6 +409,13 @@ def test_prep_candidates_are_shown_on_prep_page_with_matching_button(p):
     assert at.session_state["project"]["questions"] and not at.session_state["project"]["requirements"]
 
 
+def test_no_evidence_warning_only_for_claims(p):
+    run(p, "prep", [cand("質問", "利用人数は？")])
+    assert "根拠なし" not in html(open_app(p, "prep"))
+    run(p, "extract", [cand("要望", "打刻したい")])
+    assert "根拠なし" in html(open_app(p, "candidates"))
+
+
 def test_question_candidate_has_no_new_requirement_option(p):
     run(p, "extract", [cand("質問", "Q")])
     at = open_app(p, "candidates")
