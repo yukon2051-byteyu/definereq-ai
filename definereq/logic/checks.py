@@ -254,7 +254,7 @@ def related_impacts(p: dict, req_ids: list[str]) -> list[dict]:
             out.append({"area": "受入条件", "target": rid, "note": f"{rid} の受入条件（{len(r['acceptance'])}件）", "basis": "登録関係"})
     for d in p["shared_docs"]:
         if all_reqs & set(d.get("item_ids", [])):
-            out.append({"area": "成果物", "target": d["id"], "note": f"共有資料 {d['title']} v{d['version']}", "basis": "登録関係"})
+            out.append({"area": "成果物", "target": d["id"], "note": f"共有資料 {d['title']} 第{d['version']}版", "basis": "登録関係"})
     return out
 
 

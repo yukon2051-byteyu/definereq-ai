@@ -159,7 +159,9 @@ def render(p: dict, opt: share.Options, doc_id: str, version: int, issued_at: st
     for s in share.build(p, opt):
         doc.add_heading(clean(s.heading), level=s.level)
         for text in s.paragraphs:
-            _font(doc.add_paragraph().add_run(clean(text)), 10)
+            para = doc.add_paragraph()
+            _font(para.add_run(clean(text)), 10)
+            para.paragraph_format.keep_with_next = bool(s.table and s.table.get("rows"))  # 説明と表を別のページに分けない
         if s.table is not None:
             _table(doc, s.table, total)
     buf = io.BytesIO()
