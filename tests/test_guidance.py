@@ -470,12 +470,30 @@ def project_app(p, page="overview", **state):
 
 def test_project_panel_can_close_and_reopen_and_has_no_demo_words(blank):
     at = project_app(blank, "profile")
+    assert not any(b.key == "guide_hide" for b in at.button)  # 最初の案内では折りたたみを出さない
+    at.session_state["page"] = "prep"
+    at.run()
+    assert button(at, "guide_hide").label == "案内を折りたたむ"
+    at.session_state["page"] = "profile"
+    at.run()
     html = "".join(h.proto.body for h in at.get("html"))
     assert "現在：案件を作成した直後" in html and "デモ体験中" not in html
     at = button(at, "guide_hide").click().run()
     assert "現在：案件を作成した直後" not in "".join(h.proto.body for h in at.get("html")) and not at.exception
     at = button(at, "guide_show").click().run()
     assert "現在：案件を作成した直後" in "".join(h.proto.body for h in at.get("html"))
+
+
+def test_same_view_rerun_does_not_count_as_second_time(blank):
+    at = project_app(blank, "profile")
+    at.run()
+    at.run()
+    assert not any(b.key == "guide_hide" for b in at.button)
+
+
+def test_resumed_project_can_fold_from_start(blank):
+    at = project_app(blank, "profile", guidance_returning=True)
+    assert any(b.key == "guide_hide" for b in at.button)
 
 
 def test_project_panel_works_without_ai_and_never_calls_it(blank, monkeypatch):

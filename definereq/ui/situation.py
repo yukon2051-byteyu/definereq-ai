@@ -121,6 +121,15 @@ def _stage_question(p: dict) -> None:
         st.rerun()
 
 
+def _seen_before(page: str, main: gd.Advice | None) -> bool:
+    """案内を見るのが2回目以降か。同じ画面の再描画は数えない。再開した案件は続きの利用なので最初から対象にする。"""
+    seen = st.session_state.setdefault("guidance_seen", [])
+    view = f"{page}:{main.id if main else ''}"
+    if view not in seen:
+        seen.append(view)
+    return len(seen) >= 2 or st.session_state.get("guidance_returning", False)
+
+
 def project_panel(p: dict, page: str) -> None:
     """実案件の状況案内。主な案内は1件で、折りたたんでも作業を続けられる。"""
     if st.session_state.get("guidance_hidden"):
@@ -138,7 +147,8 @@ def project_panel(p: dict, page: str) -> None:
     with c1:
         if main:
             _go(main, page, "guide_go")
-    if c2.button("案内を閉じる", key="guide_hide", type="tertiary", width="stretch"):
+    # 最初の案内は読んでもらうため、折りたたみは2回目の案内（別の内容か別の画面）から出す
+    if _seen_before(page, main) and c2.button("案内を折りたたむ", key="guide_hide", type="tertiary", width="stretch"):
         if main and main.id == "resume":
             st.session_state["resumed"] = False
         else:
