@@ -61,7 +61,7 @@ def evidence_block(p: dict, e: dict, key: str = "") -> None:
     state = ev.recheck(p, e)
     tag = chip("引用を確認済み", "ok") if state["verified"] else chip("本文で確認できません", "bad")
     if ev.unconfirmed_speech(p, e):
-        tag += chip("話者・内容が未確認", "warn")
+        tag += chip("・".join(ev.unconfirmed_parts(p, e)) + "の確認が未実施", "warn")
     if state.get("stale"):
         tag += chip("新しい版あり", "warn")
     st.html(f'<div class="dr-ev"><div class="dr-ev-q">「{esc(str(e.get("quote")))}」</div>'
@@ -82,11 +82,20 @@ def play_at(rec: dict, start: float, key: str) -> None:
             path = str(candidate)
     uploaded = st.session_state.get("media_paths", {}).get(rec["id"])
     path = path or uploaded
-    if path:
-        if st.toggle("この時刻から再生", key=f"play_{key}"):
-            st.video(path, start_time=int(start))
-    else:
-        st.caption(f"元動画はこの画面にありません。「{rec['name']}」の {int(start // 60):02d}:{int(start % 60):02d} を確認するか、録画・発言の画面で同じ動画を添付し直してください。")
+    at = f"{int(start // 60):02d}:{int(start % 60):02d}"
+    if not path:
+        st.caption(f"元動画はこの画面にありません。「{rec['name']}」の {at} を確認するか、録画・発言の画面で同じ動画を添付し直してください。")
+        return
+    opened = st.session_state.get(f"video_{key}", False)
+    if st.button("■ 動画を閉じる" if opened else f"▶ {at}から再生", key=f"play_{key}"):
+        st.session_state[f"video_{key}"] = not opened
+        st.rerun()
+    if opened:
+        try:
+            st.video(path, start_time=int(start), autoplay=True)
+            st.caption(f"「{rec['name']}」の {at} から表示しています。再生が始まらないときは、動画の再生ボタンを押してください。")
+        except Exception:  # 動画を開けない場合も無反応にしない
+            st.warning(f"動画を開けませんでした。「{rec['name']}」の {at} を、元の動画で確認してください。")
 
 
 def tri_text(label: str, value, key: str, area: bool = False):

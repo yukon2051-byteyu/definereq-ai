@@ -16,7 +16,8 @@ def current() -> dict | None:
 
 
 def _clear_widgets() -> None:
-    keep = {"project", "page", "demo_copies", "tour_index", "tour_on", "media_paths", "ai_code", "flash", "last_view", "save_fp", "save_time", "show_home", "work_project"}
+    keep = {"project", "page", "demo_copies", "tour_index", "tour_on", "media_paths", "ai_code", "flash", "last_view", "save_fp", "save_time", "show_home", "work_project",
+            "demo_done", "artifact_files", "guidance_hidden", "resumed", "scroll_to", "guide_ai_busy"}
     for k in list(st.session_state.keys()):
         if k not in keep:
             del st.session_state[k]
@@ -41,12 +42,16 @@ def open_project(p: dict, loaded: bool = False) -> None:
     st.session_state["save_time"] = None
     st.session_state.pop("work_project", None)
     st.session_state["save_fp"] = pj.fingerprint(p) if loaded else None
+    st.session_state["resumed"] = loaded  # 再開の案内は、作業位置を推測せず記録の範囲で出す
+    st.session_state["guidance_hidden"] = False
     st.rerun()
 
 
-def go_home() -> None:
-    """トップへ戻る。作業中の案件は保持する。"""
+def go_home(section: str | None = None) -> None:
+    """トップへ戻る。作業中の案件は保持する。section を指定すると、その欄まで移動する。"""
     p = current()
+    if section:
+        st.session_state["scroll_to"] = section
     if p and p.get("is_demo"):
         close_project()
     st.session_state["show_home"] = True

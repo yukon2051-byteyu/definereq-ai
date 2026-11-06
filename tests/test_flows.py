@@ -27,7 +27,7 @@ def click(at, label):
 
 
 def test_demo_opens_from_home_without_keys():
-    at = click(run(), "3分の案内で見る")
+    at = click(run(), "案内付きでデモを見る")
     assert not at.exception and at.session_state["project"]["is_demo"]
     assert at.session_state["project"]["demo"]["stage"] == 2 and at.session_state["tour_on"]
 
@@ -82,8 +82,8 @@ def test_detail_and_back_keep_the_step():
 
 
 def test_each_session_has_separate_copy():
-    a = click(run(), "3分の案内で見る")
-    b = click(run(), "3分の案内で見る")
+    a = click(run(), "案内付きでデモを見る")
+    b = click(run(), "案内付きでデモを見る")
     a.session_state["project"]["sources"][0]["name"] = "Aだけの編集"
     assert b.session_state["project"]["sources"][0]["name"] != "Aだけの編集"
 
@@ -91,7 +91,7 @@ def test_each_session_has_separate_copy():
 def test_demo_card_has_single_entry_and_tour_can_be_closed():
     at = run()
     assert not any(b.label == "全画面を見る" for b in at.button)
-    at = click(at, "3分の案内で見る")
+    at = click(at, "案内付きでデモを見る")
     at = click(at, "全機能のメニューを見る")
     assert at.session_state["tour_on"] is False and not at.exception
     assert at.session_state["project"]["is_demo"]
@@ -103,7 +103,7 @@ def test_demo_is_read_only_on_every_page():
     for page in PAGES:
         at = run(project=builder.build("d1", 4), page=page)
         assert not at.exception, page
-        allowed = {"nav", "tour", "go", "ex", "next", "share"}
+        allowed = {"nav", "tour", "go", "ex", "next", "share", "play"}
         for b in at.button:
             assert b.disabled or (b.key or "").split("_")[0] in allowed, (page, b.label, b.key)
         assert all(t.disabled for t in at.text_area), page

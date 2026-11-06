@@ -65,8 +65,9 @@ with sync_playwright() as pw:
 
     # 出力
     btn(page, "← トップへ戻る")
-    page.get_by_role("button", name="3分の案内で見る").nth(2).click()
+    page.get_by_role("button", name="案内付きでデモを見る").nth(2).click()
     wait(page)
+    btn(page, "全機能のメニューを見る")
     btn(page, "共有資料・出力")
     btn(page, "この内容でWordを作成する")
     with page.expect_download() as d:

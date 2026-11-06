@@ -43,7 +43,7 @@ def docx_text(data: bytes) -> str:
 def test_word_has_id_version_and_no_internal_memo(built, demo, doc):
     p = built[demo]
     text = docx_text(wordx.render(p, share.Options(doc_type=doc), "DOC-009", 3, "2026-11-05T10:00:00"))
-    assert "DOC-009" in text and "v3" in text and "合意を意味しません" in text
+    assert "DOC-009" in text and "第3版" in text and "合意を意味しません" in text
     assert "内部メモ" not in text.replace("内部メモ除外", "")
     notes = [r["internal_note"] for r in p["requirements"] if r.get("internal_note")]
     assert notes and not any(n in text for n in notes)
@@ -334,10 +334,10 @@ from definereq.demos import guide as demo_guide  # noqa: E402
 def test_guide_blocks_come_from_stage_data(demo):
     """主役の内容が、その段階の案件データから取得できる（創作・先取りの検出）。"""
     steps = demo_guide.load(demo)
-    assert len(steps) == 8 and steps[-1]["process"] == "まとめ"
+    assert len(steps) == 8 and steps[-1].get("finale")
     for s in steps:
         ctx = demo_guide.Ctx(builder.build(demo, s["stage"]))
-        assert 1 <= len(s["main"](ctx)) <= 3, s["title"]
+        assert s.get("finale") or 1 <= len(s["main"](ctx)) <= 3, s["title"]
         assert isinstance(s["open"](ctx), list)
         s["more"](ctx)
         assert len(s["title"]) <= 34
@@ -345,7 +345,7 @@ def test_guide_blocks_come_from_stage_data(demo):
 
 def test_guide_layouts_match_content():
     kinds = {b["type"] for d in DEMOS for s in demo_guide.load(d) for b in s["main"](demo_guide.Ctx(builder.build(d, s["stage"])))}
-    assert {"versus", "decision", "flow3", "timeline", "summary", "convert", "speech"} <= kinds
+    assert {"versus", "decision", "flow3", "timeline", "convert", "speech"} <= kinds
 
 
 def test_guide_does_not_show_future_conclusion():
@@ -367,7 +367,7 @@ def test_guide_speech_keeps_full_text_and_status():
     p = builder.build("d1", 2)
     c = demo_guide.Ctx(p).speech("金額の訂正は再申請で進めます")
     seg = p["recordings"][0]["segments"][-1]
-    assert c["text"] == seg["text"] and c["speaker_status"] == "未確認" and c["time"]
+    assert c["text"] == seg["text"] and c["speaker_check"] == "未実施" and c["time"]
 
 
 def test_guide_past_conflict_keeps_old_version():

@@ -35,6 +35,13 @@ class Section:
     table: dict | None = None  # {"columns": [...], "rows": [[...]], "widths": [...]}
 
 
+def option_verdict(dec: dict, option: dict) -> str:
+    """案の採否を短い言葉で返す。判断の記録がなければ採否を決めつけない。"""
+    if dec.get("adopted"):
+        return "採用" if option["id"] == dec["adopted"] else "不採用"
+    return "保留" if dec.get("state") == "保留" else "未判断"
+
+
 def _quotes(p: dict, item: dict, opt: Options) -> list[str]:
     out = []
     for i, e in enumerate(item.get("evidence") or []):
@@ -114,7 +121,7 @@ def _measures(reqs: list[dict]) -> list[list[str]]:
     for r in reqs:
         for m in r.get("measures", []):
             rows.append([r["id"], m.get("metric", ""), f"{display(m.get('value'))}{m.get('unit') or ''}",
-                         m.get("kind", ""), display(m.get("condition")), display(m.get("basis")), display(m.get("status"))])
+                         m.get("kind", ""), display(m.get("origin")), display(m.get("condition")), display(m.get("basis")), display(m.get("status"))])
     return rows
 
 
@@ -159,8 +166,9 @@ def build_change(p: dict, opt: Options) -> list[Section]:
     options_rows = []
     if dec:
         for o in dec["options"]:
-            options_rows.append([o["label"], display(o.get("pros")), display(o.get("cons")),
-                                 "採用" if o["id"] == dec.get("adopted") else display(dec.get("rejected_reasons", {}).get(o["id"]))])
+            verdict = option_verdict(dec, o)
+            options_rows.append([o["label"], display(o.get("pros")), display(o.get("cons")), verdict,
+                                 display(dec.get("rationale")) if verdict == "採用" else display(dec.get("rejected_reasons", {}).get(o["id"]))])
     conclusion = "判断は記録されていません（判断待ち）。"
     if dec:
         adopted = next((o["label"] for o in dec["options"] if o["id"] == dec.get("adopted")), None)
@@ -172,7 +180,7 @@ def build_change(p: dict, opt: Options) -> list[Section]:
         Section("影響", paragraphs=[f"未調査の領域：{'、'.join(a for a in schema.IMPACT_AREAS if a not in chg['surveyed_areas']) or 'なし'}"],
                 table={"columns": ["領域", "対象", "内容", "根拠の区分"], "rows": [[i["area"], display(i.get("target")), i["note"], i["basis"]] for i in chg["impacts"]], "widths": [2, 2, 8.5, 3]}),
         Section("矛盾の確認", table={"columns": ["ID", "区分", "対象A", "対象B", "当時の指摘", "状態"], "rows": conflicts, "widths": [1.5, 2.5, 3, 3, 4.5, 1.5]}),
-        Section("選択肢", table={"columns": ["案", "利点", "懸念", "結果・不採用の理由"], "rows": options_rows, "widths": [4, 4, 4, 4]}),
+        Section("選択肢", table={"columns": ["案", "利点", "懸念", "採否", "理由"], "rows": options_rows, "widths": [3.5, 3.5, 3.5, 1.4, 4.1]}),
         Section("ご判断いただく事項", table={"columns": ["確認ID", "質問", "確認相手", "回答欄"], "rows": [[f"確認-{chg['id']}", "上記の内容で進めてよいかご判断ください。", display(chg.get("requester")), ""]], "widths": [2, 7, 2.5, 4]}),
         Section("結論", paragraphs=[conclusion]),
     ]
@@ -203,8 +211,8 @@ def build_spec(p: dict, opt: Options) -> list[Section]:
     if rest:
         title = "共通・分野をまたぐ要件" if len(p["domains"]) > 1 else "その他の要件"
         sections.append(Section(title, level=2, table={**REQ_COLS, "rows": _req_rows(rest)}))
-    sections.append(Section("数値条件と区分", paragraphs=["必要条件・現状の計測値・仮定・実現方式の候補・人が確定した設計制約を区別しています。"],
-                            table={"columns": ["要件", "指標", "値", "区分", "測定条件", "根拠", "状態"], "rows": _measures(reqs), "widths": [1.5, 3, 2, 2.5, 3, 3, 1.5]}))
+    sections.append(Section("数値条件と区分", paragraphs=["必要条件・現状の計測値・仮定・実現方式の候補・人が確定した設計制約を区別しています。出所は誰が示した値か、状態はその値の確認が済んだかを表します。"],
+                            table={"columns": ["要件", "指標", "値", "区分", "出所", "測定条件", "根拠", "状態"], "rows": _measures(reqs), "widths": [1.4, 2.7, 1.8, 2.2, 1.9, 2.6, 2.6, 1.3]}))
     nfr_rows = [[n["label"], n["state"], display(n.get("note")), "、".join(n["requirements"]) or "未設定"] for n in checks.nfr_overview(p)]
     sections.append(Section("非機能", table={"columns": ["項目", "状態", "補足", "関連要件"], "rows": nfr_rows, "widths": [3, 2, 8, 3]}))
     sections.append(Section("シナリオ", table={"columns": ["ID", "名称", "種類", "開始条件", "流れ", "終了・失敗時", "関連要件"], "rows": [[s["id"], s["title"], s.get("kind", ""), display(s.get("start")), " → ".join(s.get("steps", [])), display(s.get("end")), "、".join(s.get("related_requirements", []))] for s in p["scenarios"]], "widths": [1.4, 3, 1.4, 2.6, 4.2, 2.4, 1.5]}))
@@ -238,6 +246,22 @@ def item_ids(p: dict, opt: Options) -> list[str]:
     return ids
 
 
+def latest_doc(p: dict, doc_type: str) -> dict | None:
+    """発行済みの資料のうち、最新の版。"""
+    docs = [d for d in p["shared_docs"] if d["doc_type"] == doc_type]
+    return docs[-1] if docs else None
+
+
+def options_for(doc: dict) -> Options:
+    """発行時と同じ既定の範囲で出力する設定。"""
+    return Options(doc_type=doc["doc_type"], change_id=doc.get("change_id"))
+
+
+def doc_is_current(p: dict, doc: dict) -> bool:
+    """発行時から内容が変わっていないか。"""
+    return doc.get("fingerprint") == pj.fingerprint([s.__dict__ for s in build(p, options_for(doc))])
+
+
 def register_doc(p: dict, opt: Options, title: str, actor: str = "利用者") -> dict:
     """出力した資料を記録する。版が上がる。送付しても合意にはならない。"""
     version = 1 + sum(1 for d in p["shared_docs"] if d["doc_type"] == opt.doc_type)
@@ -245,7 +269,7 @@ def register_doc(p: dict, opt: Options, title: str, actor: str = "利用者") ->
     return pj.add(p, "shared_docs", {
         "doc_type": opt.doc_type, "title": title, "version": version, "issued_at": pj.now_iso(), "issued_by": actor,
         "item_ids": item_ids(p, opt), "fingerprint": pj.fingerprint([s.__dict__ for s in sections]),
-        "sent": False, "scope_note": "内部メモ含む" if opt.include_internal else "内部メモ除外",
+        "sent": False, "scope_note": "内部メモ含む" if opt.include_internal else "内部メモ除外", "change_id": opt.change_id,
     })
 
 

@@ -1,8 +1,9 @@
-"""3分の案内の画面。
+"""案内付きデモの画面。
 
 各画面の主題を1つに絞り、内容の関係に合う配置で見せる。
-対立は左右比較、変更は前後の並び、判断は採用案を大きく、経緯は時系列、残件は一覧。
+対立は左右比較、変更は前後の並び、判断は採用案を大きく、経緯は時系列で示す。
 原文・ID・資料の位置は開閉式の補足へ置く。
+最上段の状況案内は、案件の前提と現在の場面を示す（ガイドの何画面目かとは別の情報）。
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ import streamlit as st
 from .. import project as pj
 from ..demos import guide
 from ..project import display
-from . import state
+from . import artifacts, situation, state
 from .components import STATUS_TONE, chip, esc, play_at
 
 
@@ -34,12 +35,16 @@ def _versus(c: dict) -> None:
 
 
 def _speech(p: dict, c: dict, key: str) -> None:
-    chips = tag(c["kind"]) + chip(f"話者：{c['speaker_status']}", "ok" if c["speaker_status"] == "確認済み" else "warn") + chip(f"内容：{c['content_status']}", "ok" if c["content_status"] == "確認済み" else "warn")
+    chips = tag(c["kind"]) + chip(f"話者確認：{c['speaker_check']}", "ok" if c["speaker_check"] == "確認済み" else "warn") \
+        + chip(f"発言内容の確認：{c['content_check']}", "ok" if c["content_check"] == "確認済み" else "warn")
     note = f'<div class="dr-g-body">{esc(c["note"])}</div>' if c.get("note") else ""
-    st.html(f'<div class="dr-sp"><div class="dr-meta">{esc(c["who"])}　{esc(c["time"])}</div><div class="dr-key">「{esc(c["text"])}」</div><div class="dr-chips">{chips}</div>{note}</div>')
+    st.html(f'<div class="dr-sp"><div class="dr-meta">{esc(c["who_label"])}：{esc(c["who"])}　{esc(c["time"])}</div><div class="dr-key">「{esc(c["text"])}」</div><div class="dr-chips">{chips}</div>{note}</div>')
     rec = pj.get(p, "recordings", c["rec_id"])
     if rec.get("video_file"):
         play_at(rec, c["start"], key)
+
+
+VERDICT_TONE = {"採用": "ok", "不採用": "bad", "保留": "warn", "未判断": "plain"}
 
 
 def _decision(c: dict) -> None:
@@ -54,15 +59,31 @@ def _decision(c: dict) -> None:
                 f'<div class="dr-meta">判断者（予定）：{esc(c["decider"] or "記録なし")}</div></div>')
     rows = ""
     for r in c["rows"]:
-        result = "採用" if r["adopted"] else (r["reason"] or "未判断")
         cls = ' class="dr-t-win"' if r["adopted"] else ""
-        rows += f'<tr{cls}><td><b>{esc(r["label"])}</b></td><td>{esc(r["pros"] or "記録なし")}</td><td>{esc(r["cons"] or "記録なし")}</td><td>{esc(result)}</td></tr>'
-    st.html(f'{head}<div class="dr-t-wrap"><table class="dr-t"><thead><tr><th>案</th><th>利点</th><th>懸念</th><th>採否</th></tr></thead><tbody>{rows}</tbody></table></div>')
+        reason = "上記の採用理由のとおり" if r["adopted"] else (r["reason"] or ("判断待ち" if r["verdict"] == "未判断" else "記録なし"))
+        rows += (f'<tr{cls}><td data-label="案"><b>{esc(r["label"])}</b></td><td data-label="利点">{esc(r["pros"] or "記録なし")}</td><td data-label="懸念">{esc(r["cons"] or "記録なし")}</td>'
+                 f'<td data-label="採否">{chip(r["verdict"], VERDICT_TONE[r["verdict"]])}</td><td data-label="理由">{esc(reason)}</td></tr>')
+    st.html(f'{head}<div class="dr-t-wrap"><table class="dr-t dr-t-cards"><thead><tr><th>案</th><th>利点</th><th>懸念</th><th>採否</th><th>理由</th></tr></thead><tbody>{rows}</tbody></table></div>')
+
+
+def _parts(parts: list[tuple]) -> str:
+    """差分の表示。色だけでなく「追加」「削除」の文字でも示す。"""
+    out = ""
+    for kind, text in parts:
+        if kind == "add":
+            out += f'<ins class="dr-add"><small>追加</small>{esc(text)}</ins>'
+        elif kind == "del":
+            out += f'<del class="dr-del"><small>削除</small>{esc(text)}</del>'
+        else:
+            out += esc(text)
+    return out
 
 
 def _flow3(c: dict) -> None:
-    cols = "".join(f'<div class="dr-f-col"><div class="dr-v-lab">{esc(x["label"])}</div><div class="dr-f-text">{esc(x["text"])}</div><div class="dr-chips">{tag(x["chip"])}</div></div>' for x in c["cols"])
-    st.html(f'<div class="dr-f dr-f-{len(c["cols"])}">{cols}</div>')
+    cols = "".join(f'<div class="dr-f-col"><div class="dr-v-lab">{esc(x["label"])}</div><div class="dr-f-text">{_parts(x["parts"]) if x.get("parts") else esc(x["text"])}</div><div class="dr-chips">{tag(x["chip"])}</div></div>' for x in c["cols"])
+    legend = {"partial": "変更された部分だけを示しています。", "whole": "文章の大部分が変わったため、全体を変更として示しています。"}.get(c.get("mode"))
+    note = f'<div class="dr-meta">{esc(legend)}</div>' if legend else ""
+    st.html(f'<div class="dr-f dr-f-{len(c["cols"])}">{cols}</div>{note}')
 
 
 def _conflict(c: dict) -> None:
@@ -74,8 +95,10 @@ def _convert(c: dict) -> None:
     rows = ""
     for r in c["rows"]:
         said = f'<div class="dr-g-sub">「{esc(r["said"])}」</div>' if r.get("said") else '<div class="dr-g-sub">発言の記録なし</div>'
+        path = " → ".join(r["path"])
         rows += (f'<div class="dr-m-row"><div>{said}</div><div class="dr-m-arrow">→</div><div><div class="dr-v-lab">{esc(r["metric"])}</div><div class="dr-key">{esc(r["value"])}</div>'
-                 f'<div class="dr-chips">{tag(r["kind"])}{tag(r["status"])}</div></div></div>')
+                 f'<div class="dr-chips">{tag(r["kind"])}{chip("出所：" + r["origin"], "info" if r["origin"] != "未確認" else "warn")}{chip("確認：" + r["status"], STATUS_TONE.get(r["status"], "plain"))}</div>'
+                 f'<div class="dr-meta">経過：{esc(path)}</div></div></div>')
     st.html(f'<div class="dr-m">{rows}</div>')
 
 
@@ -86,17 +109,7 @@ def _timeline(c: dict) -> None:
     st.html(f'<div class="dr-tl"><div class="dr-v-lab">仕様の変遷</div><ul>{rows}</ul></div>')
 
 
-def _summary(c: dict) -> None:
-    decided = "".join(f"<li>{esc(i)}</li>" for i in c["decided"]) or "<li>なし</li>"
-    docs = "".join(f"<li>{esc(i)}</li>" for i in c["docs"]) or "<li>なし</li>"
-    todo = "".join(f'<tr><td>{esc(t["text"])}</td><td>{esc(display(t["ask"]))}</td><td>{esc(display(t["due"]))}</td></tr>' for t in c["todo"])
-    more = f'<div class="dr-meta">代表例{len(c["todo"])}件／全{c["todo_total"]}件</div>' if c["todo_total"] > len(c["todo"]) else ""
-    st.html(f'<div class="dr-win"><div class="dr-v-lab">決まったこと</div><ul class="dr-key-list">{decided}</ul></div>'
-            f'<div class="dr-v-lab dr-sp-top">次に確認すること</div><div class="dr-t-wrap"><table class="dr-t"><thead><tr><th>内容</th><th>確認相手</th><th>期限</th></tr></thead><tbody>{todo}</tbody></table></div>{more}'
-            f'<div class="dr-v-lab dr-sp-top">共有できる資料</div><ul class="dr-g-list">{docs}</ul>')
-
-
-RENDER = {"versus": _versus, "decision": _decision, "flow3": _flow3, "conflict": _conflict, "convert": _convert, "timeline": _timeline, "summary": _summary}
+RENDER = {"versus": _versus, "decision": _decision, "flow3": _flow3, "conflict": _conflict, "convert": _convert, "timeline": _timeline}
 
 
 def _more(step: dict, ctx: guide.Ctx) -> None:
@@ -106,13 +119,57 @@ def _more(step: dict, ctx: guide.Ctx) -> None:
                 st.write(line)
 
 
+def _finale(p: dict, ctx: guide.Ctx, steps: list[dict], i: int, intro: dict) -> None:
+    """最終画面：体験の終了 → 確認できたこと → 資料 → 決定と残件 → 次の行動。"""
+    s = ctx.summary()
+    total = s["todo_total"]
+    rest = f"デモの体験は終わりましたが、案件には確認が必要な項目が{total}件残っています。要件定義の完了を示すものではありません。" if total else "デモの体験は終わりました。"
+    st.html(f'<div class="dr-sit dr-end"><div class="dr-sit-tag">{esc(p["name"])}｜ガイド {i + 1}/{len(steps)}｜現在の場面：{esc(steps[i]["scene"])}</div><h1 class="dr-g-h dr-end-h">✓ デモ体験はここで終了です</h1>'
+            f'<p>{esc(intro["done"])}</p><p>以下から、この案件のサンプル資料を確認・ダウンロードできます。</p><p class="dr-end-n">{esc(rest)}</p></div>')
+    recap = "".join(f"<li>{esc(x)}</li>" for x in intro["recap"])
+    st.html(f'<h2 class="dr-end-sec">この体験で確認できたこと</h2><ul class="dr-g-list">{recap}</ul><h2 class="dr-end-sec">作成されたサンプル資料を見る・ダウンロードする</h2>')
+    artifacts.cards(p)
+
+    decided = "".join(f"<li>{esc(x)}</li>" for x in s["decided"][:3]) or "<li>なし</li>"
+    top = "".join(f'<li>{esc(t["text"])}<span class="dr-meta-i">確認相手：{esc(display(t["ask"]))}／期限：{esc(display(t["due"]))}</span></li>' for t in s["todo"][:3]) or "<li>なし</li>"
+    st.html(f'<h2 class="dr-end-sec">決まったことと残っていること</h2><div class="dr-end-g"><div><div class="dr-v-lab">決まったこと（{len(s["decided"])}件）</div><ul class="dr-g-list">{decided}</ul></div>'
+            f'<div><div class="dr-v-lab">残っていること（{total}件）</div><ul class="dr-g-list">{top}</ul></div></div>')
+    with st.expander("決定事項と残件の詳細を見る"):
+        st.markdown("**決まったこと**")
+        for x in s["decided"]:
+            st.write(f"・{x}")
+        st.markdown("**残っていること**")
+        for t in s["todo"]:
+            st.write(f"・{t['text']}（確認相手：{display(t['ask'])}／期限：{display(t['due'])}）")
+
+    st.html('<h2 class="dr-end-sec">次に見るもの</h2>')
+    c1, c2 = st.columns(2)
+    if c1.button("ほかのデモを見る", key="tour_others", type="primary", width="stretch"):
+        state.go_home("dr-demo")
+    if c2.button("この案件の機能画面を詳しく見る", key="tour_end", width="stretch"):
+        st.session_state["tour_on"] = False
+        state.goto("overview")
+    c3, c4, _ = st.columns([2, 1, 2])
+    if c3.button(f"前へ：{steps[i - 1]['short']}", key="tour_prev", type="tertiary"):
+        jump(steps, i - 1)
+    if c4.button("TOPへ戻る", key="tour_home", type="tertiary"):
+        state.go_home()
+
+
 def render(p: dict) -> None:
-    steps = guide.load(p["demo"]["id"])
+    demo_id = p["demo"]["id"]
+    steps = guide.load(demo_id)
     i = min(st.session_state.get("tour_index", 0), len(steps) - 1)
     step = steps[i]
     ctx = guide.Ctx(p)
+    intro = guide.INTRO[demo_id]
+    if step.get("finale"):  # 最終画面は体験の終了を最上段に示す
+        st.session_state.setdefault("demo_done", set()).add(demo_id)
+        _finale(p, ctx, steps, i, intro)
+        return
+    situation.demo_banner(p["name"], intro, step, i == 0, step["move"](ctx) if step.get("move") else None, ctx.background())
     count = step["count"](ctx)
-    st.html(f'<div class="dr-g-prog"><b>{i + 1}/{len(steps)} {esc(step["process"])}</b>' + (f"<span>{esc(count)}</span>" if count else "") + "</div>"
+    st.html(f'<div class="dr-g-prog"><b>ガイド {i + 1}/{len(steps)}（要点を見る画面）：{esc(step["process"])}</b>' + (f"<span>{esc(count)}</span>" if count else "") + "</div>"
             f'<h1 class="dr-g-h">{esc(step["title"])}</h1>' + (f'<p class="dr-g-lead">{esc(step["lead"])}</p>' if step.get("lead") else ""))
     for n, block in enumerate(step["main"](ctx)):
         if block["type"] == "speech":
@@ -121,12 +178,15 @@ def render(p: dict) -> None:
             RENDER[block["type"]](block)
     if step.get("media_note"):
         st.caption(step["media_note"])
+    done = step["done"](ctx) if step.get("done") else None
+    if done:
+        st.caption(done)
     remaining = step["open"](ctx)
     if remaining:
         items = "".join(f"<li>{esc(str(x))}</li>" for x in remaining)
         st.html(f'<div class="dr-open"><div class="dr-v-lab">まだ決まっていないこと</div><ul class="dr-g-list">{items}</ul></div>')
     _more(step, ctx)
-    _nav(steps, i, step)
+    _nav(steps, i, step, ctx)
 
 
 def sidebar(p: dict) -> None:
@@ -142,19 +202,15 @@ def sidebar(p: dict) -> None:
         st.rerun()
 
 
-def _nav(steps: list[dict], i: int, step: dict) -> None:
+def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx) -> None:
     c1, c2, c3 = st.columns([2, 2, 3])
     if i > 0 and c1.button(f"前へ：{steps[i - 1]['short']}", key="tour_prev", width="stretch"):
         jump(steps, i - 1)
-    if c2.button("詳細画面を見る", key="tour_detail", type="tertiary", width="stretch"):
+    if c2.button(step["detail"](ctx), key="tour_detail", type="tertiary", width="stretch"):
         st.session_state["tour_on"] = False
         state.goto(step["page"])
-    if i + 1 < len(steps):
-        if c3.button(f"次へ：{steps[i + 1]['short']}を見る", key="tour_next", type="primary", width="stretch"):
-            jump(steps, i + 1)
-    elif c3.button("全画面を閲覧する", key="tour_end", type="primary", width="stretch"):
-        st.session_state["tour_on"] = False
-        st.rerun()
+    if c3.button(f"次へ：{steps[i + 1]['short']}を見る", key="tour_next", type="primary", width="stretch"):
+        jump(steps, i + 1)
 
 
 def jump(steps: list[dict], i: int) -> None:
@@ -163,7 +219,7 @@ def jump(steps: list[dict], i: int) -> None:
 
 
 def back_to_guide(p: dict) -> None:
-    """全画面の閲覧から、元の工程へ戻る。"""
+    """機能画面から、元の工程へ戻る。"""
     steps = guide.load(p["demo"]["id"])
     i = min(st.session_state.get("tour_index", 0), len(steps) - 1)
     st.session_state["tour_on"] = True

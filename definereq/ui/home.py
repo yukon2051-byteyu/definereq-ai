@@ -10,7 +10,7 @@ from ..export import jsonio
 from ..schema import DOMAINS
 from ..usage import gate
 from . import state
-from .components import esc, guard, save_controls
+from .components import chip, esc, guard, save_controls
 from .theme import HERO_SHAPE, MARK
 
 LEAD = "会議前の質問準備から、録画・議事録の要件整理、追加要望の影響確認まで。判断の根拠と変更の経緯をつなぎ、要件定義書の作成を支援します。"
@@ -21,10 +21,20 @@ FLOW = [("準備", "案件の分野・要望・資料を登録し、不足情報
         ("追跡", "追加要望の影響を調べて記録し、「なぜこの仕様か」を根拠付きで確認")]
 
 
+SECTIONS = {"dr-demo"}  # 移動先として認める欄
+
+
 def render() -> None:
     # トップ専用の入れ物。余白の指定をこの中に限定し、作業画面へ影響させない
     with st.container(key="home"):
         _sections()
+    _scroll_to(st.session_state.pop("scroll_to", None))
+
+
+def _scroll_to(section: str | None) -> None:
+    """指定の欄まで移動する。描画に時間がかかるため数回試す。"""
+    if section in SECTIONS:
+        st.iframe(f"<script>const t=()=>window.parent.document.getElementById('{section}')?.scrollIntoView({{block:'start'}});t();setTimeout(t,300);setTimeout(t,900)</script>", height=1)
 
 
 def _sections() -> None:
@@ -35,23 +45,27 @@ def _sections() -> None:
 <div class="dr-jp">AI要件定義・変更経緯管理システム</div>
 <p class="dr-sub">{esc(LEAD)}</p>
 <div class="dr-label">業務アプリ ／ インフラ ／ ネットワーク ／ 複合 に対応</div>
-<div class="dr-cta"><a class="dr-btn dr-btn-p" href="#dr-demo">3分でデモを見る</a><a class="dr-btn dr-btn-s" href="#dr-new">新しい案件を始める</a><a class="dr-btn dr-btn-s" href="#dr-new">保存した案件から再開</a></div>
+<div class="dr-cta"><a class="dr-btn dr-btn-p" href="#dr-demo">案内付きでデモを見る</a><a class="dr-btn dr-btn-s" href="#dr-new">新しい案件を始める</a><a class="dr-btn dr-btn-s" href="#dr-new">保存した案件から再開</a></div>
 <div class="dr-note">デモは登録不要・無料／AI結果は準備済みのサンプルです</div>
 </div></div>""")
 
     st.html('<h2 class="dr-sec">利用の流れ</h2><p class="dr-sec-l">AIは候補を作り、プログラムが記録と照合を行い、人が判断します。AIの出力だけで要件や合意は確定しません。</p>')
     st.html('<div class="dr-steps">' + "".join(f'<div class="dr-step"><b>{esc(n)}</b>{esc(t)}</div>' for n, t in FLOW) + "</div>")
 
-    st.html('<h2 id="dr-demo" class="dr-sec">3件のデモを試す</h2><p class="dr-sec-l">APIキーや登録なしで、案内に沿って見られます。案内を閉じると、全画面を自由に見られます。デモは閲覧専用で、データは全て架空です。</p>')
+    st.html('<h2 id="dr-demo" class="dr-sec">3件のデモを試す</h2><p class="dr-sec-l">APIキーや登録なしで、案内に沿って見られます。最後にサンプル資料をダウンロードできます。デモは閲覧専用で、データは全て架空です。</p>')
     cols = st.columns(3)
+    done = st.session_state.get("demo_done", set())
     for i, (col, d) in enumerate(zip(cols, builder.catalog()), 1):
         with col, st.container(border=True, height="stretch"):
-            st.html(f'<div class="dr-demo-n">DEMO {i}　{esc("＋".join(DOMAINS[x] for x in d["domains"]))}</div>')
-            st.markdown(f"**{d['name']}**")
-            st.caption(d["lead"])
-            st.caption(f"見どころ：{d['strength']}")
+            seen = d["id"] in done
+            badge = chip("✓ 体験済み", "ok") if seen else ""
+            points = "".join(f"<li>{esc(x)}</li>" for x in d["highlights"])
+            note = "" if seen else f'<div class="dr-demo-f">{esc(d["feature"])}</div>'
+            st.html(f'<div class="dr-demo-n"><span>DEMO {i}　{esc("＋".join(DOMAINS[x] for x in d["domains"]))}</span>{badge}</div><div class="dr-demo-t">{esc(d["name"])}</div>'
+                    f'<div class="dr-demo-l">どんな状況か</div><div class="dr-demo-s">{esc(d["situation"])}</div>'
+                    f'<div class="dr-high"><b>このデモの見どころ</b><ul>{points}</ul></div>{note}')
             st.space("stretch")  # 文章の行数が違っても、ボタンと下端の線を揃える
-            if st.button("3分の案内で見る", key=f"tour_{d['id']}", type="primary", width="stretch"):
+            if st.button("もう一度見る" if seen else "案内付きでデモを見る", key=f"tour_{d['id']}", type="primary", width="stretch"):
                 state.open_demo(d["id"], tour=True)
 
     st.html('<h2 id="dr-new" class="dr-sec">あなたの案件で試す</h2>')

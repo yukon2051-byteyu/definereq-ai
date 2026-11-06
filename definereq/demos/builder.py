@@ -136,8 +136,8 @@ def opt(id_, label, pros, cons):
     return {"id": id_, "label": label, "pros": pros, "cons": cons}
 
 
-def measure(metric, value, unit, kind, condition=None, basis=None, status="確認待ち"):
-    return {"metric": metric, "value": value, "unit": unit, "kind": kind, "condition": condition, "basis": basis, "status": status}
+def measure(metric, value, unit, kind, condition=None, basis=None, status="確認待ち", origin=None):
+    return {"metric": metric, "value": value, "unit": unit, "kind": kind, "condition": condition, "basis": basis, "status": status, "origin": origin}
 
 
 def accept(given, when, then, how):
@@ -190,5 +190,6 @@ CATALOG = None
 def catalog() -> list[dict]:
     from . import d1, d2, d3
 
-    return [{"id": m.ID, "name": m.NAME, "lead": m.LEAD, "strength": m.STRENGTH, "domains": m.DOMAINS, "tour": m.TOUR}
+    return [{"id": m.ID, "name": m.NAME, "lead": m.LEAD, "strength": m.STRENGTH, "domains": m.DOMAINS, "tour": m.TOUR,
+             "situation": m.SITUATION, "highlights": m.HIGHLIGHTS, "feature": m.FEATURE}
             for m in (d1, d2, d3)]

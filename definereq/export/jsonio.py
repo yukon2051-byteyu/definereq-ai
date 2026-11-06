@@ -41,6 +41,23 @@ def migrate(p: dict) -> dict:
     return q
 
 
+def clean_guidance(p: dict) -> None:
+    """案内の保存項目を確かめる。案内は補助情報のため、壊れていても案件の読込は止めず、その部分だけ捨てる。"""
+    g = p.get("guidance")
+    if not isinstance(g, dict):
+        p.pop("guidance", None)
+        return
+    notes = g.get("notes")
+    keep = []
+    for n in notes if isinstance(notes, list) else []:
+        if isinstance(n, dict) and isinstance(n.get("state_fp"), str) and isinstance(n.get("items"), list) \
+                and all(isinstance(i, dict) and isinstance(i.get("text"), str) for i in n["items"]):
+            keep.append(n)
+    g["notes"] = keep
+    if g.get("user_stage") not in (None, "before_first", "after_first"):
+        g["user_stage"] = None
+
+
 def validate(p) -> list[str]:
     errors: list[str] = []
     if not isinstance(p, dict):
@@ -113,6 +130,7 @@ def loads(data: bytes) -> dict:
     errors = validate(p)
     if errors:
         raise LoadError(errors[:20])
+    clean_guidance(p)
     if p.get("is_demo"):  # デモから保存した案件は、通常の案件として続きを編集できるようにする
         p.update(is_demo=False, demo=None, from_demo=True)
     return p

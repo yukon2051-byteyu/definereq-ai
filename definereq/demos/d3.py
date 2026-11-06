@@ -13,6 +13,9 @@ DOMAINS = ["network"]
 TRAITS = ["comms", "confidential"]
 LEAD = "録画の発言を根拠に、外部接続の禁止と遠隔保守の要望を調整する。提案は提案のまま扱う。"
 STRENGTH = "録画根拠・ネットワーク条件・調整・変更影響"
+SITUATION = "保守会社が遠隔接続を提案していますが、社内規程では外部からの接続が禁止されています。"
+HIGHLIGHTS = ["録画の発言を根拠として確認する", "提案・制約・合意を区別し、調整事項を整理する"]
+FEATURE = "録画を根拠に提案と合意を分ける例です。"
 VIDEO = "d3_拠点ネットワーク定例.mp4"
 TOUR = [
     {"stage": 1, "page": "sources", "title": "通信一覧と構成図を読み込む", "input": "通信一覧、構成説明、規程抜粋", "ai": "なし", "human": "線のつながりは人が補足する", "result": "ポートは未確認のまま。図は未理解と表示"},
@@ -79,22 +82,22 @@ def step2(b):
 
     b.req("resp", domain="network", kind="性能", title="受発注の画面は3秒以内に開く", body="朝9時の受発注の時間帯に、受発注の画面が3秒以内に開く。",
           evidence=[b.E("video", "朝九時の受発注の時間帯に画面が遅くなります"), b.E("m2", "朝9時の受発注の画面は3秒以内で開いてほしい")],
-          measures=[measure("画面の表示時間", 3, "秒以内", "必要条件", "平日9時台、大阪拠点の端末", "第2回定例", "確認待ち"),
-                    measure("ピーク時の通信量", None, "Mbps", "現状の計測値", "平日9時台", "未計測", "未計測")],
+          measures=[measure("画面の表示時間", 3, "秒以内", "必要条件", "平日9時台、大阪拠点の端末", "第2回定例", "確認待ち", origin="関係者が提示"),
+                    measure("ピーク時の通信量", None, "Mbps", "現状の計測値", "平日9時台", "未計測", "未計測", origin="未確認")],
           priority="高", scope="今回必須", scope_reason="業務の中心のため", decider="小林", due="2026-10-30", status="確認待ち",
           acceptance=[accept("平日9時台", "受発注の画面を開く", "3秒以内に表示される", "計測の結果で確認")])
     b.req("flowlist", domain="network", kind="通信", title="受発注の通信を確保する", body="大阪拠点の端末から本社の受発注サーバーへの通信を確保する。ポートは未確認。",
           evidence=[b.E("flow", "本社の受発注サーバー"), b.E("flow", "受発注")], priority="高", scope="今回必須", confirm_with="中村", status="確認待ち")
     b.req("fail", domain="network", kind="障害", title="回線断のとき受発注を続ける", body="回線が切れたときも受発注だけは続ける。代替の方式は未決。停止の許容は30分まで。",
           evidence=[b.E("video", "回線が切れたときは、受発注だけでも続けたいです"), b.E("m2", "受発注の停止は30分までなら紙の伝票で対応できる")],
-          measures=[measure("許容停止時間", 30, "分まで", "必要条件", "受発注、平日", "第2回定例", "確認待ち"),
-                    measure("代替回線への切替時間", None, "分", "現状の計測値", None, "未計測", "未計測")],
+          measures=[measure("許容停止時間", 30, "分まで", "必要条件", "受発注、平日", "第2回定例", "確認待ち", origin="関係者が提示"),
+                    measure("代替回線への切替時間", None, "分", "現状の計測値", None, "未計測", "未計測", origin="未確認")],
           nfr_tags=["failure", "availability"], priority="高", scope="今回必須", scope_reason="業務の継続のため", decider="小林", due="2026-10-30",
           open_area="代替経路の方式が未決", status="確認待ち",
           acceptance=[accept("主回線が切れた", "切替または紙の伝票へ移行", "30分以内に受発注を再開する", "切替試験で確認")])
     b.req("redund", domain="network", kind="接続", title="回線を二重化する", body="拠点間の回線を二重化する（実現方式の候補）。", evidence=[b.E("topo", "代替回線はない")],
           nfr_tags=["availability"], priority="中", scope="判断待ち", confirm_with="中村", status="提案",
-          measures=[measure("回線の二重化", None, None, "実現方式の候補", None, "候補であり決定ではない", "確認待ち")])
+          measures=[measure("回線の二重化", None, None, "実現方式の候補", None, "候補であり決定ではない", "確認待ち", origin="未確認")])
     b.req("noext", domain="network", kind="分離", title="外部からの接続は禁止する", body="社外から社内ネットワークへの外部接続は禁止する。",
           evidence=[b.E("rule", "社外から社内ネットワークへの外部接続は禁止する"), b.E("video", "当社の規程では外部からの接続は禁止です")], nfr_tags=["auth"],
           priority="高", scope="今回必須", scope_reason="規程のため", decider="森", due="2026-10-15", status="提案")
@@ -200,8 +203,9 @@ def step4(b):
         if x["state"] == "未確認" and b.r["remote"] in (x["a"], x["b"]):
             x["state"] = "矛盾なしと確認"
             x["applicability"] = "今回は現地対応のため外部接続は発生しない。時間限定の接続は次回の検討で再確認する。"
+    b.issue_doc("meeting", "第3回定例 確認資料")
     b.issue_doc("change", "追加要望確認資料", b.c["always"])
-    b.issue_doc("spec", "要件定義書（第1版）")
+    b.issue_doc("spec", "要件定義書")
 
 
 STEPS = [step1, step2, step3, step4]

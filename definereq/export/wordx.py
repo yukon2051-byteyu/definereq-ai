@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import re
 
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -10,7 +11,6 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
-from .. import project as pj
 from .. import schema
 from . import share
 
@@ -113,7 +113,8 @@ def render(p: dict, opt: share.Options, doc_id: str, version: int, issued_at: st
         h.element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
 
     head = sec.header.paragraphs[0]
-    _font(head.add_run(clean(f"{p['name']}　{title}　{doc_id} v{version}")), 8, color=MUTED)
+    sample = "【サンプル・架空案件】" if p.get("is_demo") or p.get("from_demo") else ""
+    _font(head.add_run(clean(f"{sample}{p['name']}　{title}　{doc_id} 第{version}版")), 8, color=MUTED)
     foot = sec.footer.paragraphs[0]
     foot.alignment = WD_ALIGN_PARAGRAPH.CENTER
     _field(foot, "PAGE")
@@ -126,10 +127,10 @@ def render(p: dict, opt: share.Options, doc_id: str, version: int, issued_at: st
     _font(para.add_run(clean(p["name"])), 12, True, ACCENT)
     meta = doc.add_paragraph()
     scope = "内部メモ含む（社外共有不可）" if opt.include_internal else "内部メモ除外"
-    _font(meta.add_run(clean(f"資料ID：{doc_id}　版：v{version}　作成日時：{issued_at[:16].replace('T', ' ')}　範囲：{scope}")), 9, color=MUTED)
+    _font(meta.add_run(clean(f"資料ID：{doc_id}　版：第{version}版　作成日時：{issued_at[:16].replace('T', ' ')}　範囲：{scope}")), 9, color=MUTED)
     if p.get("is_demo") or p.get("from_demo"):
         note = doc.add_paragraph()
-        _font(note.add_run("本資料はデモ用の架空データから作成しました。"), 9, color=MUTED)
+        _font(note.add_run("【サンプル】本資料は架空の案件データから作成したサンプルです。実在の組織・案件とは関係ありません。"), 9, True, ACCENT)
     note = doc.add_paragraph()
     _font(note.add_run("本資料の送付は合意を意味しません。回答欄へのご記入をお願いします。"), 9, color=MUTED)
 
@@ -146,5 +147,12 @@ def render(p: dict, opt: share.Options, doc_id: str, version: int, issued_at: st
     return buf.getvalue()
 
 
+def safe_name(text: str) -> str:
+    """ファイル名に使えない文字を除く。"""
+    return re.sub(r'[\\/:*?"<>|\s]+', "_", text).strip("_") or "案件"
+
+
 def filename(p: dict, doc_type: str, version: int) -> str:
-    return f"{pj.today()}_{schema.DOC_TYPES[doc_type]}_v{version}.docx"
+    """案件名・資料の種類・版が分かる名前にする。"""
+    prefix = "サンプル_" if p.get("is_demo") or p.get("from_demo") else ""
+    return f"{prefix}{safe_name(p['name'])}_{schema.DOC_TYPES[doc_type]}_第{version}版.docx"

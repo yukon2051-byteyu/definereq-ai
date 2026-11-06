@@ -57,6 +57,28 @@ def unconfirmed_speech(p: dict, ev: dict) -> bool:
     return seg is None or seg["speaker_status"] != "確認済み" or seg["content_status"] != "確認済み"
 
 
+def unconfirmed_parts(p: dict, ev: dict) -> list[str]:
+    """発言の根拠で、確認が済んでいない対象（話者／内容）を返す。"""
+    if not str(ev.get("source_id", "")).startswith("REC"):
+        return []
+    rec = pj.get(p, "recordings", ev["source_id"])
+    seg = next((s for s in (rec or {}).get("segments", []) if s["id"] == ev.get("unit_id")), None)
+    if seg is None:
+        return ["話者", "発言内容"]
+    return [name for name, ok in (("話者", seg["speaker_status"] == "確認済み"), ("発言内容", seg["content_status"] == "確認済み")) if not ok]
+
+
+SPEAKER_SOURCE = {"subtitle": "字幕上の話者"}
+
+
+def speaker_view(rec: dict, seg: dict) -> dict:
+    """話者の表示。未確認の名前を確定した話者のように見せないため、出所を付ける。"""
+    confirmed = seg["speaker_status"] == "確認済み"
+    return {"label": "話者" if confirmed else SPEAKER_SOURCE.get(rec.get("method"), "文字起こし上の話者"),
+            "name": seg.get("speaker") or seg.get("speaker_label") or "記録なし", "confirmed": confirmed,
+            "speaker_check": "確認済み" if confirmed else "未実施", "content_check": seg["content_status"]}
+
+
 def source_name(p: dict, source_id: str) -> str:
     item = pj.get(p, "recordings" if source_id.startswith("REC") else "sources", source_id)
     return item["name"] if item else f"{source_id}（登録なし）"

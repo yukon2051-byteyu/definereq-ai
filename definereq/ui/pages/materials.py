@@ -15,6 +15,7 @@ from ...ingest.formats import format_time, parse_subtitles
 from ...ingest.safety import IngestError, safe_filename
 from ...media import probe as media
 from ...media import transcribe as tr
+from ...logic.evidence import speaker_view
 from ...schema import CONTENT_CONFIRM, SOURCE_KINDS, SPEAKER_CONFIRM, UTTERANCE_KINDS, VISIBILITY
 from ...usage import gate
 from ...usage.ledger import BudgetExceeded, LedgerUnavailable, Limits
@@ -225,8 +226,8 @@ def recordings(p: dict) -> None:
         ok_rerun("保存しました（自動の原文と修正履歴は残ります）")
     with st.expander("全発言を全文で読む"):
         for segment in rec["segments"]:
-            who = segment.get("speaker") or segment.get("speaker_label") or "話者未確認"
-            st.markdown(f"**{format_time(segment['start'])} {who}**（{segment.get('kind') or '未分類'}・話者{segment['speaker_status']}）")
+            view = speaker_view(rec, segment)
+            st.markdown(f"**{format_time(segment['start'])} {view['label']}：{view['name']}**（{segment.get('kind') or '未分類'}・話者確認：{view['speaker_check']}・発言内容の確認：{view['content_check']}）")
             st.write(segment["text"])
     if not rec.get("video_file") and rec["id"] not in st.session_state.get("media_paths", {}):
         st.caption("この記録には再生できる動画がありません。")

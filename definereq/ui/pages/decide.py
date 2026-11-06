@@ -8,6 +8,7 @@ from ... import project as pj
 from ...logic import agreement as ag
 from ...logic import baseline as bl
 from ...logic import checks, continuity
+from ...export import share
 from ...logic import evidence as ev
 from ...project import display
 from ...schema import (AGREEMENT_STATES, OPINION_NATURE, CHANGE_CLASSES, CHANGE_STATES, CONFLICT_KINDS, CONFLICT_STATES, IMPACT_AREAS, IMPACT_BASIS,
@@ -93,7 +94,7 @@ def decisions(p: dict) -> None:
         return
     chips(d["state"])
     if d["options"]:
-        st.dataframe(pd.DataFrame([{"案": o["label"], "利点": display(o.get("pros")), "懸念": display(o.get("cons")), "結果": "採用" if o["id"] == d.get("adopted") else (d.get("rejected_reasons", {}).get(o["id"]) or "—")} for o in d["options"]]), hide_index=True, width="stretch")
+        st.dataframe(pd.DataFrame([{"案": o["label"], "利点": display(o.get("pros")), "懸念": display(o.get("cons")), "採否": share.option_verdict(d, o), "不採用の理由": d.get("rejected_reasons", {}).get(o["id"]) or "—"} for o in d["options"]]), hide_index=True, width="stretch")
     st.markdown(f"**採用理由**：{d.get('rationale') or '理由の記録がありません'}")
     if d.get("hold_reason"):
         st.markdown(f"**保留の理由**：{d['hold_reason']}")

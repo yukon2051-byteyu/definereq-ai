@@ -15,6 +15,7 @@ from ...project import display
 from ...schema import DOC_TYPES
 from ...usage import gate
 from ...usage.ledger import LedgerUnavailable
+from .. import artifacts
 from ..ai_panel import current_code
 from ..components import chip, chips, edit_block, esc, evidence_block, head, ok_rerun, save_controls, select_item, touch
 
@@ -160,19 +161,11 @@ def share_page(p: dict) -> None:
         ids = [r["id"] for r in p["requirements"]]
         opt.exclude_ids = set(st.multiselect("対象から外す要件", ids, format_func=lambda i: pj.label_of(p, i), key="sh_ex"))
         with st.expander("内容を確認する", expanded=False):
-            for s in share.build(p, opt):
-                st.markdown(("#### " if s.level == 1 else "##### ") + s.heading)
-                for t in s.paragraphs:
-                    st.write(t)
-                if s.table is not None:
-                    if s.table["rows"]:
-                        st.dataframe(pd.DataFrame(s.table["rows"], columns=s.table["columns"]), hide_index=True, width="stretch")
-                    else:
-                        st.caption("（該当する項目はありません）")
+            artifacts.preview(share.build(p, opt))
         if st.button("この内容でWordを作成する", type="primary", key="share_word"):
             title = DOC_TYPES[doc_type]
-            if p.get("is_demo"):  # 閲覧専用では発行の記録を増やさない
-                doc = {"id": "DEMO", "version": 1, "issued_at": pj.now_iso()}
+            if p.get("is_demo"):  # 閲覧専用では発行の記録を増やさない。発行済みの資料と同じ版で出力する
+                doc = share.latest_doc(p, doc_type) or {"id": "DEMO", "version": 1, "issued_at": pj.now_iso()}
             else:
                 doc = share.register_doc(p, opt, title)
             st.session_state["word"] = {"data": wordx.render(p, opt, doc["id"], doc["version"], doc["issued_at"]), "name": wordx.filename(p, doc_type, doc["version"]), "id": doc["id"]}
@@ -207,7 +200,7 @@ def share_page(p: dict) -> None:
                     ok_rerun("記録しました")
     with tabs[2]:
         include = st.toggle("Excelに内部メモを含める（社外共有は不可）", value=False, key="xl_in")
-        st.download_button("Excelをダウンロード（要件・質問・残件・リスク・履歴）", excelx.render(p, include), file_name=f"{pj.today()}_DefineReq_要件一覧.xlsx",
+        st.download_button("Excelをダウンロード（要件・質問・残件・リスク・履歴）", excelx.render(p, include), file_name=excelx.filename(p, pj.today()),
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         if p.get("is_demo"):
             st.download_button("案件JSONをダウンロード", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json")

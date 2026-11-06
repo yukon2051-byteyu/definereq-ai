@@ -54,6 +54,14 @@ def _sheet(wb: Workbook, title: str, cols: list[tuple[str, int]], rows: list[lis
     return ws
 
 
+def filename(p: dict, when: str) -> str:
+    """Excelには版がないため、案件名と時点で区別する。"""
+    from .wordx import safe_name
+
+    prefix = "サンプル_" if p.get("is_demo") or p.get("from_demo") else ""
+    return f"{prefix}{safe_name(p['name'])}_要件一覧_{when}.xlsx"
+
+
 def render(p: dict, include_internal: bool = False) -> bytes:
     wb = Workbook()
     info = wb.active
@@ -61,7 +69,7 @@ def render(p: dict, include_internal: bool = False) -> bytes:
     for i, (k, v) in enumerate((("案件", p["name"]), ("案件ID", p["id"]), ("分野", "、".join(p["domains"])),
                                 ("出力日時", pj.now_iso()), ("形式版", p["format_version"]),
                                 ("範囲", "内部メモ含む" if include_internal else "内部メモ除外"),
-                                ("データ", "デモ用の架空データ" if p.get("is_demo") or p.get("from_demo") else "利用者の登録データ")), 1):
+                                ("データ", "【サンプル】架空の案件データ。実在の組織・案件とは関係ありません" if p.get("is_demo") or p.get("from_demo") else "利用者の登録データ")), 1):
         info.cell(row=i, column=1, value=k).font = Font(name="Yu Gothic", bold=True)
         info.cell(row=i, column=2, value=safe_cell(v)).font = Font(name="Yu Gothic")
     info.column_dimensions["A"].width = 12

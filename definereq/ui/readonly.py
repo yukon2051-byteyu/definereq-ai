@@ -14,7 +14,7 @@ from streamlit.delta_generator import DeltaGenerator
 
 # 閲覧の操作として許可する部品（key の先頭）
 VIEW_WIDGET = re.compile(r"^(rq_|rf_sel|is_sel|dc_sel|ch_sel|bl_sel|src_sel|rec_sel|seg_play|cand_f|tr_sel|sh_|xl_in|why_q|play_|stage_seg)")
-VIEW_BUTTON = re.compile(r"^(nav_|tour_|go_|ex_|next_|share_word)")
+VIEW_BUTTON = re.compile(r"^(nav_|tour_|go_|ex_|next_|share_word|play_)")
 
 DISABLE = ("text_input", "text_area", "selectbox", "multiselect", "radio", "toggle", "checkbox", "slider")
 

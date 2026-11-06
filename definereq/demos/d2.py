@@ -13,6 +13,9 @@ DOMAINS = ["app", "infra"]
 TRAITS = ["data", "deadline", "platform", "integration"]
 LEAD = "「毎朝すぐ」「データを失いたくない」を、測れる条件とアプリ・基盤の境界に分解する。"
 STRENGTH = "事前準備・非機能・アプリと基盤の境界"
+SITUATION = "「毎朝すぐに数字を見たい」「データを失いたくない」という要望がありますが、具体的な条件が決まっていません。"
+HIGHLIGHTS = ["曖昧な要望を、完了時刻や復旧条件などに具体化する", "アプリと基盤の担当範囲を整理する"]
+FEATURE = "曖昧な言葉を確認できる条件に変える例です。"
 TOUR = [
     {"stage": 1, "page": "sources", "title": "PowerPointとExcelを読み込む", "input": "移行計画案と処理量の表", "ai": "なし", "human": "発表者ノートは対象外のまま。図の内容は人が補足", "result": "スライド別の抽出結果と未理解の図"},
     {"stage": 1, "page": "prep", "title": "分野別に質問を準備する", "input": "対象分野：業務アプリ＋インフラ", "ai": "質問候補（準備済み）", "human": "重複をまとめて確認相手を決める", "result": "共通・分野別の質問"},
@@ -86,13 +89,13 @@ def step2(b):
           evidence=[b.E("plan", "毎朝すぐに本社が集計結果を確認する"), b.E("load", "1日の提出ファイル数")], priority="高", scope="今回必須",
           scope_reason="取り組みの目的のため", decider="高橋", due="2026-09-30", status="提案",
           data_io="入力：拠点のExcel（最大3000行）／出力：集計結果", related=[],
-          measures=[measure("1ファイルの行数", 3000, "行", "現状の計測値", "最大の拠点", "2026年8月のファイル", "計測済み"),
-                    measure("データ増加率", None, "％/年", "現状の計測値", None, "未確認", "未計測")],
+          measures=[measure("1ファイルの行数", 3000, "行", "現状の計測値", "最大の拠点", "2026年8月のファイル", "計測済み", origin="資料に記載"),
+                    measure("データ増加率", None, "％/年", "現状の計測値", None, "未確認", "未計測", origin="未確認")],
           acceptance=[accept("12拠点のファイルが提出済み", "集計を実行", "全拠点の合計が手作業の結果と一致する", "2026年8月分で比較")])
     b.req("morning", domain="app", kind="性能", title="毎朝8時30分までに前日分の集計を終える", body="毎朝8時30分までに前日分の集計を完了する。",
           evidence=[b.E("m1", "毎朝すぐに売上の数字を見たい"), b.E("m2", "毎朝8時30分までに前日分の集計が終わっていればよい")],
-          measures=[measure("集計の完了時刻", "8:30", "まで", "必要条件", "平日、前日分、12拠点が提出済み", "第2回打ち合わせ", "確認待ち"),
-                    measure("手作業の集計時間", 90, "分", "現状の計測値", "2026年8月の平均", "担当者の記録", "計測済み")],
+          measures=[measure("集計の完了時刻", "8:30", "まで", "必要条件", "平日、前日分、12拠点が提出済み", "第2回打ち合わせ", "確認待ち", origin="関係者が提示"),
+                    measure("手作業の集計時間", 90, "分", "現状の計測値", "2026年8月の平均", "担当者の記録", "計測済み", origin="資料に記載")],
           priority="高", scope="今回必須", scope_reason="部門会議に使うため", decider="高橋", due="2026-09-30", status="提案",
           acceptance=[accept("12拠点が提出済み", "朝の集計を実行", "8時30分までに完了する", "本番相当のデータで3日間測定")])
     b.req("exc", domain="app", kind="業務", title="未提出・重複・遅延の扱い", body="未提出の拠点を一覧で示し、重複ファイルは取り込まない。遅延は後から追加取込できる。",
@@ -104,19 +107,19 @@ def step2(b):
           acceptance=[accept("締め後の月", "数字の変更を試みる", "変更できず、訂正版の作成へ案内される", "画面操作で確認")])
     b.req("rto", domain="infra", kind="復旧", title="障害時は4時間以内に集計を再開する", body="障害時は4時間以内に集計を再開する。",
           evidence=[b.E("m2", "復旧は4時間以内を目標にする")], nfr_tags=["recovery"],
-          measures=[measure("目標復旧時間（RTO）", 4, "時間以内", "必要条件", "基盤障害時", "第2回打ち合わせ", "確認待ち")],
+          measures=[measure("目標復旧時間（RTO）", 4, "時間以内", "必要条件", "基盤障害時", "第2回打ち合わせ", "確認待ち", origin="関係者が提示")],
           priority="高", scope="今回必須", scope_reason="午後の報告に間に合わせるため", decider="高橋", due="2026-10-15", status="提案",
           open_area="復旧の試験をしたことがない", confirm_with="伊藤",
           acceptance=[accept("バックアップから復旧する", "復旧試験を実施", "4時間以内に集計を再開できる", "移行前に1回試験")])
     b.req("rpo", domain="infra", kind="復旧", title="失ってよいデータは直前の1日分まで", body="障害時に失ってよいデータは直前の1日分までとする。",
           evidence=[b.E("m1", "データを失いたくない"), b.E("m2", "失ってよいのは直前の1日分の入力までとする")], nfr_tags=["backup", "recovery"],
-          measures=[measure("許容データ損失（RPO）", 1, "日分", "必要条件", "基盤障害時", "第2回打ち合わせ", "確認待ち"),
-                    measure("バックアップの間隔", 1, "日", "現状の計測値", "現行サーバー", "第1回打ち合わせの発言", "確認待ち")],
+          measures=[measure("許容データ損失（RPO）", 1, "日分", "必要条件", "基盤障害時", "第2回打ち合わせ", "確認待ち", origin="関係者が提示"),
+                    measure("バックアップの間隔", 1, "日", "現状の計測値", "現行サーバー", "第1回打ち合わせの発言", "確認待ち", origin="関係者が提示")],
           priority="高", scope="今回必須", scope_reason="拠点のExcelから再取込できるため", decider="高橋", due="2026-10-15", status="提案",
           acceptance=[accept("前日のバックアップがある", "復旧と再取込を実施", "前日分までの集計が再現できる", "移行前に1回試験")])
     b.req("downtime", domain="infra", kind="可用性", title="計画停止は月1回の日曜夜に限る", body="保守の計画停止は月1回の日曜夜に限る。朝の集計は止めない。",
           evidence=[b.E("m1", "朝の集計は止めないでほしい"), b.E("m2", "保守の計画停止は月1回の日曜夜に限る案で調整したい")], nfr_tags=["availability", "maintenance"],
-          measures=[measure("計画停止の頻度", 1, "回/月", "必要条件", "日曜夜", "第2回打ち合わせ", "確認待ち")],
+          measures=[measure("計画停止の頻度", 1, "回/月", "必要条件", "日曜夜", "第2回打ち合わせ", "確認待ち", origin="関係者が提示")],
           priority="高", scope="今回必須", decider="高橋", status="提案", related=[])
     b.req("backup", domain="infra", kind="運用", title="日次バックアップを取得する", body="集計データのバックアップを日次で取得する。",
           evidence=[b.E("m1", "現行サーバーのバックアップは日次で")], nfr_tags=["backup"], priority="中", scope="今回必須", confirm_with="伊藤", status="確認待ち")
@@ -181,8 +184,8 @@ def step2(b):
     risk(p, "データ増加率が未計測で容量の見通しが立たない", "事実に基づく", "拠点や行数が増えた場合", "処理時間の増加", "増加率が未計測", "計測する", "伊藤", [b.E("load", "データ増加率")], b.R("auto"))
     action(p, "データ増加率を計測する", "伊藤", None, b.R("auto"))
     action(p, "障害の一次受付の担当を決める", None, None, b.R("resp"))
-    b.nfr(performance=("確認済み", "8時30分までの完了を確認"), throughput=("確認済み", "12ファイル・最大3000行"), availability=("確認済み", "日曜夜の計画停止"),
-          recovery=("確認済み", "RTO・RPOを確認。復旧試験は未実施"), backup=("未確認", "現行は日次。クラウド側の設定は未確認"), monitoring=("未確認", None))
+    b.nfr(performance=("未確認", "8時30分までの完了は関係者が提示した条件。実測は未実施"), throughput=("確認済み", "12ファイル・最大3000行"), availability=("確認済み", "日曜夜の計画停止"),
+          recovery=("確認済み", "RTO・RPOの値は判断者が確認。実際に達成できるかは復旧試験が未実施のため未確認"), backup=("未確認", "現行は日次。クラウド側の設定は未確認"), monitoring=("未確認", None))
     b.snapshot_baseline("第2回打ち合わせ後の合意版")
     doc = b.issue_doc("meeting", "第2回打ち合わせ確認資料")
     share.record_response(p, doc["id"], b.r["rto"], "4時間以内で問題ありません。", "高橋", "2026-09-22")
@@ -229,8 +232,9 @@ def step4(b):
     pj.require(p, "changes", b.c["graph"]).update(status="反映済み", related_requirements=[new])
     ag.record_history(p, new, "保留", f"追加要望 {b.c['graph']}", change_id=b.c["graph"], decided_on="2026-10-13", rationale="今回の範囲を守るため次回以降に検討する。", decider="高橋",
                       evidence=[b.E("m3", "予実グラフは次回以降にする")])
+    b.issue_doc("meeting", "第3回打ち合わせ確認資料")
     b.issue_doc("change", "追加要望確認資料", b.c["recalc"])
-    b.issue_doc("spec", "要件定義書（第1版）")
+    b.issue_doc("spec", "要件定義書")
 
 
 STEPS = [step1, step2, step3, step4]

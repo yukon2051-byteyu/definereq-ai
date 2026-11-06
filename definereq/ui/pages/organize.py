@@ -7,7 +7,7 @@ import streamlit as st
 from ... import project as pj
 from ...logic import checks, continuity
 from ...project import display, field_state
-from ...schema import AGREEMENT_STATES, CANDIDATE_INTAKE, CANDIDATE_KINDS, DOMAINS, MEASURE_KINDS, MEASURE_STATUS, PRIORITIES, REQ_KINDS, SCOPE_CHOICES
+from ...schema import AGREEMENT_STATES, CANDIDATE_INTAKE, CANDIDATE_KINDS, DOMAINS, MEASURE_KINDS, MEASURE_ORIGINS, MEASURE_STATUS, PRIORITIES, REQ_KINDS, SCOPE_CHOICES
 from ..ai_panel import ai_panel, ai_runs_list
 from ..components import add_evidence_form, chip, chips, edit_block, evidence_block, flow, guard, head, meeting_select, ok_rerun, people, select_item, touch, tri_text
 
@@ -196,11 +196,11 @@ def refine(p: dict) -> None:
         return
     st.subheader("数値・単位・測定条件")
     st.caption("必要条件・現状の計測値・仮定・実現方式の候補・人が確定した設計制約を区別します。停止時間・復旧時間・許容データ損失は別の指標として登録してください。")
-    cols = ["指標", "値", "単位", "区分", "測定条件", "根拠", "状態"]
-    df = pd.DataFrame([{"指標": m.get("metric"), "値": None if m.get("value") is None else str(m.get("value")), "単位": m.get("unit"), "区分": m.get("kind"),
+    cols = ["指標", "値", "単位", "区分", "出所", "測定条件", "根拠", "状態"]
+    df = pd.DataFrame([{"指標": m.get("metric"), "値": None if m.get("value") is None else str(m.get("value")), "単位": m.get("unit"), "区分": m.get("kind"), "出所": m.get("origin"),
                         "測定条件": m.get("condition"), "根拠": m.get("basis"), "状態": m.get("status")} for m in r.get("measures", [])], columns=cols)
     edited = st.data_editor(df, hide_index=True, width="stretch", num_rows="dynamic", key=f"ms_{r['id']}_{r['version']}", column_config={
-        "値": st.column_config.TextColumn(), "区分": st.column_config.SelectboxColumn(options=MEASURE_KINDS), "状態": st.column_config.SelectboxColumn(options=MEASURE_STATUS)})
+        "値": st.column_config.TextColumn(), "区分": st.column_config.SelectboxColumn(options=MEASURE_KINDS), "出所": st.column_config.SelectboxColumn(options=MEASURE_ORIGINS), "状態": st.column_config.SelectboxColumn(options=MEASURE_STATUS)})
     st.subheader("受入条件")
     acols = ["前提", "条件", "期待結果", "確認方法"]
     acc = [a for a in r.get("acceptance") or [] if isinstance(a, dict)]
@@ -209,7 +209,7 @@ def refine(p: dict) -> None:
     if st.button("数値と受入条件を保存", type="primary", key=f"rf_s_{r['id']}"):
         def clean(v):
             return None if v is None or (isinstance(v, float) and pd.isna(v)) or v == "" else v
-        measures = [{"metric": clean(x["指標"]), "value": clean(x["値"]), "unit": clean(x["単位"]), "kind": clean(x["区分"]), "condition": clean(x["測定条件"]),
+        measures = [{"metric": clean(x["指標"]), "value": clean(x["値"]), "unit": clean(x["単位"]), "kind": clean(x["区分"]), "origin": clean(x["出所"]), "condition": clean(x["測定条件"]),
                      "basis": clean(x["根拠"]), "status": clean(x["状態"])} for x in edited.to_dict("records") if clean(x["指標"])]
         accs = [{"given": clean(x["前提"]) or "", "when": clean(x["条件"]) or "", "then": clean(x["期待結果"]) or "", "how": clean(x["確認方法"]) or ""}
                 for x in aed.to_dict("records") if clean(x["期待結果"])]

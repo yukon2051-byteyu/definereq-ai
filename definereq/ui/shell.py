@@ -6,7 +6,7 @@ import streamlit as st
 from .. import project as pj
 from ..demos.builder import STAGES
 from ..schema import DOMAINS
-from . import guide, state
+from . import guide, situation, state
 from .readonly import HIDE_CSS
 from .components import esc, save_controls, show_flash
 from .pages import decide, materials, organize, prepare, trace
@@ -117,9 +117,9 @@ def next_step(key: str) -> None:
 
 def demo_bar(p: dict) -> None:
     """全画面の閲覧で、閲覧専用であることと案内への戻り道を示す。"""
-    c1, c2 = st.columns([5, 1])
-    c1.caption("閲覧専用のデモです。編集はできません。編集は「あなたの案件で試す」から行えます。")
-    if c2.button("案内へ戻る", key="tour_back", width="stretch"):
+    c1, c2 = st.columns([4, 1])
+    c1.caption("いま見ているのは機能画面（実際の一覧と記録）です。閲覧専用のため編集はできません。要点だけを見るときはガイドへ戻ります。編集は「あなたの案件で試す」から行えます。")
+    if c2.button("ガイドへ戻る", key="tour_back", width="stretch"):
         guide.back_to_guide(p)
 
 
@@ -137,6 +137,8 @@ def render(p: dict) -> None:
     context_bar(p, label)
     if p.get("demo"):
         demo_bar(p)
+    elif not p.get("is_demo"):
+        situation.project_panel(p, key)
     stage_control(p)
     if key == "demo_map":
         trace.demo_map(p)
