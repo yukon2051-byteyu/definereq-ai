@@ -380,6 +380,19 @@ def test_play_button_opens_video_in_demo():
     assert next(b for b in at.button if (b.key or "").startswith("play_")).label == "■ 動画を閉じる"
 
 
+def test_lfs_pointer_is_not_treated_as_video(tmp_path):
+    from definereq.demos import fetch_media
+
+    pointer = tmp_path / "a.mp4"
+    pointer.write_bytes(b"version https://git-lfs.github.com/spec/v1
+oid sha256:" + b"a" * 64 + b"
+size 450345
+")
+    assert fetch_media.is_pointer(pointer) and fetch_media.expected_hash(pointer) == "a" * 64
+    real = next(fetch_media.FILES.glob("*.mp4"))
+    assert not fetch_media.is_pointer(real)
+
+
 def project_app(p, page="overview", **state):
     at = AppTest.from_file(APP, default_timeout=60)
     at.session_state["project"] = p

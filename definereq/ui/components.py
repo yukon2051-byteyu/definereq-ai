@@ -10,6 +10,7 @@ import streamlit as st
 
 from .. import config
 from .. import project as pj
+from ..demos.fetch_media import is_pointer
 from ..logic import evidence as ev
 from ..project import display
 from ..schema import NA
@@ -78,7 +79,7 @@ def play_at(rec: dict, start: float, key: str) -> None:
     path = None
     if rec.get("video_file"):  # デモの動画
         candidate = config.DEMO_FILES / rec["video_file"]
-        if candidate.exists():
+        if candidate.exists() and not is_pointer(candidate):  # 実体のない参照ファイルは再生できない
             path = str(candidate)
     uploaded = st.session_state.get("media_paths", {}).get(rec["id"])
     path = path or uploaded

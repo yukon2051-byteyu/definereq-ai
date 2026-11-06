@@ -19,6 +19,9 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 
 COPY --chown=user . .
 
+# 動画は Git LFS 管理のため、参照ファイルだけが届いた場合は実体を取得する
+RUN python -m definereq.demos.fetch_media
+
 # README の app_port（8501）と合わせる
 # Spaces は中継サーバーを通して表示するため、アップロードが拒否されないよう XSRF と CORS の確認を外す
 EXPOSE 8501
