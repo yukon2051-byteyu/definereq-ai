@@ -72,7 +72,7 @@ def test_no_issue_is_not_shown_as_complete_when_nothing_analyzed(p):
 def test_profile_only_gets_two_entry_points(p):
     p["profile"]["problem"].update(value="月末集計に時間がかかる")
     r = gd.assess(p, "overview")
-    assert r["main"].id == "next_input" and r["main"].alt == [("議事録を取り込む", "sources")]
+    assert r["main"].id == "next_input" and r["main"].alt == [("議事録を取り込む", "records")]
 
 
 # ---- AI入力 ----
@@ -535,7 +535,7 @@ def test_home_shows_stats_and_backlog_after_requirements(p):
     assert 'class="dr-stat"' in html(at) and any(s.value == "残件" for s in at.subheader)
 
 
-@pytest.mark.parametrize("stage,page", [("before_first", "prep"), ("after_first", "sources"), ("deciding", "requirements"), ("output", "share")])
+@pytest.mark.parametrize("stage,page", [("before_first", "prep"), ("after_first", "records"), ("deciding", "requirements"), ("output", "share")])
 def test_choosing_stage_moves_to_that_work(p, stage, page):
     p["profile"]["problem"].update(value="月末の集計に時間がかかる")
     at = open_app(p, "recordings")
@@ -578,18 +578,34 @@ def test_minutes_files_without_recording_can_be_analyzed(p, name, data):
     assert p["candidates"][0]["evidence"][0]["verified"] and gd.assess(p, "sources")["main"].id == "candidates"
 
 
-def test_after_meeting_stage_opens_minutes_import(p):
+def test_after_meeting_work_is_on_one_screen(p):
+    """取込み・AIの整理・候補の確認が同じ画面にある。"""
     p["profile"]["problem"].update(value="月末の集計に時間がかかる")
     at = open_app(p, "recordings")
     at = next(r for r in at.radio if r.key == "guide_stage").set_value("after_first").run()
-    assert at.session_state["page"] == "sources" and at.session_state["src_kind"] == "議事録"
-    assert not at.exception
+    assert not at.exception and at.session_state["page"] == "records"
+    heads = [s.value for s in at.subheader]
+    assert heads == ["1. 議事録・録画を取り込む", "2. AIで整理する", "3. 候補を確認する"]
 
 
-def test_recordings_page_points_to_minutes(p):
-    p["profile"]["problem"].update(value="月末の集計に時間がかかる")
-    at = key(open_app(p, "recordings"), "go_minutes").click().run()
-    assert at.session_state["page"] == "sources" and at.session_state["src_kind"] == "議事録"
+def test_records_page_paste_to_candidates_without_moving(p):
+    at = open_app(p, "records")
+    next(t for t in at.text_area if t.key == "records_paste_b").set_value("講師が出欠を登録する。")
+    at = key(at, "records_paste_go").click().run()
+    assert not at.exception and at.session_state["page"] == "records"
+    q = at.session_state["project"]
+    assert q["sources"][0]["kind"] == "議事録"
+    assert gd.assess(q, "records")["main"].page == "records"
+    assert not any(b.key == "guide_go" for b in at.button)  # 同じ画面なので移動のボタンを出さない
+    run(q, "extract", [cand("要望", "出欠を登録する")], source_ids=[q["sources"][0]["id"]])
+    at.run()
+    assert "要件候補として採用" in [b.label for b in at.button]
+
+
+def test_recordings_page_accepts_minutes_files(p):
+    at = open_app(p, "recordings")
+    assert not at.exception and any(b.key == "rec_paste_go" for b in at.button)
+    assert not any("字幕ファイル" in str(x.label) for x in at.text_input)
 
 
 @pytest.mark.parametrize("stage,want", [("before_first", "next_input"), ("after_first", "meeting_missing"), ("deciding", "stage_require"), ("output", "export")])
@@ -608,7 +624,7 @@ def test_deciding_stage_with_requirements_points_to_them(p):
 def test_profile_page_end_has_next_steps(p):
     at = open_app(p, "profile")
     at = key(at, "pf_next_rec").click().run()
-    assert at.session_state["page"] == "sources"
+    assert at.session_state["page"] == "records"
 
 
 # ---- JSON ----
@@ -655,7 +671,7 @@ def test_new_project_shows_start_screen_without_zero_stats(p):
 
 def test_start_from_records(p):
     at = key(open_app(p), "start_records").click().run()
-    assert at.session_state["page"] == "sources"
+    assert at.session_state["page"] == "records"
 
 
 def test_carryover_hidden_on_first_use(p):

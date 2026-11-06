@@ -19,8 +19,9 @@ from ...logic.evidence import speaker_view
 from ...schema import CONTENT_CONFIRM, SOURCE_KINDS, SPEAKER_CONFIRM, UTTERANCE_KINDS, VISIBILITY
 from ...usage import gate
 from ...usage.ledger import BudgetExceeded, LedgerUnavailable, Limits
-from .. import state
-from ..ai_panel import current_code
+from ...logic.guidance import unanalyzed_minutes
+from ..ai_panel import ai_panel, current_code
+from ..candidates import board
 from ..components import chips, edit_block, head, meeting_select, ok_rerun, play_at, select_item, touch
 
 
@@ -183,33 +184,85 @@ def _transcribe_ui(p: dict, meeting: str | None) -> None:
         ok_rerun(f"{len(segs)}件の発言を登録しました")
 
 
+SUBTITLES = (".srt", ".vtt")
+
+
+def _import_files(p: dict, files: list, visibility: str, date: str | None, meeting: str | None) -> int:
+    """議事録と字幕を取り込む。字幕は時刻付きの発言、それ以外は議事録として登録する。"""
+    done = 0
+    for f in files:
+        name = safe_filename(f.name)
+        try:
+            if name.lower().endswith(SUBTITLES):
+                segs = parse_subtitles(f.getvalue().decode("utf-8-sig", errors="replace"))
+                if not segs:
+                    st.error(f"{name}：字幕の時刻を読み取れませんでした。")
+                    continue
+                tr.register_recording(p, name, segs, "subtitle", date, segs[-1]["end"], 0, segs[-1]["end"], meeting_id=meeting)
+            else:
+                registry.ingest_bytes(p, f.name, f.getvalue(), kind="議事録", visibility=visibility, occurred_at=date, meeting_id=meeting)
+            done += 1
+        except IngestError as e:
+            st.error(f"{name}：{e}")
+    return done
+
+
+def minutes_import(p: dict, meeting: str | None, key: str) -> None:
+    """議事録・字幕の取込み。録画がない会議でも、この欄だけで記録を登録できる。"""
+    st.markdown("**議事録・字幕を取り込む**（Word / Excel / PDF / PowerPoint / テキスト / SRT / VTT）")
+    st.caption("議事録として登録します。録画は必要ありません。")
+    round_no = st.session_state.get(f"{key}_round", 0)  # 取込み後に選択を空にするため、部品の名前を変える
+    files = st.file_uploader("議事録のファイル", accept_multiple_files=True, type=["docx", "xlsx", "pdf", "pptx", "txt", "srt", "vtt"], key=f"{key}_files_{round_no}")
+    c1, c2 = st.columns(2)
+    date = c1.text_input("開催日（不明なら空欄）", key=f"{key}_date")
+    visibility = c2.selectbox("公開範囲", VISIBILITY, key=f"{key}_vis")
+    if st.button("ファイルを取り込む", type="primary", disabled=not files, key=f"{key}_go"):
+        done = _import_files(p, files, visibility, date or None, meeting)
+        if done:
+            st.session_state[f"{key}_round"] = round_no + 1
+            touch(p)
+            ok_rerun(f"{done}件読み込みました")
+    title = st.text_input("貼り付ける議事録の名称", key=f"{key}_paste_t")
+    text = st.text_area("議事録の文章を貼り付ける", key=f"{key}_paste_b")
+    if st.button("貼り付けた文章を議事録として登録", key=f"{key}_paste_go") and text.strip():
+        registry.ingest_paste(p, title, text, kind="議事録", visibility=visibility, occurred_at=date or None, meeting_id=meeting)
+        touch(p)
+        ok_rerun("登録しました")
+
+
+def records(p: dict) -> None:
+    """会議の記録の整理を1画面で行う。取込み→AIの整理→候補の確認。"""
+    head("会議の記録を整理", "議事録や録画の取込みから、AIの整理、候補の確認まで、この画面で進めます。録画はなくても進められます。", "記録を取り込む")
+    st.subheader("1. 議事録・録画を取り込む")
+    with edit_block("records"):
+        meeting = meeting_select(p, "records_mtg")
+        minutes_import(p, meeting, "records")
+        with st.expander("録画から文字起こしする（録画がある場合）"):
+            _transcribe_ui(p, meeting)
+    names = [s["name"] for s in p["sources"] if s.get("kind") == "議事録" and not s.get("superseded_by")] + [r["name"] for r in p["recordings"]]
+    st.caption("登録済みの記録：" + "、".join(names) if names else "登録済みの記録はまだありません。")
+    st.subheader("2. AIで整理する")
+    if names:
+        ai_panel(p, "extract", expanded=bool(unanalyzed_minutes(p)))
+    else:
+        st.caption("議事録を取り込むと、ここからAIで要望や未決事項を整理できます。")
+    st.subheader("3. 候補を確認する")
+    tasks = tuple(sorted({r["task"] for r in p["ai_runs"]} - {"prep"}))
+    if tasks or p.get("is_demo"):
+        board(p, None if p.get("is_demo") else tasks, "records_cand", meeting)
+    else:
+        st.caption("AIで整理すると、候補がここに表示されます。候補のままでは要件や合意になりません。")
+
+
 def recordings(p: dict) -> None:
     head("録画・発言", "発言ごとに話者と内容を確認します。AIが話者を確定することはありません。発言を全員の合意として扱いません。", "資料")
-    if not p["recordings"] and not p.get("is_demo"):
-        c1, c2 = st.columns([3, 1])
-        c1.caption("録画がなくても進められます。Word・Excel・PDF・テキストの議事録は「資料・議事録」から取り込めます。")
-        if c2.button("議事録を取り込む", key="go_minutes", width="stretch"):
-            state.goto_minutes()
-    with edit_block("rec"), st.expander("録画・字幕を追加する", expanded=not p["recordings"]):
+    with edit_block("rec"), st.expander("録画・議事録・字幕を追加する", expanded=not p["recordings"]):
         if p.get("is_demo"):
             st.caption("デモでも録画の検証は実行できますが、文字起こしの実行は準備済みの結果を利用します。")
         meeting = meeting_select(p, "rec_mtg")
         _transcribe_ui(p, meeting)
         st.divider()
-        st.markdown("**字幕・議事録の時刻付きテキストを取り込む**（SRT / VTT）")
-        st.caption("この取り込みは録画の文字起こしではありません。方式は「字幕の取込」と記録されます。")
-        sub = st.file_uploader("字幕ファイル", type=["srt", "vtt"], key="sub_up")
-        name = st.text_input("会議の名称", key="sub_name")
-        date = st.text_input("開催日（不明なら空欄）", key="sub_date")
-        if sub is not None and st.button("字幕を取り込む"):
-            segs = parse_subtitles(sub.getvalue().decode("utf-8-sig", errors="replace"))
-            if not segs:
-                st.error("字幕の時刻を読み取れませんでした。")
-            else:
-                dur = segs[-1]["end"]
-                tr.register_recording(p, name or safe_filename(sub.name), segs, "subtitle", date or None, dur, 0, dur, meeting_id=meeting)
-                touch(p)
-                ok_rerun("取り込みました")
+        minutes_import(p, meeting, "rec")
 
     rec = select_item(p["recordings"], lambda r: f"{r['id']} {r['name']} v{r['version']}", "rec_sel", "録画はまだありません。")
     if not rec:

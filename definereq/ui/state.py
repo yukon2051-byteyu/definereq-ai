@@ -91,9 +91,8 @@ def goto(page: str) -> None:
 
 
 def goto_minutes() -> None:
-    """議事録の取込みへ移動する。資料の種類をあらかじめ議事録にしておく。"""
-    st.session_state["src_kind"] = "議事録"
-    goto("sources")
+    """会議の記録を整理する画面へ移動する。取込みからAIの整理までを1画面で行う。"""
+    goto("records")
 
 
 def set_stage(stage: int, page: str | None = None) -> None:

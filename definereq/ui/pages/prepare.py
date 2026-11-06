@@ -151,10 +151,8 @@ def profile(p: dict) -> None:
                 value["origin"] = p["profile"][key].get("origin")
             p["profile"].update(new)
             touch(p)
-            if to_records:
-                st.session_state["src_kind"] = "議事録"
             if to_prep or to_records:
-                st.session_state["page"] = "prep" if to_prep else "sources"
+                st.session_state["page"] = "prep" if to_prep else "records"
             ok_rerun("案件情報を反映しました")
 
     st.subheader("関係者")

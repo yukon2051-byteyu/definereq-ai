@@ -108,7 +108,7 @@ def _after_profile(p: dict) -> list[Advice]:
         return []
     return [Advice("next_input", "案件の情報を登録しました", "背景や困りごとが登録されています。資料や議事録はまだありません。",
                    "これから会議をする場合は質問を準備し、議事録や資料がある場合は取り込んでください。", "案件情報があり、質問・資料・録画が0件のため。", "prep", "会議を準備する", 12, {"overview", "profile", "prep"},
-                   short="背景・目的を登録しました。次は会議の準備、または議事録の取込みへ進めます。", alt=[("議事録を取り込む", "sources")])]
+                   short="背景・目的を登録しました。次は会議の準備、または議事録の取込みへ進めます。", alt=[("議事録を取り込む", "records")])]
 
 
 def _sources(p: dict) -> list[Advice]:
@@ -127,7 +127,7 @@ def _sources(p: dict) -> list[Advice]:
     if active and not p["questions"] and not has_meeting_record(p):  # 議事録があれば会議前とは限らない
         out.append(Advice("sources_added", "資料の登録後", f"資料{len(active)}件を登録しましたが、質問はまだ登録されていません。",
                           "確認観点と質問候補を見て、会議で聞く項目を選んでください。", "資料があり、会議の記録と質問が0件のため。", "prep", "質問候補を確認する", 20, {"sources", "prep", "overview"},
-                          alt=[("議事録を取り込む", "sources")]))
+                          alt=[("議事録を取り込む", "records")]))
     return out
 
 
@@ -157,13 +157,13 @@ def _meeting_records(p: dict) -> list[Advice]:
                           "発言の話者と内容を確認してください。", "話者または内容の確認状態が「確認済み」でない発言があるため。", "recordings", f"発言{len(unconfirmed)}件を確認する", 25, {"recordings", "sources"}))
     if user_stage(p) == "after_first" and not has_meeting_record(p):
         out.append(Advice("meeting_missing", "会議の記録が未登録", "会議は実施済みと指定されていますが、議事録や録画が登録されていません。",
-                          "Word・Excel・PDF・テキストの議事録を取り込むか、文章を貼り付けてください。録画がなくても進められます。", "会議の記録が0件のため。", "sources", "議事録を取り込む", 22, {"recordings", "sources", "meetings"},
-                          short="議事録（Word・Excel・PDF・テキスト）を取り込みます。録画がなくても進められます。", alt=[("録画を取り込む", "recordings")]))
+                          "Word・Excel・PDF・テキストの議事録を取り込むか、文章を貼り付けてください。録画がなくても進められます。", "会議の記録が0件のため。", "records", "議事録を取り込む", 22, {"records", "recordings", "sources", "meetings"},
+                          short="議事録を取り込み、AIで整理し、候補を確認します。録画がなくても進められます。"))
     waiting = unanalyzed_minutes(p)
     if waiting:
         # 要件を手作業で登録している場合は、解析を強く勧めない
         out.append(Advice("extract", "議事録を登録しました", f"AIで整理していない会議の記録が{len(waiting)}件あります。", "AIで要望・決定・未決事項を候補として整理してください。",
-                          "会議の記録があり、AIの整理が済んでいないため。", "candidates", "議事録をAIで整理する", 60 if p["requirements"] else 16, {"candidates", "recordings", "sources"}, _titles(waiting),
+                          "会議の記録があり、AIの整理が済んでいないため。", "records", "議事録をAIで整理する", 60 if p["requirements"] else 16, {"records", "candidates", "recordings", "sources"}, _titles(waiting),
                           short="議事録を登録しました。次はAIで要望や未決事項を整理します。", alt=[("次回の質問を準備する", "prep")]))
     return out
 
@@ -188,7 +188,7 @@ def _candidates(p: dict) -> list[Advice]:
         breakdown = "、".join(f"{k}{v}件" for k, v in kinds.items())
         title = "議事録・資料の解析が完了" if any(tasks.get(c.get("origin_run")) == "extract" for c in rest) else "AI候補の確認"
         out.append(Advice("candidates", title, f"{len(rest)}件の候補を整理しました（{breakdown}）。{note}候補のままでは要件になりません。", "内容と引用を確認し、必要なものを案件へ反映してください。",
-                          f"未処理の候補が{len(rest)}件あるため。", "candidates", f"候補{len(rest)}件を確認する", 26, {"candidates", "requirements"}, _titles([c["text"] for c in rest])))
+                          f"未処理の候補が{len(rest)}件あるため。", "records", f"候補{len(rest)}件を確認する", 26, {"records", "candidates", "requirements"}, _titles([c["text"] for c in rest])))
     return out
 
 
@@ -311,7 +311,7 @@ STAGE_FOCUS = {"before_first": {"prep", "prep_candidates", "sources_added", "nex
                "deciding": {"after_decision", "decide_next", "decision_wait", "conflicts", "change_new", "change_wait", "unclassified", "acceptance_missing"}, "output": {"export"}}
 
 
-STAGE_PAGES = {"before_first": "prep", "after_first": "sources", "deciding": "requirements", "output": "share"}
+STAGE_PAGES = {"before_first": "prep", "after_first": "records", "deciding": "requirements", "output": "share"}
 
 
 def _stage_default(p: dict, stage: str) -> Advice | None:
@@ -320,14 +320,14 @@ def _stage_default(p: dict, stage: str) -> Advice | None:
         return Advice("stage_prep", "これから会議をする", "会議の質問はまだ準備していません。", "質問候補を確認し、会議で聞く項目を選んでください。", "「これから会議をする」を選んだため。", "prep", "質問候補を確認する", 1, {"prep"},
                       short="会議で聞く質問と議題を準備します。")
     if stage == "after_first":
-        return Advice("stage_records", "会議が終わり、記録を整理する", "整理する会議の記録がまだありません。", "議事録を貼り付けるか、ファイルを登録してください。", "「会議が終わり、記録を整理する」を選び、未整理の記録がないため。", "sources", "議事録を取り込む", 1, {"sources"},
-                      short="議事録（Word・Excel・PDF・テキスト）を取り込み、AIで整理します。録画がなくても進められます。", alt=[("録画を取り込む", "recordings")])
+        return Advice("stage_records", "会議が終わり、記録を整理する", "整理する会議の記録がまだありません。", "議事録を貼り付けるか、ファイルを登録してください。", "「会議が終わり、記録を整理する」を選び、未整理の記録がないため。", "records", "議事録を取り込む", 1, {"records"},
+                      short="議事録を取り込み、AIで整理し、候補を確認します。この画面だけで進められます。")
     if stage == "deciding":
         if p["requirements"]:
             return Advice("stage_refine", "要件を具体化・判断する", "確認が必要な要件は検出されていません。", "要件の内容と受入条件を確認してください。", "「要件を具体化・判断する」を選んだため。", "requirements", "要件を確認する", 1, {"requirements"},
                           short="要件の内容を確認し、具体化と判断へ進めます。", alt=[("判断を記録する", "decisions")])
         return Advice("stage_require", "要件を具体化・判断する", "要件はまだ登録されていません。", "要件を手作業で追加するか、議事録をAIで整理して候補から採用してください。", "「要件を具体化・判断する」を選び、要件が0件のため。", "requirements", "要件を追加する", 1, {"requirements"},
-                      short="要件はまだありません。手作業で追加するか、議事録の整理から候補を採用します。", alt=[("議事録をAIで整理する", "candidates")])
+                      short="要件はまだありません。手作業で追加するか、議事録の整理から候補を採用します。", alt=[("議事録をAIで整理する", "records")])
     return None
 
 

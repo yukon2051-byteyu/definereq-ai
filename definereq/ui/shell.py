@@ -16,7 +16,7 @@ from .pages import decide, materials, organize, prepare, trace
 GROUPS = [
     ("案件ホーム", [("overview", "現在の状況", prepare.overview), ("profile", "背景・目的・関係者", prepare.profile)]),
     ("会議の準備", [("prep", "質問・議題", prepare.prep), ("meetings", "会議", prepare.meetings)]),
-    ("記録を取り込む", [("sources", "資料・議事録", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
+    ("記録を取り込む", [("records", "会議の記録を整理", materials.records), ("sources", "資料・議事録", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
     ("要件を整理・判断", [("candidates", "AI候補の確認", organize.candidates), ("requirements", "要件", organize.requirements), ("refine", "具体化・受入条件", organize.refine), ("decisions", "決定・合意", decide.decisions),
                   ("nfr", "非機能の確認", organize.nfr), ("scope", "範囲・優先順位", organize.scope), ("scenarios", "シナリオ", organize.scenarios), ("issues", "意見調整", decide.issues),
                   ("conflicts", "矛盾", decide.conflicts), ("risks", "リスク", decide.risks)]),
@@ -28,7 +28,7 @@ PAGES = {key: (label, fn) for _, items in GROUPS for key, label, fn in items}
 ADVANCED = {"refine", "nfr", "scope", "scenarios", "issues", "conflicts", "risks", "baseline", "usage"}
 
 # 各画面の次の行動（移動先）
-NEXT = {"overview": ("残件のもとになる要件を確認します", "requirements"), "profile": ("会議の質問を準備します", "prep"), "meetings": ("次の会議の質問を準備します", "prep"), "prep": ("会議の資料を登録します", "sources"),
+NEXT = {"records": ("候補を確認して要件を整理します", "requirements"), "overview": ("残件のもとになる要件を確認します", "requirements"), "profile": ("会議の質問を準備します", "prep"), "meetings": ("次の会議の質問を準備します", "prep"), "prep": ("会議の資料を登録します", "sources"),
         "sources": ("録画と発言を確認します", "recordings"), "recordings": ("資料と発言から候補を整理します", "candidates"), "candidates": ("採用した内容を要件で確認します", "requirements"),
         "requirements": ("曖昧な要件を具体化します", "refine"), "refine": ("非機能を確認します", "nfr"), "nfr": ("今回の範囲を決めます", "scope"),
         "scope": ("通常と例外の流れを確認します", "scenarios"), "scenarios": ("意見の違いを整理します", "issues"), "issues": ("判断を記録します", "decisions"),

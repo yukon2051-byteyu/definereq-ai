@@ -20,12 +20,12 @@ def current_code() -> str:
     return st.session_state.get("ai_code", "")
 
 
-def ai_panel(p: dict, task_key: str, extra: str = "", recordings: bool = False) -> None:
+def ai_panel(p: dict, task_key: str, extra: str = "", recordings: bool = False, expanded: bool = False) -> None:
     task = ai.TASKS[task_key]
     if p.get("is_demo"):
         st.caption("デモではAIを実行できません。準備済みのAI候補を表示しています。")
         return
-    with st.expander(f"AIで候補を作る：{task.label}"):
+    with st.expander(f"AIで候補を作る：{task.label}", expanded=expanded):
         sources = [s for s in p["sources"] if not s.get("superseded_by")]
         chosen = st.multiselect("送信する資料", [s["id"] for s in sources], default=[s["id"] for s in sources],
                                 format_func=lambda i: next(s["name"] for s in sources if s["id"] == i), key=f"ai_src_{task_key}")

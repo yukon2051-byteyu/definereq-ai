@@ -55,13 +55,16 @@ def _advice_html(a: gd.Advice, open_detail: bool) -> str:
 
 def _move(label: str, target: str) -> None:
     """議事録を取り込むボタンは、資料の種類を議事録にして移動する。"""
-    if target == "sources" and "議事録" in label:
-        state.goto_minutes()
     state.goto(target)
 
 
+def _here(a: gd.Advice, page: str) -> bool:
+    """次の操作をこの画面で行えるか。候補の確認は2つの画面でできる。"""
+    return a.page == page or (a.id == "candidates" and page == "candidates")
+
+
 def _go(a: gd.Advice, page: str, key: str) -> None:
-    if a.page == page:
+    if _here(a, page):
         return
     if st.button(a.button, key=key, type="primary"):
         st.session_state["resumed"] = False
@@ -74,7 +77,7 @@ def _actions(main: gd.Advice | None, page: str, hidden: bool) -> None:
     cols = st.columns([3] * (1 + len(alts)) + [2])
     with cols[0]:
         if main:
-            if main.page == page:
+            if _here(main, page):
                 st.caption("この画面で作業できます。")
             _go(main, page, "guide_go")
     for n, (label, target) in enumerate(alts):
@@ -153,8 +156,6 @@ def _stage_question(p: dict) -> None:
     if choice != current:
         gd.guidance_store(p)["user_stage"] = choice
         target = gd.STAGE_PAGES.get(choice)
-        if target == "sources":
-            state.goto_minutes()
         if target:
             state.goto(target)
         st.rerun()
