@@ -36,12 +36,14 @@ ITEM_SCHEMA = {
                 "text": {"type": "string"},
                 "detail": {"type": "string"},
                 "ask": {"type": "string"},
+                "owner": {"type": "string"},
+                "due": {"type": "string"},
                 "evidence": {"type": "array", "items": {
                     "type": "object",
                     "properties": {"source_id": {"type": "string"}, "unit_id": {"type": "string"}, "quote": {"type": "string"}},
                     "required": ["source_id", "unit_id", "quote"], "additionalProperties": False}},
             },
-            "required": ["kind", "text", "detail", "ask", "evidence"], "additionalProperties": False}},
+            "required": ["kind", "text", "detail", "ask", "owner", "due", "evidence"], "additionalProperties": False}},
         "notes": {"type": "string"},
     },
     "required": ["items", "notes"], "additionalProperties": False,
@@ -57,6 +59,8 @@ COMMON_RULES = """あなたは要件定義を支援するアシスタントで�
 - 業種固有の法令や慣行を、その会社の確定ルールとして補完しないでください。
 - 人数だけから機器・帯域・容量を断定しないでください。必要条件・現状の計測値・仮定・実現方式の候補を区別します。
 - 二重化やバックアップがあるだけで条件を満たすと判断しないでください。
+- ask は確認相手の名前か役割だけ、owner は作業の担当者の名前か役割だけを書きます。文章や依頼文を書かないでください。分からなければ空にします。
+- due は資料に書かれた期限だけを書きます。なければ空にします。説明は detail に書きます。
 - 事前情報と会議準備の情報に書かれている事項を、不明や未確認として挙げないでください。書かれていない事項だけを不足情報にします。"""
 
 
@@ -143,6 +147,14 @@ KNOWN_TOPICS = {"人数": r"\d+\s*[名人]", "背景": None, "目的": None, "�
 TOPIC_FIELDS = {"背景": "background", "目的": "purpose", "課題": "problem", "範囲": "scope_in", "予算": "budget", "時期": "timeline"}
 
 
+def person_name(value) -> str | None:
+    """担当や確認相手の欄に入れてよい値か確かめる。説明文は名前として扱わない。"""
+    text = (value or "").strip()
+    if not text or len(text) > 20 or re.search(r"[。？?！!]|ください|確認して|してください|ますか", text):
+        return None
+    return text
+
+
 def _same(a: str, b: str) -> bool:
     x, y = ev.norm(a), ev.norm(b)
     return x == y or SequenceMatcher(None, x, y, autojunk=False).ratio() >= DUPLICATE_RATIO
@@ -180,9 +192,11 @@ def to_candidates(p: dict, run_id: str, items: list[dict], context: str, label: 
         nums = unsupported_numbers(f"{it.get('text', '')} {it.get('detail', '')}", context)
         out.append(pj.add(p, "candidates", {
             "kind": it.get("kind") or "要点", "text": it.get("text", ""), "detail": it.get("detail") or None,
-            "ask": it.get("ask") or None, "evidence": evidence, "state": "候補", "origin_run": run_id, "origin": label,
+            "evidence": evidence, "state": "候補", "origin_run": run_id, "origin": label,
             "unsupported_numbers": nums, "no_evidence": not any(e["verified"] for e in evidence),
             "resolved_as": None, "already_known": known_topic(p, it),
+            "ask": person_name(it.get("ask")), "owner": person_name(it.get("owner")), "due": (it.get("due") or "").strip()[:30] or None,
+            "ask": person_name(it.get("ask")), "owner": person_name(it.get("owner")), "due": (it.get("due") or "").strip()[:30] or None,
         }))
     run = pj.get(p, "ai_runs", run_id)
     if run is not None:

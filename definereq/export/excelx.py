@@ -13,6 +13,7 @@ from openpyxl.worksheet.properties import PageSetupProperties
 
 from .. import project as pj
 from .. import schema
+from . import share
 from ..logic import checks
 from ..project import display
 
@@ -108,6 +109,10 @@ def render(p: dict, include_internal: bool = False) -> bytes:
             for items in bl["categories"].values() for i in items]
     ws = _sheet(wb, "残件", [("分類", 22), ("対象", 10), ("内容", 44), ("行動", 30), ("確認相手", 12), ("期限", 11), ("状態", 8)], rows)
     ws.cell(row=len(rows) + 3, column=1, value=f"分類別の合計 {bl['category_total']} 件／重複を除いた対象 {bl['unique_total']} 件")
+
+    opens = share.open_items(p)["included"]
+    _sheet(wb, "未決事項", [("ID", 10), ("種別", 14), ("内容", 50), ("関連要件", 16), ("確認相手", 14), ("期限", 12), ("状態", 10)],
+           [[i["id"], i["kind"], i["content"], "、".join(i["related"]) or "未設定", display(i.get("ask")), display(i.get("due")), i["state"]] for i in opens])
 
     _sheet(wb, "リスク", [("ID", 9), ("内容", 44), ("性質", 12), ("条件", 24), ("影響", 24), ("不確かさ", 18), ("対策", 28), ("確認相手", 12), ("状態", 10)],
            [[r["id"], r["content"], display(r.get("nature")), display(r.get("condition")), display(r.get("impact")), display(r.get("uncertainty")),

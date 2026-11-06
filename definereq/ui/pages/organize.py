@@ -8,6 +8,7 @@ from ... import project as pj
 from ...logic import checks, continuity
 from ...project import display, field_state
 from ...export import share
+from .. import state
 from ...schema import AGREEMENT_STATES, CANDIDATE_KINDS, DOMAINS, MEASURE_KINDS, MEASURE_ORIGINS, MEASURE_STATUS, PRIORITIES, REQ_KINDS, SCOPE_CHOICES
 from ..ai_panel import ai_panel, ai_runs_list
 from ..candidates import board
@@ -16,10 +17,10 @@ from ..components import STATUS_TONE, add_evidence_form, chip, chips, edit_block
 
 def candidates(p: dict) -> None:
     head("AI候補の確認", "議事録や資料からAIが整理した候補を確認し、内容に合う場所へ反映します。候補のままでは要件や合意になりません。", "要件を整理・判断")
-    if not p.get("is_demo") and not p["candidates"]:
-        flow([("入力", "選択した資料・発言"), ("AI候補", "要点・要望・決定候補など"), ("人の判断", "採用／修正／却下"), ("結果", "根拠付きの要件・論点")])
-    else:
+    if p.get("is_demo"):
         st.caption("準備済みのAI候補と、担当者が採用・却下した結果を確認できます。")
+    elif not p["candidates"]:
+        flow([("入力", "選択した資料・発言"), ("AI候補", "要点・要望・決定候補など"), ("人の判断", "採用／修正／却下"), ("結果", "根拠付きの要件・論点")])
     with edit_block("cand_mtg"):
         meeting = meeting_select(p, "cand_mtg")
     prep_tasks = {r["id"] for r in p["ai_runs"] if r["task"] == "prep"}
@@ -32,6 +33,14 @@ def candidates(p: dict) -> None:
         board(p, None if p.get("is_demo") else other, "cand", meeting)
     ai_panel(p, "extract")
     ai_runs_list(p, "extract")
+
+
+def _shortcuts(*items: tuple[str, str]) -> None:
+    """関連する作業への移動。詳細メニューを開かなくても進める。"""
+    cols = st.columns(len(items))
+    for col, (page, label) in zip(cols, items):
+        if col.button(label, key=f"go_short_{page}", type="tertiary", width="stretch"):
+            state.goto(page)
 
 
 def _req_label(r: dict) -> str:
@@ -61,6 +70,9 @@ def requirements(p: dict) -> None:
     if not r:
         return
     st.html('<div class="dr-chips">' + chip(f"合意状態：{r['status']}", STATUS_TONE.get(r["status"], "plain")) + chip(f"対象範囲：{share.scope_label(r.get('scope'))}", "plain") + chip(f"版：v{r['version']}", "plain") + "</div>")
+    accept = "登録済み" if r.get("acceptance") else "未設定"
+    st.caption(f"合意状態・対象範囲・受入条件は別々の項目です。受入条件：{accept}。合意は「決定・合意」で人が記録します。")
+    _shortcuts(("refine", "受入条件を具体化する"), ("nfr", "非機能を確認する"), ("scope", "範囲を決める"), ("scenarios", "シナリオを確認する"))
     if r.get("merged_into") or r.get("replaced_by") or r.get("split_from"):
         st.caption("系譜：" + " → ".join(pj.lineage(p, r["id"])))
     if p.get("is_demo"):  # 閲覧専用では編集と関係のタブを出さない

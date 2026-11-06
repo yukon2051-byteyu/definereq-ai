@@ -60,7 +60,7 @@ def _field(paragraph, code: str):
 
 
 # 折り返すと読みにくい列の最小幅（cm）。IDや日付が途中で切れないようにする
-MIN_WIDTH = {"ID": 1.8, "要件": 1.8, "対象": 1.8, "判断日": 2.2, "確認ID": 2.7, "版": 0.9, "状態": 1.6, "期限": 2.2}
+MIN_WIDTH = {"ID": 1.8, "要件": 1.8, "対象": 1.8, "判断日": 2.2, "確認ID": 2.7, "版": 0.9, "状態": 1.6, "期限": 2.2, "関連要件": 1.9}
 
 
 def fit_widths(cols: list[str], widths: list[float], total: float) -> list[float]:
@@ -76,9 +76,9 @@ def fit_widths(cols: list[str], widths: list[float], total: float) -> list[float
 
 def _table(doc: Document, table: dict, total_cm: float):
     rows, cols = table.get("rows") or [], table["columns"]
-    if not rows:
+    if not rows:  # 未登録を「該当なし」と見せない
         p = doc.add_paragraph()
-        _font(p.add_run("（該当する項目はありません）"), 9, color=MUTED)
+        _font(p.add_run(table.get("empty") or "まだ登録されていません。"), 9, color=MUTED)
         return
     t = doc.add_table(rows=1, cols=len(cols))
     t.style = "Table Grid"
@@ -125,7 +125,7 @@ def render(p: dict, opt: share.Options, doc_id: str, version: int, issued_at: st
     style.font.name = FONT
     style.element.rPr.rFonts.set(qn("w:eastAsia"), FONT)
     style.font.size = Pt(10)
-    for level, size in ((1, 14), (2, 11.5)):
+    for level, size in ((1, 14), (2, 11.5), (3, 10.5)):
         h = doc.styles[f"Heading {level}"]
         h.font.name, h.font.size, h.font.bold = FONT, Pt(size), True
         h.font.color.rgb = INK
@@ -134,6 +134,7 @@ def render(p: dict, opt: share.Options, doc_id: str, version: int, issued_at: st
     # 見出しが表から離れて改ページされないようにする
     doc.styles["Heading 1"].paragraph_format.keep_with_next = True
     doc.styles["Heading 2"].paragraph_format.keep_with_next = True
+    doc.styles["Heading 3"].paragraph_format.keep_with_next = True
     head = sec.header.paragraphs[0]
     sample = "【サンプル・架空案件】" if p.get("is_demo") or p.get("from_demo") else ""
     _font(head.add_run(clean(f"{sample}{p['name']}　{title}　{doc_id} 第{version}版")), 8, color=MUTED)
@@ -154,7 +155,9 @@ def render(p: dict, opt: share.Options, doc_id: str, version: int, issued_at: st
         note = doc.add_paragraph()
         _font(note.add_run("【サンプル】本資料は架空の案件データから作成したサンプルです。実在の組織・案件とは関係ありません。"), 9, True, ACCENT)
     note = doc.add_paragraph()
-    _font(note.add_run("本資料の送付は合意を意味しません。回答欄へのご記入をお願いします。"), 9, color=MUTED)
+    # 回答欄があるのは確認資料だけ。要件定義書には依頼文を書かない
+    has_answer = opt.doc_type in ("meeting", "change")
+    _font(note.add_run("本資料の送付は合意を意味しません。" + ("回答欄へのご記入をお願いします。" if has_answer else "")), 9, color=MUTED)
 
     for s in share.build(p, opt):
         doc.add_heading(clean(s.heading), level=s.level)

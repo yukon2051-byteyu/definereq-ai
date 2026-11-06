@@ -146,7 +146,11 @@ def _precheck(p: dict, check: dict) -> None:
         if check["missing_profile"]:
             rows += f"<li>{esc('・'.join(check['missing_profile']))}が未設定（案件情報を参照します）</li>"
         st.html(f'<ul class="dr-g-list">{rows}</ul>')
-        st.caption("未採用のAI候補は文書に含まれません。質問・宿題・未回答は、候補の画面から確認事項へ反映すると文書に記載されます。")
+        o = check["open"]
+        st.markdown(f"**未決事項**　登録{o['registered']}件／掲載{len(o['included'])}件／除外{len(o['excluded'])}件" + (f"／同じ内容をまとめた{o['merged']}件" if o["merged"] else ""))
+        for item in o["excluded"]:
+            st.caption(f"除外：{item['id']} {item['content']}（{item['reason']}）")
+        st.caption("未採用のAI候補は文書に含まれません。質問・宿題・未回答は、候補の画面から反映すると「未決事項」に記載されます。")
         with st.expander(f"出力対象の要件と版（{len(check['targets'])}件）"):
             for t in check["targets"]:
                 st.write(t)
@@ -198,7 +202,7 @@ def share_page(p: dict) -> None:
         w = st.session_state.get("word")
         if w:
             st.success(f"{w['title']}を作成しました。下のボタンからダウンロードしてください。")
-            st.download_button(f"{w['title']}をダウンロード（Word）", w["data"], file_name=w["name"], mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", key="dl_word", on_click="ignore", type="primary")
+            st.download_button(f"{w['title']}をダウンロード（Word）", w["data"], file_name=w["name"], mime=artifacts.WORD, key="dl_word", on_click="ignore", type="primary")
             st.caption("PDFが必要な場合は、Wordで開いて「名前を付けて保存」からPDFを選んでください。")
             c1, c2 = st.columns(2)
             if c1.button("未確認事項を確認する", key="go_overview_open", width="stretch"):

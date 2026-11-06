@@ -55,7 +55,10 @@ def corpus(p: dict) -> str:
 
 def suggest_traits(p: dict) -> list[str]:
     """本文に含まれる語から、深掘りする特徴の候補を示す（確定は人）。"""
-    text = corpus(p)
+    # 「給与計算は対象外」のような文の語を、案件の特徴として提案しない
+    sentences = [s for s in re.split(r"[。\n]", corpus(p)) if not re.search(r"対象外|含まない|含めない|行わない|扱わない", s)]
+    scope_out = (p["profile"].get("scope_out") or {}).get("value") or ""
+    text = "\n".join(s for s in sentences if not (scope_out and s.strip() and s.strip() in scope_out))
     return [k for k, t in config.checkpoints()["traits"].items() if any(w in text for w in t["keywords"])]
 
 

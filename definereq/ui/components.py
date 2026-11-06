@@ -184,9 +184,11 @@ def ok_rerun(message: str) -> None:
 
 
 def show_flash() -> None:
+    """操作の結果を画面の上に表示する。部品の位置がずれないよう、入れ物は常に置く。"""
     msg = st.session_state.pop("flash", None)
-    if msg:
-        st.toast(msg)
+    with st.container():
+        if msg:
+            st.success(msg)
 
 
 def guard(func, *args, **kwargs):

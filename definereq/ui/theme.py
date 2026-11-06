@@ -246,7 +246,8 @@ button:focus-visible,a:focus-visible{outline:2px solid #2A5DB0;outline-offset:2p
 /* 作業のメニュー：上位は太字、選んだ作業の機能は字下げする */
 [data-testid="stSidebar"] [class*="st-key-nav_group_"] button p{font-weight:700;font-size:14px}
 [data-testid="stSidebar"] [class*="st-key-nav_sub_"]{padding-left:12px;margin-bottom:4px}
-[data-testid="stSidebar"] [class*="st-key-nav_sub_"] button p{font-size:13px}
+[data-testid="stSidebar"] [class*="st-key-nav_sub_"] button p{font-size:13.5px}
+[data-testid="stSidebar"] [data-testid="stExpander"] details{border-color:#3A3A40}
 /* トップページ専用の余白。見た目の間隔は 区切り30px／説明→内容14px／カード内8px */
 .st-key-home{gap:14px}
 .stMainBlockContainer:has(.st-key-home){padding-bottom:32px}

@@ -90,8 +90,8 @@ def test_meeting_doc_separates_decided_and_proposed():
     p = builder.build("d1", 2)
     secs = {s.heading: s for s in share.build(p, share.Options(doc_type="meeting"))}
     decided = str(secs["決定事項"].table["rows"])
-    proposed = str(secs["提案・確認待ちの事項"].table["rows"])
-    assert "再申請" in decided and "役割ごとの権限" in proposed
+    proposed = str(secs["未合意の要件"].table["rows"])
+    assert "再申請" in decided and "権限を分ける" in proposed
     assert "承認後の申請は変更しない" not in proposed
 
 
@@ -106,7 +106,7 @@ def test_excluded_item_not_in_doc(built):
     rid = p["requirements"][0]["id"]
     title = p["requirements"][0]["title"]
     secs = share.build(p, share.Options(doc_type="meeting", exclude_ids={rid}))
-    assert title not in str([s.table for s in secs if s.heading == "提案・確認待ちの事項"])
+    assert title not in str([s.table for s in secs if s.heading == "未合意の要件"])
 
 
 @pytest.mark.parametrize("domains,want,absent", [(["app"], "業務アプリ：画面・帳票", "ネットワーク：分離"), (["network"], "ネットワーク：分離", "業務アプリ：画面・帳票"),

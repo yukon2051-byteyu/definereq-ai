@@ -24,6 +24,8 @@ GROUPS = [
                  ("baseline", "基準版・再確認", decide.baseline), ("usage", "AI・費用", trace.usage)]),
 ]
 PAGES = {key: (label, fn) for _, items in GROUPS for key, label, fn in items}
+# 使う頻度の低い機能は「詳細メニュー」にまとめる。関連する作業の画面からも移動できる
+ADVANCED = {"refine", "nfr", "scope", "scenarios", "issues", "conflicts", "risks", "baseline", "usage"}
 
 # 各画面の次の行動（移動先）
 NEXT = {"overview": ("残件のもとになる要件を確認します", "requirements"), "profile": ("会議の質問を準備します", "prep"), "meetings": ("次の会議の質問を準備します", "prep"), "prep": ("会議の資料を登録します", "sources"),
@@ -63,7 +65,13 @@ def sidebar(p: dict) -> None:
             if active:  # 選んだ作業の機能だけを表示する
                 with st.container(key=f"nav_sub_{n}"):
                     for key, label, _ in items:
-                        nav(key, label)
+                        if key not in ADVANCED:
+                            nav(key, label)
+                    more = [x for x in items if x[0] in ADVANCED]
+                    if more:
+                        with st.expander("詳細メニュー", expanded=current in ADVANCED):
+                            for key, label, _ in more:
+                                nav(key, label)
         if p.get("demo"):
             st.divider()
             if st.button("機能対応表", key="nav_map", width="stretch"):
@@ -94,7 +102,7 @@ def stage_control(p: dict) -> None:
 
 def scroll_top_on_change(p: dict, key: str) -> None:
     """画面や段階が変わったら先頭へ戻す（案内パネルが画面外に隠れないように）。"""
-    marker = f"{p['id']}:{key}:{(p.get('demo') or {}).get('stage')}:{st.session_state.get('tour_on')}:{st.session_state.get('tour_index')}"
+    marker = f"{p['id']}:{key}:{(p.get('demo') or {}).get('stage')}:{st.session_state.get('tour_on')}:{st.session_state.get('tour_index')}:{st.session_state.get('scroll_nonce', 0)}"
     # st.html のスクリプトは初回しか実行されないため、埋め込み枠から親の画面を操作する
     script = ("const d=window.parent.document;const t=()=>{d.querySelector('[data-testid=stMain]')?.scrollTo(0,0);window.parent.scrollTo(0,0)};"
               "t();setTimeout(t,150);setTimeout(t,500);"

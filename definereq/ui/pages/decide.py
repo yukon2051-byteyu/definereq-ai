@@ -13,6 +13,7 @@ from ...logic import evidence as ev
 from ...project import display
 from ...schema import (AGREEMENT_STATES, OPINION_NATURE, CHANGE_CLASSES, CHANGE_STATES, CONFLICT_KINDS, CONFLICT_STATES, IMPACT_AREAS, IMPACT_BASIS,
                        ISSUE_STATES, RISK_NATURE, RISK_STATES)
+from .. import state
 from ..ai_panel import ai_panel, ai_runs_list
 from ..components import add_evidence_form, chip, chips, edit_block, esc, evidence_block, guard, head, meeting_select, ok_rerun, people, select_item, touch
 
@@ -89,6 +90,10 @@ def decisions(p: dict) -> None:
             ag.new_decision(p, topic.strip(), opts, related_requirements=reqs)
             touch(p)
             ok_rerun("追加しました")
+    c1, c2, c3 = st.columns(3)
+    for col, (target, label) in zip((c1, c2, c3), (("issues", "意見の違いを整理する"), ("conflicts", "矛盾の候補を確認する"), ("risks", "リスクを確認する"))):
+        if col.button(label, key=f"go_short_{target}", type="tertiary", width="stretch"):
+            state.goto(target)
     d = select_item(p["decisions"], lambda x: f"{x['id']} {x['topic']}", "dc_sel", "判断はまだありません。")
     if not d:
         return
@@ -138,7 +143,7 @@ def decisions(p: dict) -> None:
         decider = c1.selectbox("判断者", names, index=names.index(d["decider"]) if d.get("decider") in names else 0, key=f"{k}_dec_{len(names)}")
         confirmer = c2.selectbox("確認者", names, index=names.index(d["confirmer"]) if d.get("confirmer") in names else 0, key=f"{k}_con_{len(names)}")
         date = c3.text_input("判断日（YYYY-MM-DD）", d.get("decided_on") or "", key=f"{k}_date")
-        state = st.selectbox("状態", AGREEMENT_STATES, index=AGREEMENT_STATES.index(d["state"]), key=f"{k}_st")
+        new_state = st.selectbox("状態", AGREEMENT_STATES, index=AGREEMENT_STATES.index(d["state"]), key=f"{k}_st")
         meeting = meeting_select(p, f"{k}_mtg", d.get("meeting_id"))
         if st.form_submit_button("記録する", type="primary"):
             d["meeting_id"] = meeting
@@ -147,9 +152,10 @@ def decisions(p: dict) -> None:
             d.update(adopted=adopted, rationale=reason or None, rejected_reasons={a: b for a, b in rej.items() if b}, hold_reason=hold or None,
                      decider=decider or None, confirmer=confirmer or None, decided_on=date or None, related_requirements=related)
             touch(p)
-            if state != d["state"]:
-                if guard(ag.set_state, p, d["id"], state, "human"):
-                    ok_rerun("判断を合意済みとして記録しました。画面上部の確認欄から、要件へ反映できます" if state == "合意済み" else "記録しました")
+            if new_state != d["state"]:
+                if guard(ag.set_state, p, d["id"], new_state, "human"):
+                    st.session_state["scroll_nonce"] = st.session_state.get("scroll_nonce", 0) + 1  # 反映の確認欄が見えるように先頭へ戻す
+                    ok_rerun("判断を合意済みとして記録しました。すぐ下の確認欄から、要件へ反映できます" if new_state == "合意済み" else "記録しました")
             else:
                 ok_rerun("記録しました")
 

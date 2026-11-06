@@ -51,6 +51,10 @@ class Advice:
     rank: int           # 既定の順位（小さいほど先）
     pages: set = field(default_factory=set)  # 関連する画面
     items: list = field(default_factory=list)  # 該当する項目
+    short: str = ""  # 説明を閉じても残す短い文
+    alt: list = field(default_factory=list)  # 副操作（ボタン名, 画面）
+    short: str = ""  # 説明を閉じても残す短い文
+    alt: list = field(default_factory=list)  # 副操作（ボタン名, 画面）
 
 
 def _titles(items: list, limit: int = 3) -> list[str]:
@@ -88,14 +92,23 @@ def _start(p: dict) -> list[Advice]:
                    "案件情報が未入力で、資料も登録されていないため。", "profile", "案件情報を入力する", 10, {"overview", "profile", "sources"})]
 
 
+def unanalyzed_minutes(p: dict) -> list[str]:
+    """AIでまだ整理していない議事録と録画の名前。"""
+    runs = [(r.get("selection") or {}) for r in p["ai_runs"] if r["task"] == "extract"]
+    done_src = {s for r in runs for s in (r.get("source_ids") or [])}
+    done_rec = {s for r in runs for s in (r.get("recording_ids") or [])}
+    everything = any(r.get("source_ids") is None for r in runs)
+    minutes = [s["name"] for s in p["sources"] if s.get("kind") == "議事録" and not s.get("superseded_by") and s["id"] not in done_src and not everything]
+    return minutes + [r["name"] for r in p["recordings"] if r["id"] not in done_rec and not everything]
+
+
 def _after_profile(p: dict) -> list[Advice]:
     """背景だけが登録された状態。会議前の人にも、記録を持っている人にも進み先を示す。"""
     if phase(p) != "unprocessed" or p["sources"] or p["recordings"] or p["questions"]:
         return []
     return [Advice("next_input", "案件の情報を登録しました", "背景や困りごとが登録されています。資料や議事録はまだありません。",
-                   "これから会議をする場合は質問を準備し、議事録や資料がある場合は取り込んでください。", "案件情報があり、質問・資料・録画が0件のため。", "prep", "会議の質問を準備する", 12, {"overview", "profile", "prep"}),
-            Advice("next_records", "議事録や資料がある場合", "議事録や資料があれば、AIで要望や未決事項を整理できます。", "議事録や資料を取り込んでください。",
-                   "資料と録画が0件のため。", "sources", "資料・議事録を取り込む", 13, {"overview", "sources"})]
+                   "これから会議をする場合は質問を準備し、議事録や資料がある場合は取り込んでください。", "案件情報があり、質問・資料・録画が0件のため。", "prep", "会議を準備する", 12, {"overview", "profile", "prep"},
+                   short="背景・目的を登録しました。次は会議の準備、または議事録の取込みへ進めます。", alt=[("議事録を取り込む", "sources")])]
 
 
 def _sources(p: dict) -> list[Advice]:
@@ -111,9 +124,10 @@ def _sources(p: dict) -> list[Advice]:
         out.append(Advice("source_figure", "図の内容を読み取れていない資料があります", f"{len(unread)}件の資料に、内容を理解できていない図があります。",
                           "図の意味を人が補足してください。補足がない図は根拠に使われません。", "資料に図の未理解の警告があり、人の補足が未入力のため。", "sources", "資料を確認する", 45,
                           {"sources"}, _titles([s["name"] for s in unread])))
-    if active and not p["questions"]:
+    if active and not p["questions"] and not has_meeting_record(p):  # 議事録があれば会議前とは限らない
         out.append(Advice("sources_added", "資料の登録後", f"資料{len(active)}件を登録しましたが、質問はまだ登録されていません。",
-                          "確認観点と質問候補を見て、会議で聞く項目を選んでください。", "資料があり、質問が0件のため。", "prep", "質問候補を確認する", 20, {"sources", "prep", "overview"}))
+                          "確認観点と質問候補を見て、会議で聞く項目を選んでください。", "資料があり、会議の記録と質問が0件のため。", "prep", "質問候補を確認する", 20, {"sources", "prep", "overview"},
+                          alt=[("議事録を取り込む", "sources")]))
     return out
 
 
@@ -144,11 +158,12 @@ def _meeting_records(p: dict) -> list[Advice]:
     if user_stage(p) == "after_first" and not has_meeting_record(p):
         out.append(Advice("meeting_missing", "会議の記録が未登録", "会議は実施済みと指定されていますが、議事録や録画が登録されていません。",
                           "議事録を資料として登録するか、録画・字幕を登録してください。", "「初回会議の後」と指定され、会議の記録が0件のため。", "recordings", "会議の記録を登録する", 22, {"recordings", "sources", "meetings"}))
-    extracted = any(r["task"] == "extract" for r in p["ai_runs"]) or p["requirements"] or p["candidates"]
-    minutes = [s for s in p["sources"] if s.get("kind") == "議事録"]
-    if (minutes or p["recordings"]) and not extracted:
-        out.append(Advice("extract", "議事録・録画の解析後", "会議の記録がありますが、要望や決定の候補はまだ整理されていません。",
-                          "会議後の整理で、要望・決定・未決事項を候補として抽出してください。", "会議の記録があり、候補と要件が0件のため。", "candidates", "会議後の整理へ進む", 28, {"candidates", "recordings"}))
+    waiting = unanalyzed_minutes(p)
+    if waiting:
+        # 要件を手作業で登録している場合は、解析を強く勧めない
+        out.append(Advice("extract", "議事録を登録しました", f"AIで整理していない会議の記録が{len(waiting)}件あります。", "AIで要望・決定・未決事項を候補として整理してください。",
+                          "会議の記録があり、AIの整理が済んでいないため。", "candidates", "議事録をAIで整理する", 60 if p["requirements"] else 16, {"candidates", "recordings", "sources"}, _titles(waiting),
+                          short="議事録を登録しました。次はAIで要望や未決事項を整理します。", alt=[("次回の質問を準備する", "prep")]))
     return out
 
 
@@ -230,13 +245,27 @@ def _backlog(p: dict) -> list[Advice]:
     out = []
     missing = bl["categories"]["判断者・期限未設定"]
     if missing:
-        out.append(Advice("owner_missing", "判断者・期限が未設定の要件", f"判断者または期限が未設定の要件が{len(missing)}件あります。AIや案内が自動で設定することはありません。", "判断者と期限を人が決めて入力してください。",
+        out.append(Advice("owner_missing", "判断者・期限が未設定の要件", f"判断者または期限が未設定の要件が{len(missing)}件あります。AIやプログラムが自動で設定することはありません。", "判断者と期限を人が決めて入力してください。",
                           "判断者または期限が空欄の要件があるため。", "requirements", "要件を確認する", 50, {"requirements"}, _titles([i["content"] for i in missing])))
     accept = bl["categories"]["受入条件未設定"]
     if accept:
         out.append(Advice("acceptance_missing", "受入条件が未設定の要件", f"受入条件が未設定の要件が{len(accept)}件あります。", "どの状態なら満たすと言えるかを具体化してください。",
                           "受入条件が空欄の要件があるため。", "refine", "受入条件を具体化する", 55, {"refine", "requirements"}, _titles([i["content"] for i in accept])))
     return out
+
+
+def _organize(p: dict) -> list[Advice]:
+    """要件を採用した後の進み先。判断の記録と受入条件の具体化へつなぐ。"""
+    if any(c["state"] in ("候補", "要再確認") for c in p["candidates"]):
+        return []
+    active = [r for r in p["requirements"] if r["status"] not in ("廃止", "却下", "合意済み")]
+    linked = {x for d in p["decisions"] for x in d.get("related_requirements", [])}
+    waiting = [r for r in active if r["id"] not in linked]
+    if not waiting:
+        return []
+    return [Advice("decide_next", "要件を登録しました", f"判断の記録がない要件が{len(waiting)}件あります。", "内容を具体化し、関係者の判断を記録してください。",
+                   "未合意の要件に、関連する判断がないため。", "decisions", "判断を記録する", 37, {"decisions", "requirements", "refine"}, _titles([r["title"] for r in waiting]),
+                   short=f"未合意の要件が{len(waiting)}件あります。次は具体化と判断の記録へ進めます。", alt=[("受入条件を具体化する", "refine")])]
 
 
 def _classify(p: dict) -> list[Advice]:
@@ -260,7 +289,7 @@ def _profile(p: dict) -> list[Advice]:
 def _before_export(p: dict) -> list[Advice]:
     bl = checks.backlog(p)
     pending = sum(1 for r in p["requirements"] if r["status"] not in ("合意済み", "廃止", "却下"))
-    return [Advice("export", "資料を出力する前の確認", f"合意済みでない要件が{pending}件、残件の対象が{bl['unique_total']}件あります。これらは資料に確認待ちや未決事項として記載されます。",
+    return [Advice("export", "資料の作成", f"合意済みでない要件が{pending}件、残件の対象が{bl['unique_total']}件あります。これらは資料に未合意や未決事項として記載されます。",
                    "掲載する範囲と内部メモの有無を確認してください。出力は資料を作る操作で、案件の完成や内容の正しさを保証するものではありません。",
                    "共有資料の画面を開いているため。", "share", "共有資料を確認する", 5, {"share"})]
 
@@ -273,19 +302,26 @@ def _resume(p: dict) -> Advice:
                   "残件を確認し、次に進める作業を選んでください。", "保存したJSONを読み込んだ直後のため。", "overview", "残件を確認する", 0, {"overview"})
 
 
-RULES = (_start, _after_profile, _sources, _prep, _meeting_records, _candidates, _conflicts, _changes, _decisions, _classify, _profile, _backlog)
+RULES = (_start, _after_profile, _sources, _prep, _meeting_records, _candidates, _conflicts, _changes, _decisions, _organize, _classify, _profile, _backlog)
+
+# 利用者が選んだ作業の段階。案件の状態より優先する（AIは変更しない）
+STAGE_LABELS = {None: "案件の状態から判定する", "before_first": "これから会議をする", "after_first": "会議が終わり、記録を整理する", "deciding": "要件を具体化・判断する", "output": "資料を作成する"}
+STAGE_FOCUS = {"before_first": {"prep", "prep_candidates", "sources_added", "next_input"}, "after_first": {"meeting_missing", "extract", "recording_check", "candidates"},
+               "deciding": {"after_decision", "decide_next", "decision_wait", "conflicts", "change_new", "change_wait", "unclassified", "acceptance_missing"}, "output": {"export"}}
 
 
 def collect(p: dict, page: str | None = None) -> list[Advice]:
     found = [a for rule in RULES for a in rule(p)]
-    if page == "share":
+    if page == "share" or user_stage(p) == "output":
         found += _before_export(p)
     return found
 
 
 def assess(p: dict, page: str | None = None, resumed: bool = False) -> dict:
-    """主な案件案内を選ぶ。今の画面に関連する案内を先にする。"""
-    found = sorted(collect(p, page), key=lambda a: (0 if page in a.pages else 1, a.rank))
+    """次にすることを1つ選ぶ。判定は案件の状態で共通にし、開いている画面で結論を変えない。
+    資料の画面だけは、作成前の確認を先に出す。"""
+    focus = STAGE_FOCUS.get(user_stage(p), set())
+    found = sorted(collect(p, page), key=lambda a: (0 if a.id in focus else 1, a.rank))
     if resumed:
         found.insert(0, _resume(p))
     main = found[0] if found else None

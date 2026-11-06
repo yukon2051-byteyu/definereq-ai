@@ -60,7 +60,7 @@ def clean_guidance(p: dict) -> None:
                 and all(isinstance(i, dict) and isinstance(i.get("text"), str) for i in n["items"]):
             keep.append(n)
     g["notes"] = keep
-    if g.get("user_stage") not in (None, "before_first", "after_first"):
+    if g.get("user_stage") not in (None, "before_first", "after_first", "deciding", "output"):
         g["user_stage"] = None
 
 

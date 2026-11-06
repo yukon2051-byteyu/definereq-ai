@@ -126,6 +126,7 @@ def profile(p: dict) -> None:
             ok_rerun("保存しました")
 
     st.subheader("案件の情報")
+    st.caption("分かる範囲だけで構いません。不明な項目は空欄のまま進めます。ここの内容は下のボタンでまとめて案件に反映します。関係者と用語は1件ずつ追加します。")
     if p.get("is_demo"):
         definition([(label, p["profile"][key]["value"]) for key, label in PROFILE_FIELDS.items()])
     with edit_block("profile"), st.form("profile"):
@@ -136,12 +137,19 @@ def profile(p: dict) -> None:
             value = c1.text_area(label, value=cur["value"] or "", height=68, key=f"pf_{key}")
             cert = c2.selectbox("確かさ", CERTAINTY, index=CERTAINTY.index(cur["certainty"]), key=f"pfc_{key}")
             new[key] = {"value": value.strip() or None, "certainty": cert}
-        if st.form_submit_button("案件内に反映", type="primary"):
+        st.markdown("**入力が終わったら**（下のどのボタンでも、入力内容を案件に反映します）")
+        b1, b2, b3 = st.columns(3)
+        save = b1.form_submit_button("案件内に反映", type="primary", width="stretch")
+        to_prep = b2.form_submit_button("反映して会議を準備する", width="stretch")
+        to_records = b3.form_submit_button("反映して議事録を取り込む", width="stretch")
+        if save or to_prep or to_records:
             for key, value in new.items():  # 出所の記録は残す
                 value["origin"] = p["profile"][key].get("origin")
             p["profile"].update(new)
             touch(p)
-            ok_rerun("保存しました")
+            if to_prep or to_records:
+                st.session_state["page"] = "prep" if to_prep else "sources"
+            ok_rerun("案件情報を反映しました")
 
     st.subheader("関係者")
     df = pd.DataFrame([{"ID": s["id"], "氏名・役割": s["name"], "所属": s["org"], "立場": s["position"], "判断・確認できる範囲": s["authority"],
@@ -166,6 +174,25 @@ def profile(p: dict) -> None:
             pj.add(p, "glossary", {"term": term.strip(), "meaning": meaning})
             touch(p)
             ok_rerun("追加しました")
+    _next_block()
+
+
+def _next_block() -> None:
+    """ページの末尾の進み先。上のフォームの未反映の入力は、フォーム内のボタンで反映できる。"""
+    with edit_block("next"):
+        st.subheader("入力が終わったら")
+        st.caption("案件情報の入力中は、上のフォーム内のボタンを使うと入力内容を反映して移動できます。")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**これから会議をする**")
+            st.caption("質問や議題を準備します。")
+            if st.button("会議を準備する", key="pf_next_prep", width="stretch"):
+                state.goto("prep")
+        with c2:
+            st.markdown("**すでに議事録・資料がある**")
+            st.caption("記録を取り込み、AIで整理します。")
+            if st.button("記録を取り込む", key="pf_next_rec", width="stretch"):
+                state.goto("sources")
 
 
 def prep(p: dict) -> None:
@@ -198,15 +225,16 @@ def prep(p: dict) -> None:
         if qs:
             order = {"高": 0, "中": 1, "低": 2, None: 3}
             st.caption("優先順位の「高→中→低」の順に表示します。回答は会議後に記録します。")
-            df = pd.DataFrame([{"ID": q["id"], "質問": q["text"], "優先": q.get("priority"), "優先する理由": q.get("why"), "確認相手": q.get("ask"),
+            df = pd.DataFrame([{"ID": q["id"], "種別": q.get("category") or "質問", "質問": q["text"], "優先": q.get("priority"), "優先する理由": q.get("why"), "確認相手": q.get("ask"), "関連要件": "、".join(q.get("related_requirements") or []),
                                 "状態": q["status"], "回答": q.get("answer") or ""} for q in sorted(qs, key=lambda x: order.get(x.get("priority"), 3))])
-            edited = st.data_editor(df, hide_index=True, width="stretch", disabled=["ID"],
+            edited = st.data_editor(df, hide_index=True, width="stretch", disabled=["ID", "種別"],
                                     column_config={"状態": st.column_config.SelectboxColumn(options=QUESTION_STATES, required=True),
                                                    "優先": st.column_config.SelectboxColumn(options=["高", "中", "低"])}, key="q_ed")
             if st.button("質問の変更を保存"):
                 for row in edited.to_dict("records"):
                     q = pj.get(p, "questions", row["ID"])
-                    q.update(text=row["質問"], priority=row["優先"], why=row["優先する理由"], ask=row["確認相手"], status=row["状態"], answer=row["回答"] or None)
+                    q.update(text=row["質問"], priority=row["優先"], why=row["優先する理由"], ask=row["確認相手"], status=row["状態"], answer=row["回答"] or None,
+                             related_requirements=[x.strip() for x in str(row["関連要件"] or "").replace(",", "、").split("、") if pj.get(p, "requirements", x.strip())])
                 touch(p)
                 ok_rerun("保存しました")
         with edit_block("addq"):

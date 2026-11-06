@@ -25,14 +25,14 @@ CARDS = [("spec", "合意した要件と、保留・未確認の項目を整理�
 def preview(sections: list[share.Section]) -> None:
     """資料の内容を画面に表示する。Wordと同じ組み立て結果を使う。"""
     for s in sections:
-        st.markdown(("#### " if s.level == 1 else "##### ") + s.heading)
+        st.markdown({1: "#### ", 2: "##### "}.get(s.level, "###### ") + s.heading)
         for t in s.paragraphs:
             st.write(t)
         if s.table is not None:
             if s.table["rows"]:
                 st.dataframe(pd.DataFrame(s.table["rows"], columns=s.table["columns"]), hide_index=True, width="stretch")
             else:
-                st.caption("（該当する項目はありません）")
+                st.caption(s.table.get("empty") or "まだ登録されていません。")
 
 
 def word_for(p: dict, doc: dict) -> dict:

@@ -20,9 +20,6 @@ from . import state
 from .ai_panel import current_code
 from .components import chip, esc, ok_rerun, touch
 
-STAGE_CHOICES = {None: "まだ分からない", "before_first": "はい、初回会議の前です", "after_first": "いいえ、会議は実施済みです"}
-
-
 def frame(tag: str, rows: list[tuple[str, str]], lead: str = "", kind: str = "demo") -> str:
     """案内の枠のHTML。文字は全てエスケープする。"""
     body = "".join(f'<div class="dr-sit-row"><b>{esc(k)}</b><span>{esc(v)}</span></div>' for k, v in rows)
@@ -46,8 +43,14 @@ def demo_banner(name: str, intro: dict, step: dict, first: bool, when: str | Non
         st.caption(NOTE)
 
 
-def _advice_html(a: gd.Advice) -> str:
-    return frame(f"現在：{a.title}", [("現在の状況", a.situation), ("今、確認するとよいこと", a.todo), ("案内の理由", a.reason)], kind="work")
+def _short(a: gd.Advice) -> str:
+    return a.short or f"{a.title}。{a.todo}"
+
+
+def _advice_html(a: gd.Advice, open_detail: bool) -> str:
+    """閉じても残すのは短い文。詳しい説明と、おすすめする理由だけを開閉する。"""
+    rows = [("現在の状況", a.situation), ("今、確認するとよいこと", a.todo), ("この操作をおすすめする理由", a.reason)] if open_detail else []
+    return frame(f"現在の状況と次にすること｜{a.title}", rows, _short(a), kind="work")
 
 
 def _go(a: gd.Advice, page: str, key: str) -> None:
@@ -56,6 +59,28 @@ def _go(a: gd.Advice, page: str, key: str) -> None:
     if st.button(a.button, key=key, type="primary"):
         st.session_state["resumed"] = False
         state.goto(a.page)
+
+
+def _actions(main: gd.Advice | None, page: str, hidden: bool) -> None:
+    """次の操作は、説明を閉じても常に表示する。"""
+    alts = [x for x in (main.alt if main else []) if x[1] != page]
+    cols = st.columns([3] * (1 + len(alts)) + [2])
+    with cols[0]:
+        if main:
+            if main.page == page:
+                st.caption("この画面で作業できます。")
+            _go(main, page, "guide_go")
+    for n, (label, target) in enumerate(alts):
+        if cols[n + 1].button(label, key=f"guide_alt_{n}"):
+            st.session_state["resumed"] = False
+            state.goto(target)
+    if hidden:
+        if cols[-1].button("詳しい説明を表示", key="guide_show", type="tertiary", width="stretch"):
+            st.session_state["guidance_hidden"] = False
+            st.rerun()
+    elif cols[-1].button("詳しい説明を閉じる", key="guide_hide", type="tertiary", width="stretch"):
+        st.session_state["guidance_hidden"] = True
+        st.rerun()
 
 
 def _note_items(note: dict) -> None:
@@ -73,11 +98,11 @@ def _ai_block(p: dict, a: gd.Advice) -> None:
     fp = gd.state_fingerprint(p)
     note = ai_guidance.current_note(p, fp, a.id)
     if note:
-        st.caption(f"AIの提案（{note['generated_at'][:16].replace('T', ' ')} 作成）。人が判断してください。上の案内は登録データに基づく状態の説明です。")
+        st.caption(f"AIの提案（{note['generated_at'][:16].replace('T', ' ')} 作成）。人が判断してください。上の説明は登録データに基づく状態の説明です。")
         _note_items(note)
     old = ai_guidance.stale_notes(p, fp)
     if old:
-        with st.expander("以前のAI補足（案件の状態が変わったため、現在の案内ではありません）"):
+        with st.expander("以前のAI補足（案件の状態が変わったため、現在の内容ではありません）"):
             st.caption(f"作成：{old[-1]['generated_at'][:16].replace('T', ' ')}／対象：{old[-1].get('advice_title') or '記録なし'}")
             _note_items(old[-1])
     if note:
@@ -86,7 +111,7 @@ def _ai_block(p: dict, a: gd.Advice) -> None:
         code = current_code()
         rd = gate.readiness(code if code else None)
         if not rd.ai:
-            st.caption("今はAIを使えません。この案内は登録データからプログラムが判定しているため、そのまま作業を続けられます。")
+            st.caption("今はAIを使えません。この説明は登録データからプログラムが判定しているため、そのまま作業を続けられます。")
             for reason in rd.reasons:
                 st.caption(reason)
             return
@@ -97,7 +122,7 @@ def _ai_block(p: dict, a: gd.Advice) -> None:
         if st.button("AIで補足を作成", key="guide_ai", disabled=busy):
             st.session_state["guide_ai_busy"] = True
             try:
-                with st.spinner("AIが案内の補足を作成しています。"):
+                with st.spinner("AIが補足を作成しています。"):
                     ai_guidance.run(p, a, code, rd.ledger)
             except (AIError, BudgetExceeded, LedgerUnavailable) as e:
                 st.warning(f"AIの補足を作成できませんでした。{e} 通常の操作はそのまま続けられます。")
@@ -112,59 +137,41 @@ def _ai_block(p: dict, a: gd.Advice) -> None:
 
 
 def _stage_question(p: dict) -> None:
-    """記録から段階を判断できないときだけ確かめる。指定は利用者の判断として保持する。"""
+    """作業の段階は利用者が選び直せる。選んだ段階はAIが変更しない。"""
     current = gd.user_stage(p)
-    keys = list(STAGE_CHOICES)
-    choice = st.radio("初回会議の前ですか？（会議の記録がないため確認しています）", keys, index=keys.index(current), format_func=STAGE_CHOICES.get, horizontal=True, key="guide_stage")
+    keys = list(gd.STAGE_LABELS)
+    with st.expander("作業の段階を選び直す"):
+        choice = st.radio("今の作業", keys, index=keys.index(current) if current in keys else 0, format_func=gd.STAGE_LABELS.get, key="guide_stage")
     if choice != current:
         gd.guidance_store(p)["user_stage"] = choice
         st.rerun()
 
 
-def _seen_before(page: str, main: gd.Advice | None) -> bool:
-    """案内を見るのが2回目以降か。同じ画面の再描画は数えない。再開した案件は続きの利用なので最初から対象にする。"""
-    seen = st.session_state.setdefault("guidance_seen", [])
-    view = f"{page}:{main.id if main else ''}"
-    if view not in seen:
-        seen.append(view)
-    return len(seen) >= 2 or st.session_state.get("guidance_returning", False)
-
-
 def project_panel(p: dict, page: str) -> None:
-    """実案件の状況案内。主な案内は1件で、折りたたんでも作業を続けられる。"""
-    if st.session_state.get("guidance_hidden"):
-        if st.button("状況案内を表示", key="guide_show", type="tertiary"):
-            st.session_state["guidance_hidden"] = False
-            st.rerun()
-        return
+    """現在の状況と次にすること。主な内容は1件。説明を閉じても、状況の短い文と次の操作は残す。
+
+    閉じた状態は案件を開いている間、別の画面でも続く。別の案件を開くと元に戻る。
+    """
+    hidden = st.session_state.get("guidance_hidden", False)
     result = gd.assess(p, page, st.session_state.get("resumed", False))
     main = result["main"]
     if main is None:
-        st.html(frame("現在：確認が必要な項目は検出されていません", [("補足", "登録された内容からの判定です。登録されていない論点は検出できません。案件の完成や正しさを示すものではありません。")], kind="work"))
+        st.html(frame("現在の状況と次にすること", [], "確認した範囲では、対応が必要な項目は検出されていません。登録されていない論点は検出できません。", kind="work"))
     else:
-        st.html(_advice_html(main))
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        if main:
-            _go(main, page, "guide_go")
-    # 最初の案内は読んでもらうため、折りたたみは2回目の案内（別の内容か別の画面）から出す
-    if _seen_before(page, main) and c2.button("案内を折りたたむ", key="guide_hide", type="tertiary", width="stretch"):
-        if main and main.id == "resume":
-            st.session_state["resumed"] = False
-        else:
-            st.session_state["guidance_hidden"] = True
-        st.rerun()
-    if result["stage_question"]:
-        _stage_question(p)
+        st.html(_advice_html(main, not hidden))
+    _actions(main, page, hidden)
+    if hidden:
+        return
+    _stage_question(p)
     if main and main.items:
         st.caption("該当する項目：" + "／".join(main.items))
     others = result["extra"] + result["rest"]
     if others:
-        with st.expander(f"ほかの案内（{len(others)}件）"):
+        with st.expander(f"ほかに確認すること（{len(others)}件）"):
             for n, a in enumerate(others):
                 st.markdown(f"**{a.title}**")
                 st.write(a.situation)
-                st.caption(f"案内の理由：{a.reason}")
+                st.caption(f"この操作をおすすめする理由：{a.reason}")
                 _go(a, page, f"guide_go_{n}")
     if main:
         _ai_block(p, main)

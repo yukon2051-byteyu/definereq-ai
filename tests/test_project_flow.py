@@ -72,7 +72,7 @@ def test_no_issue_is_not_shown_as_complete_when_nothing_analyzed(p):
 def test_profile_only_gets_two_entry_points(p):
     p["profile"]["problem"].update(value="月末集計に時間がかかる")
     r = gd.assess(p, "overview")
-    assert r["main"].id == "next_input" and r["extra"][0].id == "next_records"
+    assert r["main"].id == "next_input" and r["main"].alt == [("議事録を取り込む", "sources")]
 
 
 # ---- AI入力 ----
@@ -301,7 +301,7 @@ def test_spec_separates_agreed_and_excludes_pending_candidates(p):
     run(p, "extract", [cand("要望", "勤務形態の管理を入れたい")])
     secs = share.build(p, share.Options(doc_type="spec"))
     text = str([s.__dict__ for s in secs])
-    assert "決定（合意済み）" in text and "提案" in text and "勤務形態の管理" not in text and "REQ-001 v1" in text
+    assert "合意済み" in text and "下書き" in text and "勤務形態の管理" not in text and "（v1）" in text
     assert "分類未設定の要件" not in [s.heading for s in secs]
     assert "Excelの勤怠集計を見直す" in text
 
@@ -345,6 +345,186 @@ def test_word_opens_with_japanese(p):
     data = wordx.render(p, share.Options(doc_type="spec"), "DOC-001", 1, pj.now_iso())
     d = Document(io.BytesIO(data))
     assert "勤怠システムの更新" in "\n".join(x.text for x in d.paragraphs) and d.tables
+
+
+# ---- 研修案件の指摘の再発防止 ----
+def training():
+    p = pj.new_project("社内研修の申込・受講管理（架空テスト）", ["app"])
+    p["profile"]["scope_out"].update(value="給与計算、経費精算の承認は対象外")
+    p["profile"]["problem"].update(value="メールで申込み、Excelで定員を管理している")
+    return p
+
+
+def test_registered_open_items_reach_word_and_excel():
+    p = training()
+    cs = run(p, "extract", [cand("未回答", "繰上げ回答期限24時間の起算点・休日扱い"), cand("不足情報", "認証方式、保存期間、性能条件、予算、開始日は未確認"),
+                            cand("次の行動", "講師・事務局の権限範囲を確認する"), cand("要望", "CSVを出力する")])
+    for c in cs[:3]:
+        intake.apply(p, c["id"])
+    intake.adopt_requirement(p, cs[3]["id"], {"kind": "連携", "open_items": "CSV項目は未確認"})
+    data = wordx.render(p, share.Options(doc_type="spec"), "DOC-001", 1, pj.now_iso())
+    d = Document(io.BytesIO(data))
+    text = "\n".join(c.text for t in d.tables for row in t.rows for c in row.cells)
+    for w in ("起算点", "認証方式", "権限範囲", "CSV項目は未確認"):
+        assert w in text, w
+    o = share.open_items(p)
+    assert o["registered"] == 4 and len(o["included"]) == 4 and not o["excluded"]
+    assert share.precheck(p)["open"]["registered"] == 4
+
+
+def test_open_item_has_required_columns_and_keeps_unset():
+    p = training()
+    r = pj.add(p, "requirements", pj.new_requirement(title="T", body="B", open_items="CSV項目は未確認"))
+    row = next(s for s in share.build(p, share.Options(doc_type="spec")) if s.heading == "未決事項").table
+    assert row["columns"] == ["ID", "種別", "内容", "関連要件", "確認相手", "期限", "状態"]
+    assert row["rows"][0] == [r["id"], "要件の未確認事項", "CSV項目は未確認", r["id"], "未設定", "未設定", "未確認"]
+
+
+def test_excluded_requirement_item_is_reported_not_silently_dropped():
+    p = training()
+    r = pj.add(p, "requirements", pj.new_requirement(title="T", body="B", open_items="CSV項目は未確認"))
+    o = share.open_items(p, share.Options(doc_type="spec", exclude_ids={r["id"]}))
+    assert not o["included"] and o["excluded"][0]["reason"]
+
+
+def test_same_content_is_merged_keeping_links():
+    p = training()
+    r = pj.add(p, "requirements", pj.new_requirement(title="T", body="B", open_items="CSV項目は未確認"))
+    pj.add(p, "questions", {"text": "CSV項目は未確認", "why": None, "ask": "人事", "priority": None, "status": "未質問", "answer": None, "perspective_id": None, "category": "確認事項", "evidence": []})
+    o = share.open_items(p)
+    assert len(o["included"]) == 1 and o["merged"] == 1 and r["id"] in o["included"][0]["related"]
+
+
+def test_internal_note_not_in_open_items():
+    p = training()
+    r = pj.add(p, "requirements", pj.new_requirement(title="T", body="B"))
+    r["internal_note"] = "社外秘メモ"
+    assert "社外秘メモ" not in str(share.open_items(p))
+
+
+def test_owner_field_rejects_sentences_and_keeps_human_value():
+    p = training()
+    c = run(p, "extract", [cand("次の行動", "研修事務局が権限範囲を確認する", ask="期限を設定するか確認してください。")])[0]
+    assert c["ask"] is None and intake.owner_of(c) == "研修事務局"
+    intake.apply(p, c["id"], "山田", "2026-12-01", "利用者", None, "")
+    a = p["actions"][0]
+    assert a["owner"] == "山田" and a["due"] == "2026-12-01" and a["ask"] is None
+
+
+def test_cleared_owner_stays_empty():
+    p = training()
+    c = run(p, "extract", [cand("次の行動", "研修事務局が確認する", owner="研修事務局")])[0]
+    intake.apply(p, c["id"], "", "", "利用者", None, "")
+    assert p["actions"][0]["owner"] is None and p["actions"][0]["due"] is None
+
+
+def test_owner_stays_empty_when_unknown():
+    assert intake.owner_of({"text": "権限範囲を確認する"}) is None
+
+
+@pytest.mark.parametrize("value", ["期限を設定するか確認してください。", "確認してください", "x" * 30])
+def test_person_name_rejects_text(value):
+    assert ai.person_name(value) is None
+
+
+def test_decision_candidate_new_requirement_keeps_links_and_no_agreement():
+    p = training()
+    src = registry.ingest_paste(p, "議事録", "本人のキャンセルは開始前日17時までとする", kind="議事録")
+    c = run(p, "extract", [cand("決定", "本人のキャンセルは開始前日17時まで", evidence=[{"source_id": src["id"], "unit_id": "", "quote": "本人のキャンセルは開始前日17時まで"}])])[0]
+    intake.apply(p, c["id"], new_requirement=True)
+    r, d = p["requirements"][0], p["decisions"][0]
+    assert r["status"] == "下書き" and r["from_candidate"] == c["id"] and r["evidence"][0]["verified"]
+    assert d["state"] == "下書き" and d["related_requirements"] == [r["id"]]
+
+
+def test_decision_candidate_link_existing_and_none():
+    p = training()
+    r = pj.add(p, "requirements", pj.new_requirement(title="T", body="B"))
+    cs = run(p, "extract", [cand("決定", "既存に関連付ける"), cand("決定", "要件なしの判断")])
+    intake.apply(p, cs[0]["id"], link_requirements=[r["id"]])
+    intake.apply(p, cs[1]["id"])
+    assert p["decisions"][0]["related_requirements"] == [r["id"]] and p["decisions"][1]["related_requirements"] == [] and len(p["requirements"]) == 1
+
+
+def test_split_parts_classified_separately():
+    p = training()
+    c = run(p, "extract", [cand("要望", "講師が出欠を登録し、月別CSVを出力する", detail="CSV項目は未確認")])[0]
+    parts = intake.split_details(p, c, intake.split_proposal(c["text"]))
+    assert parts[0]["kind"] == "機能" and parts[1]["kind"] == "連携"
+    assert parts[0]["open_items"] is None and parts[1]["open_items"] == "CSV項目は未確認"
+    rs = intake.adopt_requirement(p, c["id"], parts=[{"text": x["text"], "kind": x["kind"], "open_items": x["open_items"]} for x in parts])
+    assert [r["kind"] for r in rs] == ["機能", "連携"] and rs[0]["open_items"] is None
+
+
+def test_out_of_scope_word_is_not_suggested_as_trait():
+    from definereq.logic import checks
+
+    p = training()
+    assert "approval" not in checks.suggest_traits(p)
+    p["profile"]["request"].update(value="上長の承認を画面で行いたい")
+    assert "approval" in checks.suggest_traits(p)
+
+
+def test_next_action_uses_minutes_not_question_count():
+    p = training()
+    registry.ingest_paste(p, "議事録", "初回の内容", kind="議事録")
+    for page in ("sources", "candidates", "overview", "prep"):
+        assert gd.assess(p, page)["main"].id == "extract", page
+    assert gd.assess(p, "sources")["main"].alt == [("次回の質問を準備する", "prep")]
+    run(p, "extract", [cand("要望", "申込したい")], source_ids=[p["sources"][0]["id"]])
+    assert gd.assess(p, "sources")["main"].id == "candidates"
+
+
+def test_after_adoption_goes_to_decision_and_refine():
+    p = training()
+    c = run(p, "extract", [cand("要望", "申込したい")])[0]
+    intake.adopt_requirement(p, c["id"], {"kind": "機能"})
+    main = gd.assess(p, "requirements")["main"]
+    assert main.id == "decide_next" and ("受入条件を具体化する", "refine") in main.alt
+
+
+def test_user_can_choose_stage_and_it_changes_next_action():
+    p = training()
+    registry.ingest_paste(p, "議事録", "初回の内容", kind="議事録")
+    gd.guidance_store(p)["user_stage"] = "output"
+    assert gd.assess(p, "overview")["main"].id == "export"
+
+
+def test_spec_requirement_table_is_compact_with_details():
+    p = training()
+    long = "講師が研修の出欠を登録し、事務局が月別の一覧を確認できるようにするために必要な画面を用意する"
+    pj.add(p, "requirements", pj.new_requirement(title=long, body=long, kind="機能", open_items="CSV項目は未確認"))
+    secs = share.build(p, share.Options(doc_type="spec"))
+    table = next(s for s in secs if "機能" in s.heading and s.table).table
+    assert "内容" not in table["columns"] and "…" in table["rows"][0][3]
+    detail = next(s for s in secs if s.level == 3)
+    assert any("未確認事項：CSV項目は未確認" in x for x in detail.paragraphs) and any("受入条件：未設定" in x for x in detail.paragraphs)
+
+
+def test_unregistered_is_not_shown_as_not_applicable():
+    p = training()
+    text = str([(s.heading, s.table.get("empty")) for s in share.build(p, share.Options(doc_type="spec")) if s.table])
+    assert "受入条件はまだ登録されていません" in text and "シナリオはまだ登録されていません" in text
+
+
+def test_answer_request_only_in_docs_with_answer_column():
+    p = training()
+    spec = Document(io.BytesIO(wordx.render(p, share.Options(doc_type="spec"), "DOC-001", 1, pj.now_iso())))
+    meet = Document(io.BytesIO(wordx.render(p, share.Options(doc_type="meeting"), "DOC-002", 1, pj.now_iso())))
+    assert "回答欄" not in "\n".join(x.text for x in spec.paragraphs)
+    assert "回答欄" in "\n".join(x.text for x in meet.paragraphs)
+
+
+def test_real_project_candidates_page_has_no_demo_wording():
+    p = training()
+    run(p, "extract", [cand("要望", "申込したい")])
+    assert not any("準備済みのAI候補" in c.value for c in open_app(p, "candidates").caption)
+
+
+def test_profile_page_end_has_next_steps(p):
+    at = open_app(p, "profile")
+    at = key(at, "pf_next_rec").click().run()
+    assert at.session_state["page"] == "sources"
 
 
 # ---- JSON ----

@@ -100,8 +100,8 @@ def test_stage_is_not_assumed_and_user_choice_is_kept(blank):
 
 def test_candidates_conflict_order_prefers_current_page():
     p = builder.build("d3", 4)
-    assert gd.assess(p, "conflicts")["main"].id == "conflicts"
-    assert gd.assess(p, "prep")["main"].id == "prep"
+    # 次にすることは案件の状態で決まり、開いている画面で変わらない
+    assert gd.assess(p, "conflicts")["main"].id == gd.assess(p, "prep")["main"].id
     r = gd.assess(p, "prep")
     assert len(r["extra"]) <= 1 and r["main"].id not in [a.id for a in r["extra"] + r["rest"]]
 
@@ -348,7 +348,7 @@ def test_final_documents_open_and_match(demo):
         data = wordx.render(p, share.options_for(doc), doc["id"], doc["version"], doc["issued_at"])
         d = Document(io.BytesIO(data))
         text = "\n".join(x.text for x in d.paragraphs) + "\n".join(x.text for s in d.sections for x in s.header.paragraphs)
-        assert "サンプル" in text and f"第{doc['version']}版" in text and "（v" not in text
+        assert "サンプル" in text and f"第{doc['version']}版" in text and "版（v" not in text
     name = wordx.filename(p, "spec", 1)
     assert name.startswith("サンプル_") and "要件定義書_第1版" in name and p["name"] in name
     assert "（第1版）" not in str([d["title"] for d in p["shared_docs"]])
@@ -470,30 +470,25 @@ def project_app(p, page="overview", **state):
 
 def test_project_panel_can_close_and_reopen_and_has_no_demo_words(blank):
     at = project_app(blank, "profile")
-    assert not any(b.key == "guide_hide" for b in at.button)  # 最初の案内では折りたたみを出さない
-    at.session_state["page"] = "prep"
-    at.run()
-    assert button(at, "guide_hide").label == "案内を折りたたむ"
-    at.session_state["page"] = "profile"
-    at.run()
     html = "".join(h.proto.body for h in at.get("html"))
-    assert "現在：案件を作成した直後" in html and "デモ体験中" not in html
+    assert "案件を作成した直後" in html and "デモ体験中" not in html and "この操作をおすすめする理由" in html
+    assert button(at, "guide_hide").label == "詳しい説明を閉じる"
     at = button(at, "guide_hide").click().run()
-    assert "現在：案件を作成した直後" not in "".join(h.proto.body for h in at.get("html")) and not at.exception
+    folded = "".join(h.proto.body for h in at.get("html"))
+    assert "この操作をおすすめする理由" not in folded and "案件を作成した直後" in folded and not at.exception
     at = button(at, "guide_show").click().run()
-    assert "現在：案件を作成した直後" in "".join(h.proto.body for h in at.get("html"))
+    assert "この操作をおすすめする理由" in "".join(h.proto.body for h in at.get("html"))
 
 
-def test_same_view_rerun_does_not_count_as_second_time(blank):
-    at = project_app(blank, "profile")
+def test_next_action_stays_after_closing_detail_on_other_pages(blank):
+    """説明を閉じても、状況の文と次の操作は別の画面でも残る。"""
+    blank["profile"]["problem"].update(value="申込をメールで受けている")
+    at = project_app(blank, "overview", guidance_hidden=True)
+    assert button(at, "guide_go").label == "会議を準備する" and button(at, "guide_alt_0").label == "議事録を取り込む"
+    assert "背景・目的を登録しました" in "".join(h.proto.body for h in at.get("html"))
+    at.session_state["page"] = "requirements"
     at.run()
-    at.run()
-    assert not any(b.key == "guide_hide" for b in at.button)
-
-
-def test_resumed_project_can_fold_from_start(blank):
-    at = project_app(blank, "profile", guidance_returning=True)
-    assert any(b.key == "guide_hide" for b in at.button)
+    assert button(at, "guide_go").label == "会議を準備する" and button(at, "guide_show").label == "詳しい説明を表示"
 
 
 def test_project_panel_works_without_ai_and_never_calls_it(blank, monkeypatch):
@@ -502,7 +497,7 @@ def test_project_panel_works_without_ai_and_never_calls_it(blank, monkeypatch):
 
     monkeypatch.setattr(ai_gd, "run", boom)
     add_request(blank)
-    at = project_app(blank)
+    at = project_app(blank, "profile")
     at = button(at, "guide_go").click().run()
     assert not at.exception and at.session_state["page"] == "prep"
 

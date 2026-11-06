@@ -34,25 +34,46 @@ def _adopt_form(p: dict, c: dict, meeting: str | None) -> None:
     s = intake.suggest(p, c)
     st.caption(f"分類は{s['basis']}です。確認してから採用してください。分からない項目は空欄のままで構いません。")
     domains, kinds = [None, *DOMAINS], [None, *REQ_KINDS]
-    with st.form(f"cand_req_{c['id']}"):
+    parts = intake.split_proposal(c["text"])
+    split = bool(parts) and st.toggle("複数の要件に分けて採用する", value=True, key=f"split_{c['id']}", help="原文の範囲で分けた案です。分類は1件ずつ確認できます。")
+    rows = intake.split_details(p, c, parts) if split else [{**s, "text": c["text"]}]
+    if split and c.get("detail"):
+        st.caption(f"元の候補の補足：{c['detail']}")
+
+    def row(n: int, item: dict) -> dict:
+        text = st.text_area(f"要件{n + 1}の本文", item["text"], key=f"cr_t_{c['id']}_{n}", height=68) if split else item["text"]
         c1, c2 = st.columns(2)
-        domain = c1.selectbox("分野", domains, index=domains.index(s["domain"]), format_func=lambda d: "未分類のまま" if d is None else DOMAINS[d])
-        kind = c2.selectbox("要件の種類", kinds, index=kinds.index(s["kind"]), format_func=lambda k: k or "未分類のまま")
-        target = st.text_input("対象業務・利用者", s["target"] or "")
-        data_io = st.text_input("入出力・連携", s["data_io"] or "")
-        open_items = st.text_input("未確認事項", s["open_items"] or "")
-        parts = intake.split_proposal(c["text"])
-        split_text = ""
-        if parts:
-            st.caption("複数の動作を含む可能性があります。分けて採用する場合は、下の分割案を確認してください（原文の範囲で分けています）。")
-            split_text = st.text_area("分割案（1行に1件。空欄なら分割しません）", "\n".join(parts))
+        domain = c1.selectbox(f"分野（要件{n + 1}）", domains, index=domains.index(item["domain"]), format_func=lambda d: "未分類のまま" if d is None else DOMAINS[d], key=f"cr_d_{c['id']}_{n}")
+        kind = c2.selectbox(f"要件の種類（要件{n + 1}）", kinds, index=kinds.index(item["kind"]), format_func=lambda k: k or "未分類のまま", key=f"cr_k_{c['id']}_{n}")
+        target = st.text_input(f"対象業務・利用者（要件{n + 1}）", item.get("target") or "", key=f"cr_u_{c['id']}_{n}")
+        data_io = st.text_input(f"入出力・連携（要件{n + 1}）", item.get("data_io") or "", key=f"cr_i_{c['id']}_{n}")
+        open_items = st.text_input(f"未確認事項（要件{n + 1}）", item.get("open_items") or "", key=f"cr_o_{c['id']}_{n}")
+        return {"text": text, "domain": domain, "kind": kind, "target": target, "data_io": data_io, "open_items": open_items, "background": s["background"]}
+
+    with st.form(f"cand_req_{c['id']}_{len(rows)}"):
+        values = [row(n, item) for n, item in enumerate(rows)]
         if st.form_submit_button("この内容で要件に採用", type="primary"):
-            fields = {"domain": domain, "kind": kind, "target": target, "data_io": data_io, "open_items": open_items, "background": s["background"]}
-            created = guard(intake.adopt_requirement, p, c["id"], fields, split_text.splitlines() if split_text.strip() else None, "利用者", meeting)
+            created = guard(intake.adopt_requirement, p, c["id"], None, values, "利用者", meeting)
             if created:
                 touch(p)
                 st.session_state.pop("cand_open", None)
-                ok_rerun("、".join(r["id"] for r in created) + " を要件（下書き）として採用しました")
+                ok_rerun("、".join(r["id"] for r in created) + " を要件（下書き）として採用しました。次は「要件」の画面で内容を確認できます")
+
+
+def _decision_form(p: dict, c: dict, meeting: str | None) -> None:
+    """決定の候補の扱いを選ぶ。どれを選んでも合意にはならない。"""
+    choices = {"link": "既存の要件に関連付ける", "new": "決定の内容から新しい要件の下書きを作る", "none": "要件を伴わない判断として記録する"}
+    with st.form(f"cand_dec_{c['id']}"):
+        how = st.radio("要件との関係", list(choices), format_func=choices.get, key=f"cd_h_{c['id']}", index=0 if p["requirements"] else 1)
+        reqs = [r["id"] for r in p["requirements"]]
+        linked = st.multiselect("関連付ける要件（既存の要件に関連付ける場合）", reqs, format_func=lambda i: pj.label_of(p, i), key=f"cd_r_{c['id']}")
+        st.caption("判断記録の下書きを作ります。合意にするには、判断者・判断日・採用案を人が記録します。")
+        if st.form_submit_button("判断記録の下書きに追加", type="primary"):
+            label = guard(intake.apply, p, c["id"], meeting_id=meeting, link_requirements=linked if how == "link" else [], new_requirement=how == "new")
+            if label:
+                touch(p)
+                st.session_state.pop("cand_open", None)
+                ok_rerun("判断記録の下書きを作りました。「決定・合意」の画面で判断者と判断日を記録できます")
 
 
 def _advanced(p: dict, c: dict, meeting: str | None) -> None:
@@ -71,14 +92,19 @@ def _advanced(p: dict, c: dict, meeting: str | None) -> None:
 def _actions(p: dict, c: dict, meeting: str | None, key: str) -> None:
     route = intake.route_for(c["kind"])
     with edit_block(f"intake_{key}_{c['id']}"):
-        owner, due = None, None
-        if route.kind == "action":
-            a, b = st.columns(2)
-            owner = a.text_input("担当（未設定可）", c.get("ask") or "", key=f"own_{c['id']}")
-            due = b.text_input("期限（未設定可）", key=f"due_{c['id']}")
+        owner, due, ask = intake.KEEP, intake.KEEP, intake.KEEP
+        if route.kind == "action":  # 担当・確認相手・期限は別の項目。入力した値をそのまま保存する
+            a, b, d = st.columns(3)
+            owner = a.text_input("担当（未設定可）", intake.owner_of(c) or "", key=f"own_{c['id']}")
+            ask = b.text_input("確認相手（未設定可）", ai.person_name(c.get("ask")) or "", key=f"ask_{c['id']}")
+            due = d.text_input("期限（未設定可）", c.get("due") or "", key=f"due_{c['id']}")
         b1, b2, b3, b4 = st.columns([3, 2, 1, 2])
         if route.kind == "requirement":
             if b1.button(route.button, key=f"go_req_{c['id']}", type="primary", width="stretch"):
+                st.session_state["cand_open"] = c["id"]
+                st.rerun()
+        elif route.kind == "decision":
+            if b1.button(route.button, key=f"go_dec_{c['id']}", type="primary", width="stretch"):
                 st.session_state["cand_open"] = c["id"]
                 st.rerun()
         elif route.kind == "profile":
@@ -91,7 +117,7 @@ def _actions(p: dict, c: dict, meeting: str | None, key: str) -> None:
                 touch(p)
                 ok_rerun("記録として残しました")
         elif b1.button(route.button, key=f"apply_{c['id']}", type="primary", width="stretch"):
-            label = guard(intake.apply, p, c["id"], owner or None, due or None, "利用者", meeting)
+            label = guard(intake.apply, p, c["id"], owner, due, "利用者", meeting, ask)
             if label:
                 touch(p)
                 ok_rerun(f"「{label}」へ反映しました")
@@ -104,7 +130,7 @@ def _actions(p: dict, c: dict, meeting: str | None, key: str) -> None:
             touch(p)
             ok_rerun("却下しました")
         if st.session_state.get("cand_open") == c["id"]:
-            _adopt_form(p, c, meeting)
+            (_decision_form if route.kind == "decision" else _adopt_form)(p, c, meeting)
         if route.kind == "requirement" and st.toggle("既存の要件への補足などに振り分ける", key=f"adv_{c['id']}"):
             _advanced(p, c, meeting)
 
