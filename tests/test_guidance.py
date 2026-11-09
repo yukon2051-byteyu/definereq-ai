@@ -385,9 +385,15 @@ def to_end(at):
 
 
 def test_home_cards_show_situation_and_highlights():
+    """カードは 案件名 → このデモで分かること → 案件の背景 → 開始ボタン の順。共通の説明は一覧の上に1回だけ。"""
     at = app()
     html = "".join(h.proto.body for h in at.get("html"))
-    assert "どんな案件か" in html and "誰が何に困っているか" in html and "このデモの見どころ" in html and "経理は直接変更を認めていません" in html
+    for name, take in (("経費申請アプリの刷新", "対立する要望から、判断と変更を追う"), ("拠点売上集計の自動化とクラウド移行", "曖昧な要望を、測れる要件にする"),
+                       ("拠点ネットワーク更新と遠隔保守", "録画の発言から、合意の根拠を確認する")):
+        assert html.index(name) < html.index(take)
+    assert html.index("対立する要望から") < html.index("現場と経理の意見が分かれています")
+    assert html.count("登録・APIキー不要") == 1 and "架空データの閲覧専用" in html and "AIの結果は用意済みのサンプル" in html
+    assert [button(at, f"tour_{d}").label for d in ("d1", "d2", "d3")] == ["経費申請のデモを見る", "売上集計・クラウド移行のデモを見る", "ネットワーク更新のデモを見る"]
     assert "3分" not in html
 
 
@@ -395,10 +401,13 @@ def test_first_and_later_banner():
     at = button(app(), "tour_d1").click().run()
     first = "".join(h.proto.body for h in at.get("html"))
     assert "デモ体験中｜経費申請アプリの刷新" in first and "デモ用の役割" in first and "現場と経理の要望を取りまとめる" in first
-    assert first.index("現在の業務") < first.index("困りごと") < first.index("今回、変えたいこと") < first.index("関係者が重視すること") < first.index("検討中の論点") < first.index("このデモで確認すること")
+    # 冒頭は 現場の要望 ⇔ 経理の制約 → 今回の論点。紙・Excelの説明はその下（開閉式）
+    assert first.index("現場の要望") < first.index("経理の制約") < first.index("今回の論点") < first.index("元の記録を残しながら、どう訂正するか？") < first.index("現在の業務")
+    assert button(at, "tour_next_top").label == "次へ：会議前の確認点を見る" and button(at, "tour_shortcut").label == "見どころへ：3案の比較と採用理由"
+    assert any(e.label.startswith("案件の詳しい背景") for e in at.expander)
     at = button(at, "tour_next").click().run()
     later = "".join(h.proto.body for h in at.get("html"))
-    assert "現場と経理の要望を取りまとめる" not in later and "ガイド 2/8" in later and "経費申請アプリの刷新｜第1回会議の前" in later and "アプリの支援" in later
+    assert "現場と経理の要望を取りまとめる" not in later and "ステップ 2/8" in later and '<li class="on"><b>1</b>背景と準備</li>' in later and "経費申請アプリの刷新｜第1回会議の前" in later and "アプリの支援" in later
     assert any(e.label == "案件の背景を確認" for e in at.expander)
 
 
@@ -421,7 +430,7 @@ def test_other_demo_returns_to_demo_list_with_done_mark():
     at = to_end(app())
     at = button(at, "tour_others").click().run()
     assert not at.exception
-    assert button(at, "tour_d1").label == "もう一度見る" and button(at, "tour_d2").label == "案内付きでデモを見る"
+    assert button(at, "tour_d1").label == "経費申請のデモを見る" and button(at, "tour_d2").label == "売上集計・クラウド移行のデモを見る"
     assert "体験済み" in "".join(h.proto.body for h in at.get("html"))
     at = button(at, "tour_d1").click().run()
     assert at.session_state["tour_index"] == 0 and at.session_state["tour_on"] and "d1" in at.session_state["demo_done"]
@@ -527,3 +536,76 @@ def test_demo_walk_never_uses_paid_ai(monkeypatch):
     monkeypatch.setattr(ai_gd, "run", boom)
     at = to_end(app())
     assert not at.exception and at.session_state["tour_index"] == 7
+
+
+# ---- デモの見どころ・判断・判断後の仕様・終了画面 ----
+def html_of(at):
+    return "".join(h.proto.body for h in at.get("html"))
+
+
+def test_shortcut_goes_to_decision_with_issue_line():
+    at = button(button(app(), "tour_d1").click().run(), "tour_shortcut").click().run()
+    assert at.session_state["tour_index"] == 4 and not at.exception
+    h = html_of(at)
+    assert "この案件の論点" in h and "ステップ 5/8" in h and '<li class="on"><b>2</b>比較と判断</li>' in h
+    assert button(at, "tour_next").label == "次へ：追加要望の影響を見る"
+
+
+def test_decision_shows_choice_reason_basis_then_table():
+    at = button(button(app(), "tour_d1").click().run(), "tour_shortcut").click().run()
+    h = html_of(at)
+    h = h[h.index('class="dr-vd"'):]  # 判断の部品の中で順番を確かめる
+    order = ["1. 採用した案", "再申請を採用", "2. 採用理由", "元の記録が残り監査で説明できること", "3. この判断の根拠", "本人確認済みの記録",
+             "判断に使っていない発言（話者未確認）", "4. 3案の比較"]
+    assert [h.index(x) for x in order] == sorted(h.index(x) for x in order)
+    assert "関係者による判断" in h and "発言（話者確認済み）" in h and "（採用）" in h
+    assert button(at, "tour_evidence").label == "この判断に使った確認メールを見る" and button(at, "tour_detail").label == "決定・合意の一覧を見る"
+
+
+def test_evidence_and_decision_list_return_to_origin_step():
+    base = button(button(app(), "tour_d1").click().run(), "tour_shortcut").click().run()
+    at = button(base, "tour_evidence").click().run()
+    q = at.session_state["project"]
+    assert at.session_state["page"] == "sources" and not at.session_state["tour_on"]
+    assert next(s for s in q["sources"] if s["id"] == at.session_state["src_sel"])["name"] == "判断の確認メール"
+    assert button(at, "tour_back").label == "← 5. 訂正方法の比較に戻る"
+    at = button(at, "tour_back").click().run()
+    assert at.session_state["tour_on"] and at.session_state["tour_index"] == 4
+    at = button(at, "tour_detail").click().run()
+    assert at.session_state["page"] == "decisions" and button(at, "tour_back").label == "← 5. 訂正方法の比較に戻る"
+    # 別のステップから詳細を開いたときは、そのステップへ戻る
+    at = button(at, "tour_back").click().run()
+    at = button(at, "tour_next").click().run()
+    at = button(at, "tour_detail").click().run()
+    assert button(at, "tour_back").label == "← 6. 追加要望の影響に戻る"
+
+
+def test_after_spec_summary_comes_before_table():
+    at = button(app(), "tour_d1").click().run()
+    for _ in range(6):
+        at = button(at, "tour_next").click().run()
+    h = html_of(at)
+    h = h[h.index('class="dr-cs"'):]
+    order = ["変更前（v1）", "変更後（v2）", "引き続き守る制約", "承認済みの申請は直接変更しない", "下書きの作成まで", "追加要望", "過去の判断との衝突", "採用した対応", "<table"]
+    assert [h.index(x) for x in order] == sorted(h.index(x) for x in order)
+
+
+def test_finale_separates_end_and_open_items_and_puts_next_first():
+    at = to_end(app())
+    h = html_of(at)
+    assert "デモ体験はここで終了です" in h and "案件に残る未確認の項目" in h and '<div class="dr-end-n">4件</div>' in h
+    labels = [b.label for b in at.button]
+    assert labels.index("ほかのデモを見る") < labels.index("要件定義書の内容を見る")
+    assert "再申請方式を採用した理由と、未確認の項目がどう記録されたかを確認できます。" in h
+    downloads = [b.label for b in at.get("download_button")]
+    assert "要件定義書をWordでダウンロード" in downloads and "要件一覧をExcelでダウンロード" in downloads
+    at = button(at, "tour_view_spec").click().run()
+    assert any("要件定義書の内容" in m.value for m in at.markdown)
+
+
+@pytest.mark.parametrize("demo,index,label", [("d2", 2, "見どころへ：「毎朝すぐ」を測れる条件にする"), ("d3", 2, "見どころへ：録画の発言と提案の扱い")])
+def test_other_demo_shortcuts(demo, index, label):
+    at = button(button(app(), f"tour_{demo}").click().run(), "tour_shortcut")
+    assert at.label == label
+    at = at.click().run()
+    assert at.session_state["tour_index"] == index and "この案件の論点" in html_of(at) and not at.exception

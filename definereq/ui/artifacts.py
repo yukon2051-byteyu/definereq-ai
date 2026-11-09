@@ -72,13 +72,13 @@ def _doc_card(p: dict, doc_type: str, text: str, when: str) -> None:
     except Exception as e:  # 出力の失敗で案内の画面全体を止めない
         _failed(title, doc_type, e)
         return
+    # ボタンの名前に資料名を入れ、どの資料を開くかを分かるようにする。
     # 要件定義書は横に並べて優先し、幅の狭いカードは文字が切れないよう縦に並べる
     first, second = st.columns(2) if doc_type == "spec" else (st.container(), st.container())
-    if first.button("内容を見る", key=f"tour_view_{doc_type}", width="stretch"):
+    if first.button(f"{title}の内容を見る", key=f"tour_view_{doc_type}", width="stretch", type="primary" if doc_type == "spec" else "secondary"):
         st.session_state["doc_view"] = doc_type
         st.rerun()
-    second.download_button("Wordをダウンロード", f["data"], file_name=f["name"], mime=WORD, key=f"dl_{doc_type}", on_click="ignore", width="stretch",
-                           type="primary" if doc_type == "spec" else "secondary")
+    second.download_button(f"{title}をWordでダウンロード", f["data"], file_name=f["name"], mime=WORD, key=f"dl_{doc_type}", on_click="ignore", width="stretch")
 
 
 def _excel_card(p: dict, when: str) -> None:
@@ -89,15 +89,20 @@ def _excel_card(p: dict, when: str) -> None:
     except Exception as e:
         _failed("要件一覧", "excel", e)
         return
-    st.download_button("Excelをダウンロード", f["data"], file_name=f["name"], mime=EXCEL, key="dl_excel", on_click="ignore", width="stretch")
+    st.download_button("要件一覧をExcelでダウンロード", f["data"], file_name=f["name"], mime=EXCEL, key="dl_excel", on_click="ignore", width="stretch")
 
 
-def cards(p: dict) -> None:
-    """成果物のカード。要件定義書を大きく、ほかの資料を下に並べる。"""
+def cards(p: dict, spec_note: str | None = None) -> None:
+    """成果物のカード。要件定義書を大きく、ほかの資料を下に並べる。
+
+    spec_note：要件定義書で見てほしい内容（デモごとの1文）。なければ資料の一般的な説明を出す。
+    """
     when = STAGES.get((p.get("demo") or {}).get("stage"), pj.today())
     spec, *others = CARDS
     with st.container(border=True, key="doc_spec"):
-        _doc_card(p, spec[0], spec[1], when)
+        _doc_card(p, spec[0], spec_note or spec[1], when)
+    if st.session_state.get("doc_view") == "spec":  # 押したカードのすぐ下に内容を出す
+        _viewer(p)
     cols = st.columns(3)
     for col, (doc_type, text) in zip(cols, others):
         with col, st.container(border=True, height="stretch"):
@@ -105,6 +110,11 @@ def cards(p: dict) -> None:
     with cols[2], st.container(border=True, height="stretch"):
         _excel_card(p, when)
     st.caption("PDFが必要な場合は、Wordで開いて「名前を付けて保存」からPDFを選んでください。")
+    if st.session_state.get("doc_view") not in (None, "spec"):
+        _viewer(p)
+
+
+def _viewer(p: dict) -> None:
     viewing = st.session_state.get("doc_view")
     doc = share.latest_doc(p, viewing) if viewing else None
     if doc:

@@ -19,7 +19,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 URL, OUT = sys.argv[1], Path(sys.argv[2])
 OUT.mkdir(parents=True, exist_ok=True)
-START = "案内付きでデモを見る"
+STARTS = ["経費申請のデモを見る", "売上集計・クラウド移行のデモを見る", "ネットワーク更新のデモを見る"]
 ERRORS = "[data-testid=stException],[data-testid=stAlertContentError]"
 SIZES = (("pc", {"viewport": {"width": 1440, "height": 900}}), ("sp", {"viewport": {"width": 390, "height": 844}, "is_mobile": True, "has_touch": True}))
 problems: list[str] = []
@@ -47,7 +47,7 @@ def next_step(g) -> bool:
 
 
 def downloads(g, name: str) -> None:
-    for label, kind in (("Wordをダウンロード", "docx"), ("Excelをダウンロード", "xlsx")):
+    for label, kind in (("Wordでダウンロード", "docx"), ("Excelでダウンロード", "xlsx")):
         buttons = g.get_by_role("button", name=label)
         for i in range(buttons.count()):
             with g.expect_download(timeout=30000) as d:
@@ -77,16 +77,16 @@ with sync_playwright() as pw:
                 g.evaluate("document.getElementById('dr-demo').scrollIntoView({block:'start'})")
                 g.wait_for_timeout(700)
                 g.screenshot(path=OUT / f"{size}_cards.png")
-            g.get_by_role("button", name=START).nth(n).click()
+            g.get_by_role("button", name=STARTS[n]).click()
             i = 0
             while True:
                 g.wait_for_selector(".dr-g-h", timeout=60000)
                 g.wait_for_timeout(1500)
                 body = g.inner_text("body")
                 tag = g.locator(".dr-sit-tag").inner_text()
-                check(g.locator(".dr-sit").count() == 1 and "｜" in tag and "ガイド" in body, f"{name}_{i} 状況案内（{tag[:36]}）")
+                check(g.locator(".dr-sit").count() == 1 and "｜" in tag and "ステップ" in body, f"{name}_{i} 状況案内（{tag[:36]}）")
                 if i == 0:
-                    check(all(w in body for w in ("現在の業務", "困りごと", "今回、変えたいこと", "関係者が重視すること", "検討中の論点", "このデモで確認すること")), f"{name} 背景の6項目")
+                    check(g.locator(".dr-q-box").count() == 2 and "今回の論点" in body and g.get_by_text("案件の詳しい背景（現在の業務・困りごと・関係者）").count() == 1, f"{name} 冒頭の論点と詳しい背景")
                 elif i < 7:
                     g.get_by_text("案件の背景を確認").click()
                     g.wait_for_timeout(600)
@@ -107,7 +107,7 @@ with sync_playwright() as pw:
             g.screenshot(path=OUT / f"{name}_end_full.png", full_page=False)
             downloads(g, name)
             check(g.locator(".dr-end-h").count() == 1, f"{name} ダウンロード後も最終画面のまま")
-            g.get_by_role("button", name="内容を見る").first.click()
+            g.get_by_role("button", name="要件定義書の内容を見る").first.click()
             g.wait_for_timeout(2000)
             check("この文書について" in g.inner_text("body"), f"{name} 内容を見る")
             more = g.get_by_text(re.compile(r"^全\d+件を見る$"))
@@ -123,14 +123,14 @@ with sync_playwright() as pw:
             g.wait_for_timeout(2500)
             top = g.evaluate("document.getElementById('dr-demo').getBoundingClientRect().top")
             check(-5 <= top <= 200, f"{name} デモ選択欄へ戻る（上端 {top:.0f}px）")
-            check("体験済み" in g.inner_text("body") and g.get_by_role("button", name="もう一度見る").count() == 1, f"{name} 体験済み")
+            check("体験済み" in g.inner_text("body") and g.get_by_role("button", name=STARTS[n]).count() == 1, f"{name} 体験済み")
             c.close()
 
     # 録画の再生
     c = b.new_context(viewport={"width": 1440, "height": 900})
     g = c.new_page()
     open_top(g)
-    g.get_by_role("button", name=START).nth(2).click()
+    g.get_by_role("button", name=STARTS[2]).click()
     g.wait_for_selector(".dr-g-h", timeout=60000)
     for _ in range(2):
         g.wait_for_timeout(1200)
@@ -150,7 +150,7 @@ with sync_playwright() as pw:
     g.get_by_role("button", name="確認状態を見る").click()
     g.wait_for_timeout(3000)
     check("機能画面" in g.inner_text("body"), "詳細へ移動すると機能画面の説明が出る")
-    g.get_by_role("button", name="ガイドへ戻る").click()
+    g.get_by_role("button", name=re.compile(r"^← \d+\. ")).click()  # 開いた元のステップへ戻る
     g.wait_for_selector(".dr-g-h", timeout=60000)
     g.wait_for_timeout(2500)
     check(g.locator(".dr-g-h").inner_text() == title, "ガイドの元の画面へ戻る")

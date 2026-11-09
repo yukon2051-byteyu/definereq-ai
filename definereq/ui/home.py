@@ -13,7 +13,9 @@ from . import state
 from .components import chip, esc, guard, save_controls
 from .theme import HERO_SHAPE, MARK
 
-LEAD = "会議前の質問準備から、録画・議事録の要件整理、追加要望の影響確認まで。判断の根拠と変更の経緯をつなぎ、要件定義書の作成を支援します。"
+# 説明文は句点の位置で2行に分ける（幅の狭い画面では、それぞれの行の中で折り返す）
+LEAD_LINES = ("会議前の質問準備から、録画・議事録の要件整理、追加要望の影響確認まで。", "判断の根拠と変更の経緯をつなぎ、要件定義書の作成を支援します。")
+LEAD = "".join(LEAD_LINES)
 FLOW = [("準備", "案件の分野・要望・資料を登録し、不足情報と質問を整理"),
         ("整理", "録画・議事録・資料から、要望・決定・未決事項を抽出"),
         ("判断", "例外・非機能の見落とし、矛盾、意見の違いを確認し、関係者が要件を確定"),
@@ -53,7 +55,7 @@ def _sections() -> None:
 <div class="dr-mark">{MARK}<span>DefineReq_AI</span></div>
 <h1 class="dr-h1"><span>あなたの要件定義に<i class="dr-comma">、</i></span><span>伴走する<b class="dr-ai">AI</b>を</span></h1>
 <div class="dr-jp">AI要件定義・変更経緯管理システム</div>
-<p class="dr-sub">{esc(LEAD)}</p>
+<p class="dr-sub">{"".join(f"<span>{esc(x)}</span>" for x in LEAD_LINES)}</p>
 <div class="dr-label">業務アプリ ／ インフラ ／ ネットワーク ／ 複合 に対応</div>
 <div class="dr-cta"><a class="dr-btn dr-btn-p" href="#dr-demo">案内付きでデモを見る</a><a class="dr-btn dr-btn-s" href="#dr-new-create">新しい案件を始める</a><a class="dr-btn dr-btn-s" href="#dr-resume">保存した案件から再開</a></div>
 <div class="dr-note">デモは登録不要・無料／AI結果は準備済みのサンプルです</div>
@@ -62,20 +64,20 @@ def _sections() -> None:
     st.html('<h2 class="dr-sec">利用の流れ</h2><p class="dr-sec-l">AIは候補を作り、プログラムが記録と照合を行い、人が判断します。AIの出力だけで要件や合意は確定しません。</p>')
     st.html('<div class="dr-steps">' + "".join(f'<div class="dr-step"><b>{esc(n)}</b>{esc(t)}</div>' for n, t in FLOW) + "</div>")
 
-    st.html('<h2 id="dr-demo" class="dr-sec">3件のデモを試す</h2><p class="dr-sec-l">APIキーや登録なしで、案内に沿って見られます。最後にサンプル資料をダウンロードできます。デモは閲覧専用で、データは全て架空です。</p>')
+    st.html('<h2 id="dr-demo" class="dr-sec">3件のデモを試す</h2>'
+            '<div class="dr-demo-common"><span>登録・APIキー不要</span><span>架空データの閲覧専用</span><span>AIの結果は用意済みのサンプル</span></div>')
     cols = st.columns(3)
     done = st.session_state.get("demo_done", set())
     for i, (col, d) in enumerate(zip(cols, builder.catalog()), 1):
+        # 案件名 → このデモで分かること → 案件の背景 → 開始ボタン の順
         with col, st.container(border=True, height="stretch"):
             seen = d["id"] in done
             badge = chip("✓ 体験済み", "ok") if seen else ""
-            points = "".join(f"<li>{esc(x)}</li>" for x in d["highlights"])
             st.html(f'<div class="dr-demo-n"><span>DEMO {i}　{esc("＋".join(DOMAINS[x] for x in d["domains"]))}</span>{badge}</div><div class="dr-demo-t">{esc(d["name"])}</div>'
-                    f'<div class="dr-demo-l">どんな案件か</div><div class="dr-demo-s">{esc(d["summary"])}</div>'
-                    f'<div class="dr-demo-l">誰が何に困っているか</div><div class="dr-demo-s">{esc(d["situation"])}</div>'
-                    f'<div class="dr-high"><b>このデモの見どころ</b><ul>{points}</ul></div>')
+                    f'<div class="dr-take"><div class="dr-demo-l">このデモで分かること</div><b>{esc(d["takeaway"])}</b></div>'
+                    f'<div class="dr-demo-l">案件の背景</div><div class="dr-demo-s">{esc(d["background"])}</div>')
             st.space("stretch")  # 文章の行数が違っても、ボタンと下端の線を揃える
-            if st.button("もう一度見る" if seen else "案内付きでデモを見る", key=f"tour_{d['id']}", type="primary", width="stretch"):
+            if st.button(d["start"], key=f"tour_{d['id']}", type="primary", width="stretch"):
                 state.open_demo(d["id"], tour=True)
 
     st.html('<h2 id="dr-new" class="dr-sec">あなたの案件で試す</h2>')

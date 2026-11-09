@@ -136,6 +136,7 @@ __PALETTE_CSS__
 .dr-comma{font-style:normal}
 @media (min-width:761px){.dr-h1 span{white-space:nowrap}.dr-comma{margin-right:-.312em}}
 .dr-sub{font-size:16px;line-height:1.75;color:#3C3E44;margin:8px 0 0}
+.dr-sub span{display:block}
 .dr-label{font-size:13px;font-weight:700;color:var(--muted);margin-top:8px}
 .dr-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
 .dr-btn{display:inline-block;padding:11px 22px;border-radius:4px;font-size:15px;font-weight:700;text-decoration:none;line-height:1.3}
@@ -194,6 +195,64 @@ __PALETTE_CSS__
 .dr-setup-h b{font-weight:900}
 .dr-setup-t{font-size:14.5px;line-height:1.65;color:#2F3036;margin-top:4px}
 .dr-anchor{scroll-margin-top:70px;height:0}
+/* デモ一覧：このデモで分かること（背景より強く見せる）と、共通の説明 */
+.dr-take{margin-top:10px;padding:8px 12px;border-left:4px solid #D9330F;background:#FBF3E8}
+.dr-take .dr-demo-l{margin-top:0;color:#7A3A00}
+.dr-take b{display:block;font-size:16.5px;font-weight:900;line-height:1.5;color:var(--ink)}
+.dr-demo-common{display:flex;flex-wrap:wrap;gap:6px 8px;margin:2px 0 10px}
+.dr-demo-common span{font-size:13px;font-weight:700;color:#45474D;background:#EFEFF2;border-radius:999px;padding:2px 12px}
+/* デモの大きな区分と現在地 */
+.dr-ph{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:2px 0 6px}
+.dr-ph ol{display:flex;gap:4px;list-style:none;margin:0;padding:0}
+.dr-ph li{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;color:#6B6D73;background:#F3F2EF;padding:3px 12px 3px 6px;border-radius:999px;white-space:nowrap}
+.dr-ph li b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#DADBDF;color:#45474D;font-size:12px}
+.dr-ph li.done{color:#45474D}
+.dr-ph li.on{background:#FBE7DF;color:#8F2408}
+.dr-ph li.on b{background:#D9330F;color:#fff}
+.dr-ph-now{font-size:14px;color:var(--muted)}
+.dr-ph-now span{margin-left:12px}
+.dr-g-focus{margin:4px 0 0;font-size:16px;line-height:1.6;color:var(--ink)}
+.dr-g-focus b{font-size:13.5px;color:#B8290A;margin-right:10px}
+/* デモの冒頭：立場の異なる主張と今回の論点 */
+.dr-q{margin-top:6px}
+.dr-q-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dr-q-box{padding:12px 16px;background:#F7F5F1;border-radius:6px}
+.dr-q-lab{display:flex;gap:10px;align-items:baseline;font-size:15px;font-weight:900;color:#B8290A;margin-bottom:4px}
+.dr-q-lab span{font-size:13px;font-weight:700;color:#4A4C53}
+.dr-q-focus{margin-top:10px;padding:10px 16px;border-left:5px solid #D9330F;background:#FBF3E8}
+.dr-q-t{font-size:22px;font-weight:900;line-height:1.5;color:var(--ink)}
+.st-key-tour_start,.st-key-tour_end_next{gap:10px;flex-wrap:wrap;margin:6px 0}
+/* 判断の画面：採用案 → 理由 → 根拠 → 比較 */
+.dr-vd section{margin-top:12px}
+.dr-vd-win{padding:12px 16px;border-left:5px solid #1C7A4D;background:#F1F9F4}
+.dr-vd-t{font-size:24px;font-weight:900;line-height:1.45;color:var(--ink)}
+.dr-vd-list{list-style:none;margin:0;padding:0}
+.dr-vd-list li,.dr-vd-skip{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.dr-vd-skip{border-bottom:0;opacity:.9}
+.dr-key-s{font-size:16px;font-weight:700;line-height:1.6;color:var(--ink)}
+.dr-t-h{margin-top:14px}
+.dr-t-cmp td:nth-child(3){min-width:16em}
+.dr-t-cmp .dr-t-win td{background:#F1F9F4;font-weight:400}
+.dr-t-cmp .dr-t-win td:first-child b::after{content:"（採用）";font-size:13px;color:#1C7A4D;margin-left:4px}
+/* 判断後の仕様の要約 */
+.dr-cs-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.dr-cs-grid>div{padding:10px 14px;border-radius:6px;background:#F7F5F1}
+.dr-cs-after{background:#F1F9F4 !important;border-left:4px solid #1C7A4D}
+.dr-cs-keep{background:#EEF2FA !important;border-left:4px solid #2A5DB0}
+.dr-cs-scope{margin-top:8px;font-size:15px;line-height:1.65;color:var(--ink)}
+.dr-cs-flow{display:grid;grid-template-columns:1fr 24px 1fr 24px 1fr;align-items:stretch;gap:6px;margin-top:10px}
+.dr-cs-step{padding:8px 12px;border:1px solid var(--line);border-radius:6px}
+.dr-cs-arrow{display:grid;place-items:center;color:#B8290A;font-weight:900}
+.dr-cs-next{margin:6px 0 4px}
+/* 終了画面：体験の終了と、案件に残る項目を分ける */
+.dr-end-row{display:grid;grid-template-columns:3fr 2fr;gap:10px;margin-top:8px}
+.dr-end-box{background:#fff;border:1px solid #D7EBDD;border-radius:4px;padding:8px 12px}
+.dr-end-left{border-color:#EBD9BE;background:#FFFBF4}
+.dr-end-n{font-size:24px;font-weight:900;color:#8A4B00;line-height:1.3}
+/* 次にすること（準備画面と、資料の登録直後） */
+.st-key-setup_next,.st-key-src_next{border-left:4px solid #D9330F !important;background:#FFFBF7}
+.dr-next{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;font-size:15px;line-height:1.6;color:var(--ink)}
+.dr-next b{font-size:15px;font-weight:900;color:#B8290A}
 /* 背景・資料の画面：見出しの下の短い案内、登録する種類、準備画面の補助の操作 */
 .dr-brief{font-size:13.5px;line-height:1.6;color:#2F3036;border-left:3px solid #2A5DB0;padding:2px 0 2px 10px;margin:2px 0 4px}
 .dr-brief b{color:#1F4A8F;margin-right:10px}

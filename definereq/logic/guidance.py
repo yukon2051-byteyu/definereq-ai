@@ -103,6 +103,46 @@ def unanalyzed_minutes(p: dict) -> list[str]:
     return minutes + [r["name"] for r in p["recordings"] if r["id"] not in done_rec and not everything]
 
 
+def requirement_candidates(p: dict) -> list[dict]:
+    """確認待ちの要件候補（会議準備のAI候補は除く）。_candidates と同じ条件。"""
+    tasks = {r["id"]: r["task"] for r in p["ai_runs"]}
+    return [c for c in p["candidates"] if c["state"] in ("候補", "要再確認") and tasks.get(c.get("origin_run")) != "prep"]
+
+
+def has_profile(p: dict) -> bool:
+    return any(v.get("value") for v in p["profile"].values()) or bool(p["stakeholders"])
+
+
+PREP = ("会議の準備へ進む", "prep", "背景と資料をもとに、次の打ち合わせで確認することを整理できます。")
+RECORDS = ("会議の記録を整理する", "records", "取り込んだ議事録から、要望・決定事項・未決事項を整理できます。")
+CANDIDATES = ("要件候補を確認する", "candidates", "整理した候補を確認し、要件として採用するか判断できます。")
+
+
+def setup_next(p: dict) -> dict:
+    """案件の準備と資料の画面に出す「次にすること」。主な操作1つと、ほかに進める作業。
+
+    議事録の判定は unanalyzed_minutes（資料種別「議事録」と録画、AIで未整理のもの）を使う。
+    未整理の議事録があれば、要件候補があっても記録の整理を先に勧める。背景が空欄でも進められる。
+    """
+    waiting, cands = unanalyzed_minutes(p), requirement_candidates(p)
+    if waiting:
+        main, alts = RECORDS, [CANDIDATES] if cands else [PREP]
+        detail = f"AIで整理していない記録：{'、'.join(waiting[:3])}" + (f" ほか{len(waiting) - 3}件" if len(waiting) > 3 else "")
+    elif cands:
+        main, alts, detail = CANDIDATES, [PREP], f"確認待ちの候補：{len(cands)}件"
+    elif p["requirements"]:  # 要件の整理が進んだ後は、状況の判定（assess）の結果を使う
+        a = assess(p, "setup")["main"]
+        if a and a.page not in ("setup", "profile", "sources"):
+            return {"label": a.button, "page": a.page, "reason": a.short or a.reason, "detail": None, "alts": [PREP[:2]] if a.page != "prep" else []}
+        main, alts, detail = PREP, [], None
+    elif p["sources"] or has_profile(p):
+        main, alts, detail = PREP, [("議事録を取り込む", "sources")] if not p["sources"] else [], None
+    else:
+        return {"label": "資料・議事録を取り込む", "page": "sources", "reason": "議事録や要望書があれば取り込むと、次の作業を案内できます。背景の入力から始めることもできます。",
+                "detail": None, "alts": [("背景・目的・関係者を入力", "profile")]}
+    return {"label": main[0], "page": main[1], "reason": main[2], "detail": detail, "alts": [x[:2] for x in alts]}
+
+
 def _after_profile(p: dict) -> list[Advice]:
     """背景だけが登録された状態。会議前の人にも、記録を持っている人にも進み先を示す。"""
     if phase(p) != "unprocessed" or p["sources"] or p["recordings"] or p["questions"]:

@@ -53,6 +53,7 @@ def _source_import(p: dict) -> None:
     ファイルと貼り付けの入力欄は常に同じ名前で置くため、種類や取り込み方法を切り替えても入力は消えない。
     """
     with edit_block("src"), st.container(border=True, key="src_box"):
+        _after_register(p)  # 登録した直後は、取り込み欄の一番上（初期表示の範囲）に結果と次の操作を出す
         mode = st.radio("取り込むもの", list(MODES), horizontal=True, key="src_mode")
         if MODES[mode]:
             kind = MODES[mode]
@@ -81,10 +82,10 @@ def _source_import(p: dict) -> None:
                         done += 1
                     except IngestError as e:
                         st.error(f"{safe_filename(f.name)}：{e}")
-                if done:
+                if done:  # 1件以上の登録に成功したときだけ、次の操作を案内する
                     st.session_state["src_up_round"] = n + 1
                     touch(p)
-                    ok_rerun(f"{done}件読み込みました（種類：{kind}）")
+                    _registered(p, f"{done}件読み込みました（種類：{kind}）")
         with tabs[1]:
             m = st.session_state.get("paste_round", 0)
             title = st.text_input("貼り付ける文章の名称", key=f"paste_t_{m}")
@@ -97,7 +98,28 @@ def _source_import(p: dict) -> None:
                     registry.ingest_paste(p, title, text, kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
                     st.session_state["paste_round"] = m + 1
                     touch(p)
-                    ok_rerun(f"登録しました（種類：{kind}）")
+                    _registered(p, f"登録しました（種類：{kind}）")
+
+
+def _registered(p: dict, message: str) -> None:
+    """登録の成功を記録して再描画する。表示は、別の画面へ移るか「続けて資料を追加する」を押すまで残す。"""
+    st.session_state["src_done"] = {"project": p["id"], "message": message}
+    st.rerun()
+
+
+def _after_register(p: dict) -> None:
+    """登録した直後の案内：成功メッセージと、案件の状態に合う次の操作。準備画面を経由せずに続けられる。"""
+    from .prepare import next_block
+
+    done = st.session_state.get("src_done")
+    if not done or done["project"] != p["id"]:
+        return
+    with st.container(key="src_done_box"):
+        st.success(done["message"])
+        next_block(p, "src_next", "次の操作")
+        if st.button("続けて資料を追加する", key="src_more", type="tertiary"):
+            st.session_state.pop("src_done", None)
+            st.rerun()
 
 
 def _source_list(p: dict) -> None:

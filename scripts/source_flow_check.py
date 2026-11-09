@@ -273,7 +273,7 @@ with sync_playwright() as pw:
         wait(g)
         if label == "改修後のファイル":
             close_sidebar(g)
-            click(g, "案件の準備")
+            click(g, "← 案件の準備に戻る")
             ok = "入力済み" in body(g) and "取り込み済み 1件" in body(g)
             click(g, "背景・目的・関係者を編集")
             ok = ok and g.get_by_label("背景", exact=True).first.input_value().endswith("月末に集計している") and "架空の研修責任者" in g.content()

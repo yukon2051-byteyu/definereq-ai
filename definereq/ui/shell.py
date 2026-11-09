@@ -126,12 +126,18 @@ def next_step(key: str, p: dict) -> None:
         state.goto(target)
 
 
+def back_to_setup(key: str) -> None:
+    """自分の案件の各画面の最上部に置く戻る操作。左メニューを閉じていても、案件の準備へ戻れる。"""
+    if st.button("← 案件の準備に戻る", key="go_setup_ov" if key == "overview" else f"go_setup_{key}", type="tertiary"):
+        state.goto("setup")
+
+
 def demo_bar(p: dict) -> None:
-    """全画面の閲覧で、閲覧専用であることと案内への戻り道を示す。"""
-    c1, c2 = st.columns([4, 1])
-    c1.caption("いま見ているのは機能画面（実際の一覧と記録）です。閲覧専用のため編集はできません。要点だけを見るときはガイドへ戻ります。編集は「あなたの案件で試す」から行えます。")
-    if c2.button("ガイドへ戻る", key="tour_back", width="stretch"):
-        guide.back_to_guide(p)
+    """機能画面（詳細）の上部に、開いた元のステップへの戻り道を示す。戻り先の番号と名前をボタンに出す。"""
+    with st.container(key="demo_back", horizontal=True, vertical_alignment="center"):
+        if st.button(guide.back_label(p), key="tour_back", type="primary"):
+            guide.back_to_guide(p)
+        st.caption("いま見ているのは機能画面（実際の一覧と記録）です。閲覧専用のため編集はできません。編集は「あなたの案件で試す」から行えます。")
 
 
 def render(p: dict) -> None:
@@ -149,7 +155,9 @@ def render(p: dict) -> None:
     if p.get("demo"):
         demo_bar(p)
     elif not p.get("is_demo") and key not in ("setup", "profile", "sources") and not (key == "overview" and gd.phase(p) == "empty"):
-        # 背景と資料の画面は入力を先に見せるため、案内は各画面の見出しの下に短く出す
+        # 自分の案件の作業画面は、同じ位置に「戻る」（案件の準備へ）と「次に進む」（状況案内の主ボタン）を置く。
+        # 背景と資料の画面は入力を先に見せるため、戻る操作と案内を各画面の見出し付近に置く
+        back_to_setup(key)
         situation.project_panel(p, key)  # 案件の準備の画面は、それ自体が進み先を示す
     stage_control(p)
     if key == "demo_map":

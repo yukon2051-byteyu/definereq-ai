@@ -337,7 +337,7 @@ def test_guide_blocks_come_from_stage_data(demo):
     assert len(steps) == 8 and steps[-1].get("finale")
     for s in steps:
         ctx = demo_guide.Ctx(builder.build(demo, s["stage"]))
-        assert s.get("finale") or 1 <= len(s["main"](ctx)) <= 3, s["title"]
+        assert s.get("finale") or 1 <= len(s["main"](ctx)) <= 4, s["title"]  # 判断後の仕様は、要約の下に比較表・差分・変遷を置く
         assert isinstance(s["open"](ctx), list)
         s["more"](ctx)
         assert len(s["title"]) <= 34

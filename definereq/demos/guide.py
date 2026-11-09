@@ -140,15 +140,16 @@ class Ctx:
     def story(self, demo_id: str) -> dict:
         """最初の画面の背景。説明の土台の文が記録にあることを確かめる。"""
         s = STORIES[demo_id]
-        for text in s["checks"]:
+        for text in s["checks"] + [x[3] for x in s["sides"]]:
             if not self.has(text):
                 raise KeyError(f"背景の説明が記録と一致しません: {text}")
-        return {"type": "story", **s}
+        sides = [{"label": label, "who": who, "text": text, "quote": self.full(check)} for label, who, text, check in s["sides"]]
+        return {"type": "story", **s, "sides": sides}
 
     def background(self) -> list[tuple[str, str]]:
         """どの画面からでも開ける、短い背景。"""
         s = STORIES[self.p["demo"]["id"]]  # 最初の画面と同じ文章。照合は資料がそろう最初の画面で行う
-        return [*s["rows"], ("検討中の論点", s["issue"])]
+        return [("今回の論点", s["focus"]), *s["rows"], ("検討中の論点", s["issue"])]
 
     def agreed(self) -> list[str]:
         out = []
@@ -243,6 +244,58 @@ class Ctx:
                 for h in self.p["history"] if h.get("requirement_id") in ids]
         return {"type": "timeline", "rows": sorted(rows, key=lambda x: x["date"])}
 
+    def verdict(self, topic: str, confirm_source: str, unused: str) -> dict:
+        """判断画面：採用した案 → 採用理由 → 根拠 → 案の比較。全て判断の記録から取る。
+
+        confirm_source：本人が判断を確認した記録の名前。unused：判断に使っていない（話者未確認の）発言。
+        """
+        d = self.decision(topic)
+        rec = self.dec(topic)
+        mail = self._find(self.p["sources"], lambda s: s["name"] == confirm_source, confirm_source)
+        basis = []
+        for e in rec.get("evidence", []):
+            where = ev.citation(self.p, e)
+            if str(e["source_id"]).startswith("REC"):
+                r = pj.get(self.p, "recordings", e["source_id"])
+                seg = next((x for x in r["segments"] if x["id"] == e.get("unit_id")), None)
+                if seg is None:
+                    raise KeyError(f"根拠の発言がありません: {e.get('quote')}")
+                v = ev.speaker_view(r, seg)
+                kind = "発言（話者確認済み）" if v["confirmed"] else "発言（話者未確認）"
+                where = f"{r['name']} {format_time(seg['start'])}　{v['label']}：{v['name']}"
+            elif e["source_id"] == mail["id"]:
+                kind = "本人確認済みの記録"
+            else:
+                kind = "資料"
+            basis.append({"kind": kind, "quote": e.get("quote"), "where": where})
+        skipped = self.speech(unused)
+        if skipped["speaker_check"] == "確認済み":
+            raise KeyError(f"話者確認済みの発言です: {unused}")
+        return {**d, "type": "verdict", "basis": basis, "mail_id": mail["id"], "mail_name": mail["name"],
+                "skipped": {"text": skipped["text"], "where": f"{skipped['where']}　{skipped['who_label']}：{skipped['who']}"}}
+
+    def change_summary(self, req_title: str, change_text: str, topic: str, before: tuple, after: tuple, keep: tuple, scope: str | None = None) -> dict:
+        """判断後の仕様の要約：変更前／変更後／引き続き守る制約と、追加要望→衝突→採用した対応。
+
+        before / after / keep は（表示する文, 照合する文）。照合する文が記録にないと例外になる。
+        before は変更前の版の本文か受入条件、after は現在の本文、keep は要件の本文で確かめる。
+        """
+        r, c, d = self.req(req_title), self.chg(change_text), self.dec(topic)
+        old = " ".join([r["versions"][-1]["body"]] + [f"{a['given']} {a['when']} {a['then']}" for a in r.get("acceptance", [])])
+        bodies = " ".join(x["body"] for x in self.p["requirements"])
+        for (text, check), pool, label in ((before, old, "変更前"), (after, r["body"], "変更後"), (keep, bodies, "守る制約")):
+            for part in ([check] if isinstance(check, str) else check):
+                if part not in pool:
+                    raise KeyError(f"{label}の文が記録と一致しません: {part}")
+        adopted = next(o for o in d["options"] if o["id"] == d.get("adopted"))
+        rejected = next(iter(d.get("rejected_reasons", {}).items()), None)
+        if not rejected:
+            raise KeyError(f"不採用の理由がありません: {topic}")
+        label = next(o["label"] for o in d["options"] if o["id"] == rejected[0])
+        clash = f"「{label}」は不採用。{rejected[1]}"
+        return {"type": "change_sum", "before": before[0], "after": after[0], "keep": keep[0], "scope": scope,
+                "request": c["content"], "clash": clash, "adopted": adopted["label"], "before_v": r["versions"][-1]["version"], "after_v": r["version"]}
+
     def summary(self) -> dict:
         bl = checks.backlog(self.p)
         seen, todo = set(), []
@@ -276,6 +329,9 @@ def _after(g: Ctx, req_title: str) -> dict:
 STORIES = {
     "d1": dict(
         title="承認後の金額間違いに対応できる経費申請アプリへ",
+        sides=[("現場の要望", "営業部", "承認後に見つかった金額の誤りを訂正したい", "承認後でも金額を訂正できるようにしたい"),
+               ("経理の制約", "経理課", "承認済みの記録は直接変更できない", "変更履歴があっても直接変更は認めない")],
+        focus="元の記録を残しながら、どう訂正するか？",
         rows=[("現在の業務", "社員は紙の申請書で経費を申請し、承認者の承認を受けます。申請の管理はExcelの台帳で行っています。"),
               ("困りごと", "承認までの状況が見えません。また、現場の申告では金額を1桁間違えたまま承認されることが月に数件あり、今は担当者が台帳を手で直しています。"),
               ("今回、変えたいこと", "申請から精算までを一つのアプリで追えるようにします。あわせて、承認後に金額の誤りが見つかったときの扱いを決めます。")],
@@ -288,6 +344,9 @@ STORIES = {
                 "精算が終わった申請まで直したいわけではない", "変更履歴があっても直接変更は認めない", "監査で説明できない", "承認された申請の内容は変更できない"]),
     "d2": dict(
         title="手作業の売上集計を自動化し、クラウド移行も検討する",
+        sides=[("利用部門の要望", "経営企画", "毎朝すぐに売上の数字を見たい", "毎朝すぐに売上の数字を見たい"),
+               ("現状の制約", "集計の担当", "手作業の集計に約90分かかり、拠点の提出が9時を過ぎる日もある", "月に2回ほど9時を過ぎる")],
+        focus="「毎朝すぐ」を、何時までに何が見られればよいという測れる条件にできるか？",
         rows=[("現在の業務", "12拠点がExcelを提出し、本社の担当2名が毎朝手作業でまとめています。集計には約90分かかります（2026年8月の記録）。"),
               ("困りごと", "経営企画は朝9時の部門会議で売上の数字を使います。一方で提出の遅れや重複は手で直しており、大阪拠点の提出が9時を過ぎることも月に2回ほどあります。"),
               ("今回、変えたいこと", "集計を自動化し、毎朝すぐに本社が結果を確認できるようにします。あわせて、現行サーバーの保守と障害対応を情報システム課だけで担っているため、基盤の保守をベンダーへ任せられるクラウド移行も検討します。")],
@@ -300,6 +359,9 @@ STORIES = {
                 "基盤の保守をベンダーへ任せられるクラウドへの移行も検討している", "データを失いたくない", "締め後の数字は固定してほしい", "切替の作業で停止が必要になる可能性がある", "復旧を試験したことはない", "障害の一次受付の担当は未定である"]),
     "d3": dict(
         title="大阪拠点の回線更新と、保守の進め方を見直す",
+        sides=[("保守会社の提案", "保守会社", "外部からの遠隔保守で、障害対応を早くしたい", "障害対応を早くするために、外部からの遠隔保守を提案します"),
+               ("社内規程の制約", "情報システム課", "外部からの接続は禁止（事前承認による例外の規定あり）", "当社の規程では外部からの接続は禁止です"),],
+        focus="遠隔保守の提案と、外部接続を禁じる規程をどう整理するか？",
         rows=[("現在の業務", "大阪拠点と本社は主回線1本で接続しており、代替回線はありません。障害時は保守会社の担当者が拠点へ出向いて対応しています。"),
               ("困りごと", "朝9時の受発注の時間帯に画面が遅くなると現場が申告しています（通信量は未計測）。障害時は担当者の到着まで時間がかかります。"),
               ("今回、変えたいこと", "回線を更新し、受発注の業務が止まりにくい通信環境にします。")],
@@ -346,8 +408,9 @@ def _d1() -> dict:
              media_note="第2回は会議ツールの字幕を取り込んだ記録で、録画の再生はありません。"),
         dict(process="判断", short="訂正方法の比較", stage=2, page="decisions", title="3案を比べて、再申請を採用した",
              lead=None,
-             main=lambda g: [g.decision("承認後の金額訂正の方式")],
-             more=lambda g: [("判断の根拠を見る", g.citations("承認後の金額訂正の方式"))],
+             main=lambda g: [g.verdict("承認後の金額訂正の方式", "判断の確認メール", "金額の訂正は再申請で進めます")],
+             evidence_button="この判断に使った確認メールを見る",
+             more=lambda g: [],
              open=lambda g: [(DECIDE, f"{d['topic']}（{d['state']}：{d.get('hold_reason')}）") for d in g.p["decisions"] if d["state"] == "保留"], count=lambda g: f"代表例1件／判断 全{len(g.p['decisions'])}件"),
         dict(process="追加要望と影響", short="追加要望の影響", stage=3, page="changes", title="経理の直接訂正の要望が、過去の判断と衝突する",
              lead=lambda g: _request_lead(g, "直接訂正"),
@@ -356,7 +419,12 @@ def _d1() -> dict:
              open=lambda g: [(DECIDE, "直接訂正を認めるか"), (UNKNOWN, f"影響を未調査の領域 {g.impacts(g.chg('直接訂正'))[1]}件")], count=lambda g: f"代表例1件／追加要望 全{len(g.p['changes'])}件"),
         dict(process="判断後の仕様", short="判断後の仕様", stage=4, page="trail", title="追加要望への判断と、変更された仕様",
              lead=None,
-             main=lambda g: [g.decision("経理担当者による直接訂正"), _after(g, "金額の誤り"), g.timeline("金額の誤り")],
+             main=lambda g: [g.change_summary("金額の誤り", "直接訂正", "経理担当者による直接訂正",
+                                              before=("申請者が再申請し、内容を引き継いだ下書きを作る", ["申請者が再申請する", "内容を引き継いだ下書き"]),
+                                              after=("経理担当者も、再申請の下書きを代行作成できる", "再申請の下書きは経理担当者が代行作成できる"),
+                                              keep=("承認済みの申請は直接変更しない", "承認済みの申請は直接変更できない"),
+                                              scope="経理担当者が代行できるのは、再申請の下書きの作成までです。承認済みの申請の金額を直接訂正することは認めていません。"),
+                             g.decision("経理担当者による直接訂正"), _after(g, "金額の誤り"), g.timeline("金額の誤り")],
              more=lambda g: [("「なぜ再申請か」の回答を見る", [g.why("なぜ再申請なのか")["reason"]]), ("判断の根拠を見る", g.citations("経理担当者による直接訂正"))],
              open=lambda g: [(DECIDE, f"{d['topic']}（{d['state']}）") for d in g.p["decisions"] if d["state"] == "保留"], count=lambda g: f"履歴 全{len(g.p['history'])}件"),
         FINAL,
@@ -400,7 +468,12 @@ def _d2() -> dict:
              open=lambda g: [(DECIDE, "当月の再集計を認めるか"), (UNKNOWN, f"影響を未調査の領域 {g.impacts(g.chg('再集計'))[1]}件")], count=lambda g: f"代表例1件／追加要望 全{len(g.p['changes'])}件"),
         dict(process="判断後の仕様", short="判断と理由", stage=4, page="why", title="再集計の要望への判断と、変更された仕様",
              lead=None,
-             main=lambda g: [g.decision("締め後の再集計"), _after(g, "締め後の数字"), g.timeline("締め後の数字")],
+             main=lambda g: [g.change_summary("締め後の数字", "再集計", "締め後の再集計",
+                                              before=("訂正は、翌月の訂正版として作る", "訂正は翌月の訂正版として作る"),
+                                              after=("訂正は、訂正版として翌営業日までに作る", "訂正は訂正版として翌営業日までに作る"),
+                                              keep=("締め後の数字は固定し、元の数字は残す", ["締め後の数字は固定し", "元の数字は残す"]),
+                                              scope="当月の数字の再集計は認めていません。早めたのは、訂正版を作る時期です。"),
+                             g.decision("締め後の再集計"), _after(g, "締め後の数字"), g.timeline("締め後の数字")],
              more=lambda g: [("理由が未記録の例を見る", [f"質問「{g.why('なぜ保存期間は3年なのか')['question']}」への回答：{g.why('なぜ保存期間は3年なのか')['reason']}（AIで補っていません）"]), ("判断の根拠を見る", g.citations("締め後の再集計"))],
              open=lambda g: g.open_summary(), count=lambda g: f"履歴 全{len(g.p['history'])}件"),
         FINAL,
@@ -443,7 +516,12 @@ def _d3() -> dict:
              open=lambda g: [(DECIDE, "保守の方式"), (UNKNOWN, f"影響を未調査の領域 {g.impacts(g.chg('常時接続'))[1]}件")], count=lambda g: f"代表例1件／追加要望 全{len(g.p['changes'])}件"),
         dict(process="判断後の仕様", short="判断と理由", stage=4, page="why", title="常時接続の要望への判断と、変更された仕様",
              lead=None,
-             main=lambda g: [g.decision("遠隔保守の扱い"), _after(g, "現地対応"), g.timeline("現地対応")],
+             main=lambda g: [g.change_summary("現地対応", "常時接続", "遠隔保守の扱い",
+                                              before=("保守会社が遠隔保守を行う（提案の段階）", "保守会社が遠隔保守を行う（提案）"),
+                                              after=("今回の保守は現地対応とし、時間限定の遠隔接続は次回以降に検討する", ["今回の保守は現地対応とする", "時間限定の遠隔接続は次回以降に検討する"]),
+                                              keep=("社外から社内ネットワークへの外部接続は禁止する", "社外から社内ネットワークへの外部接続は禁止する"),
+                                              scope="常時接続は認めていません。時間限定の接続は、承認者とログの運用が決まるまで次回以降の検討です。"),
+                             g.decision("遠隔保守の扱い"), _after(g, "現地対応"), g.timeline("現地対応")],
              more=lambda g: [("過去の指摘を見る", [f"{a}：{b}" for a, b, _ in g.conflict(g.chg("常時接続"))] + g.impact_lines(g.chg("常時接続"))[:2]), ("判断の根拠を見る", g.citations("遠隔保守の扱い"))],
              open=lambda g: g.open_summary(), count=lambda g: f"履歴 全{len(g.p['history'])}件"),
         FINAL,
@@ -452,17 +530,44 @@ def _d3() -> dict:
 
 GUIDES = {"d1": _d1, "d2": _d2, "d3": _d3}
 
+# 本文上部に出す大きな区分（名前と、含む画面の数）。画面の並びと合わないとテストで検出する
+PHASES = {
+    "d1": [("背景と準備", 3), ("比較と判断", 2), ("変更と成果物", 3)],
+    "d2": [("背景と資料", 2), ("条件の具体化と調整", 3), ("変更と成果物", 3)],
+    "d3": [("背景と資料", 2), ("録画の確認と条件", 3), ("変更と成果物", 3)],
+}
+
+# 見どころへの近道（画面の番号は0から）。一覧のカードで説明した体験に直結する画面を選ぶ
+SHORTCUTS = {
+    "d1": (4, "見どころへ：3案の比較と採用理由"),
+    "d2": (2, "見どころへ：「毎朝すぐ」を測れる条件にする"),
+    "d3": (2, "見どころへ：録画の発言と提案の扱い"),
+}
+
+
+def phase_of(demo_id: str, index: int) -> tuple[int, str]:
+    """画面の番号から、大きな区分の番号と名前を返す。"""
+    end = 0
+    for n, (name, size) in enumerate(PHASES[demo_id]):
+        end += size
+        if index < end:
+            return n, name
+    raise IndexError(index)
+
 # デモ用の役割と、体験の振り返り。実案件の利用者の役割を決めるものではない
 INTRO = {
     "d1": dict(role="現場と経理の要望を取りまとめる要件定義担当者",
                done="対立する要望の整理から、判断理由の記録、追加要望への対応までを確認しました。",
-               recap=["対立する条件を整理した", "比較と判断理由を記録した", "追加要望と過去の判断の関係を追跡した"]),
+               recap=["対立する条件を整理した", "比較と判断理由を記録した", "追加要望と過去の判断の関係を追跡した"],
+               spec_note="再申請方式を採用した理由と、未確認の項目がどう記録されたかを確認できます。"),
     "d2": dict(role="業務部門と基盤担当の条件を取りまとめる要件定義担当者",
                done="曖昧な要望の具体化から、アプリと基盤の整理、追加要望への対応までを確認しました。",
-               recap=["曖昧な要望を、確認できる条件に分けた", "数値の出所と確認状態を区別した", "アプリと基盤の担当範囲と未決事項を整理した"]),
+               recap=["曖昧な要望を、確認できる条件に分けた", "数値の出所と確認状態を区別した", "アプリと基盤の担当範囲と未決事項を整理した"],
+               spec_note="「毎朝8時30分まで」などの数値条件と、訂正版で対応する判断の理由、未確認の項目を確認できます。"),
     "d3": dict(role="拠点の要望と保守会社の提案を取りまとめる要件定義担当者",
                done="録画の発言の確認から、提案と合意の区別、追加要望への対応までを確認しました。",
-               recap=["録画の発言を、時刻付きの根拠として確認した", "提案・制約・合意を区別した", "追加要望の影響を調べ、判断と理由を記録した"]),
+               recap=["録画の発言を、時刻付きの根拠として確認した", "提案・制約・合意を区別した", "追加要望の影響を調べ、判断と理由を記録した"],
+               spec_note="現地対応を採用した理由と、時間限定の遠隔接続など未決の項目がどう記録されたかを確認できます。"),
 }
 
 
@@ -489,7 +594,7 @@ SCENES = {
              support=[("入力・根拠", "第1回議事録と第2回の字幕"), (AI, "要望・制約・決定の候補を抽出"), (PROGRAM, "引用を原文と照合し、資料にない数値に印を付ける"), ("人が行うこと", "候補を読み、採用か却下かを決める")]),
         dict(scene="第2回会議の記録", date=lambda g: g.on("第2回打ち合わせ"), check="初回で整理した要望と制約を受け、訂正方法についての発言を確認します。", detail=lambda g: f"発言{sum(len(r['segments']) for r in g.p['recordings'])}件と確認状態を見る",
              support=[("入力・根拠", "会議ツールの字幕"), (PROGRAM, "発言ごとに話者と内容の確認状態を記録し、未確認の情報だけでは合意できないようにする"), ("人が行うこと", "話者と内容を確認する")]),
-        dict(scene="第2回会議の後", date=lambda g: g.dec("承認後の金額訂正の方式")["decided_on"], check="発言の確認を受け、判断者が訂正方法を選びました。", detail=lambda g: f"判断{g.count('decisions')}件と根拠を見る",
+        dict(scene="第2回会議の後", date=lambda g: g.dec("承認後の金額訂正の方式")["decided_on"], check="発言の確認を受け、判断者が訂正方法を選びました。", detail=lambda g: "決定・合意の一覧を見る",
              support=[("入力・根拠", "3つの案、第2回の発言、確認メール"), (PROGRAM, "採用案・判断者・判断日がそろわない記録は合意にしない"), ("人が行うこと", "案を比べ、採否と理由を判断する（AIは比較も判断もしていません）")]),
         dict(scene="追加要望の受付", date=lambda g: g.requests("直接訂正")["date"], check="判断の後、経理担当者から直接訂正の要望が届きました。過去の判断と衝突していないかを確認します。", detail=lambda g: "変更影響の詳細を見る",
              support=[("入力・根拠", "追加要望のメールと過去の判断"), (AI, "影響しそうな点の候補を作成"), (PROGRAM, "登録済みの関連から影響をたどり、文型の照合で矛盾の候補を検出し、未調査の領域を示す"), ("人が行うこと", "影響を確認し、採否を判断する")]),

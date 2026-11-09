@@ -18,14 +18,6 @@ from .. import drafts, situation
 from ..components import chip, definition, edit_block, esc, guard, head, ok_rerun, save_controls, select_item, touch
 
 
-def nav_row(*items: tuple[str, str, str], top: bool = True) -> None:
-    """案件内の移動。左メニューを閉じていても、本文から行き来できるようにする。"""
-    cols = st.columns(len(items) + (2 if top else 0))
-    for col, (label, page, key) in zip(cols, items):
-        if col.button(label, key=key, width="stretch", type="secondary"):
-            state.goto(page)
-
-
 def setup(p: dict) -> None:
     """案件の準備。背景と資料はどちらからでも始められ、あとから追加・編集できる。"""
     head("案件の準備", "背景の入力と資料の取り込みは、どちらからでも始められます。あとから追加・編集できます。", "案件ホーム")
@@ -44,8 +36,10 @@ def setup(p: dict) -> None:
             st.space("stretch")
             if st.button(label, key=key, width="stretch"):
                 state.goto(page)
-    st.caption("2つの項目がそろう前でも、左のメニューから会議の準備や要件の整理に進めます。")
-    if not p.get("is_demo"):  # 続きの作業に備える補助の操作。2枚のカードより控えめに置く
+    if not p.get("is_demo"):
+        st.caption("上の2つは、背景や資料をあとから追加・編集するときの入口です。")
+        next_block(p, "setup_next")
+    if not p.get("is_demo"):  # 続きの作業に備える補助の操作。「次にすること」より下に、控えめに置く
         with st.container(key="setup_resume"):
             st.html('<div class="dr-resume-t"><b>続きの作業に備える</b>' + esc(RESUME_NOTE) + "</div>")
             save_controls(p, "save_setup", note=False)
@@ -54,6 +48,23 @@ def setup(p: dict) -> None:
 # 再開用ファイルの説明。jsonio.dumps は案件データ（取り込んだ資料の本文を含む）を書き出し、元のファイルと保存前の下書きは含まない
 RESUME_NOTE = ("別の日に続ける場合は、再開用ファイルをダウンロードしてください。元のWord・PDFファイルは含まれません。"
                "各画面の「保存」は、いま開いている案件への反映です。再開用ファイルは、ブラウザーを閉じた後に案件を復元するためのものです（保存していない下書きは含まれません）。")
+
+
+def next_block(p: dict, key: str, lead: str = "次にすること") -> None:
+    """案件の状態に合う次の作業。主ボタン1つで既存の作業画面を直接開き、ほかに進める作業は控えめに出す。
+
+    ボタンは画面を開くだけで、AIの実行は移動先の画面の操作で行う。
+    """
+    nx = gd.setup_next(p)
+    with st.container(border=True, key=key):
+        st.html(f'<div class="dr-next"><b>{esc(lead)}</b><span>{esc(nx["reason"])}</span></div>'
+                + (f'<div class="dr-meta">{esc(nx["detail"])}</div>' if nx.get("detail") else ""))
+        with st.container(horizontal=True, vertical_alignment="center"):
+            if st.button(f"{nx['label']} →", key=f"{key}_go", type="primary"):
+                state.goto(nx["page"])
+            for n, (label, page) in enumerate(nx["alts"]):
+                if st.button(f"ほかの作業：{label}", key=f"{key}_alt_{n}", type="tertiary"):
+                    state.goto(page)
 
 
 def top_nav(back_key: str, cross: tuple[str, str, str]) -> None:
@@ -105,8 +116,6 @@ def overview(p: dict) -> None:
     if phase == "empty" and not p.get("is_demo"):
         setup(p)
         return
-    if not p.get("is_demo"):  # 左メニューを閉じていても、案件の準備へ戻れるようにする
-        nav_row(("案件の準備", "setup", "go_setup_ov"), ("背景・目的・関係者", "profile", "go_profile_ov"))
     head(p["name"], "現在の状況と、確認・依頼することをまとめています。" if not p.get("is_demo") else "残件と次の行動を確認します。完成度の点数は表示しません。", "案件ホーム")
     bl = checks.backlog(p)
     stats = [("要件", sum(1 for r in p["requirements"] if r["status"] not in ("廃止", "却下"))),
