@@ -118,7 +118,7 @@ with sync_playwright() as pw:
     click(g, "前へ：案件の背景")
     shortcut(g, DEMOS[0])
     t = g.inner_text("body")
-    check("ステップ 5/8" in t and "この案件の論点" in t and g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 判断", "2 見どころへ直接進み、現在地（比較と判断・ステップ5）と論点が出る")
+    check("ステップ 5/8" in t and "この案件の論点" in t and g.locator(".dr-loc").inner_text() == "デモステップ 5/8 · 判断", "2 見どころへ直接進み、現在地（比較と判断・ステップ5）と論点が出る")
 
     # 3. 判断の画面
     top_vd = g.locator(".dr-vd").first.inner_text()
@@ -133,13 +133,13 @@ with sync_playwright() as pw:
     # 本文は表（キャンバス描画）のため、選ばれた記録の名前で確かめる。画面写真でも確認する
     g.screenshot(path=OUT / "3_mail.png")
     picked = g.locator("[data-testid=stSelectbox]").filter(has_text="表示する項目").evaluate("e=>e.textContent+' '+[...e.querySelectorAll('input')].map(i=>i.value+' '+(i.getAttribute('aria-label')||'')).join(' ')")
-    check("判断の確認メール" in picked and btn(g, "← ステップ5「判断」に戻る").count() == 1, f"3 確認メールの記録が開き、戻り先が「← ステップ5「判断」に戻る」（{picked.strip()[:40]}）")
-    click(g, "← ステップ5「判断」に戻る", 3000)
+    check("判断の確認メール" in picked and btn(g, "← デモステップ 5/8『判断』に戻る").count() == 1, f"3 確認メールの記録が開き、戻り先が「← デモステップ 5/8『判断』に戻る」（{picked.strip()[:40]}）")
+    click(g, "← デモステップ 5/8『判断』に戻る", 3000)
     check("ステップ 5/8" in g.inner_text("body"), "3 確認メールから、ステップ5へ戻る")
-    click(g, "決定・合意の一覧を見る", 3000)
+    click(g, "この案件の決定・合意を確認する", 3000)
     g.screenshot(path=OUT / "3_decisions.png")
-    check(g.locator(".dr-title").first.inner_text() == "決定・合意" and btn(g, "← ステップ5「判断」に戻る").count() == 1, "3 決定・合意の一覧（案件全体の判断記録）が開き、戻り先を表示")
-    click(g, "← ステップ5「判断」に戻る", 3000)
+    check(g.locator(".dr-title").first.inner_text() == "決定・合意" and btn(g, "← デモステップ 5/8『判断』に戻る").count() == 1, "3 決定・合意の一覧（案件全体の判断記録）が開き、戻り先を表示")
+    click(g, "← デモステップ 5/8『判断』に戻る", 3000)
 
     # 4. 判断後の仕様
     click(g, "次へ：追加要望と影響")

@@ -149,9 +149,9 @@ with sync_playwright() as pw:
     success_y = ok_box.locator("[data-testid=stAlert]").bounding_box()["y"]
     go = next_button(g).first
     check(go.inner_text() == "会議の記録を整理する →" and abs(go.bounding_box()["y"] - success_y) < 200 and in_view(go), f"2 議事録の登録直後、成功メッセージの近く（{go.bounding_box()['y'] - success_y:.0f}px下）に記録の整理を表示")
-    check(main(g).get_by_role("button", name="続けて資料を追加する").count() == 1 and main(g).get_by_role("button", name="← 案件の準備に戻る").count() == 1, "2 続けて資料を追加する操作と、案件の準備に戻る操作も使える")
+    check(main(g).get_by_role("button", name="続けて資料を追加する").count() == 1 and main(g).get_by_role("button", name="← 準備の概要に戻る").count() == 1, "2 続けて資料を追加する操作と、案件の準備に戻る操作も使える")
     g.screenshot(path=OUT / "2_after_register.png")
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     t = body(g)
     cards_bottom = g.locator(".st-key-setup_profile").bounding_box()["y"]
     nb = g.locator(".st-key-setup_next").bounding_box()["y"]
@@ -162,13 +162,13 @@ with sync_playwright() as pw:
     g.screenshot(path=OUT / "1_setup_next.png")
     click(g, "会議の記録を整理する →", 3000)
     check(title(g) == "会議の記録を整理" and "第1回打ち合わせ議事録" in body(g), "1 1クリックで既存の整理画面が開く（取り込んだ議事録が並ぶ）")
-    check(main(g).get_by_role("button", name="← 案件の準備に戻る").count() == 1 and "件の候補を作成しました" not in body(g), "どの画面でも上部に戻る操作。AIは画面を開いただけでは実行しない")
-    click(g, "← 案件の準備に戻る")
+    check(main(g).get_by_role("button", name="← 準備の概要に戻る").count() == 1 and "件の候補を作成しました" not in body(g), "どの画面でも上部に戻る操作。AIは画面を開いただけでは実行しない")
+    click(g, "← 準備の概要に戻る")
     click(g, "背景・目的・関係者を編集")
     keep = g.get_by_label("背景", exact=True).first.input_value() == "申込をメールで受けている"
     click(g, "資料・議事録へ")
     check(keep and "第1回打ち合わせ議事録" in g.content(), "5 次の作業へ進んで戻っても、保存済みの背景と登録済みの資料が残る")
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     with g.expect_download() as d:
         main(g).get_by_role("button", name="再開用ファイルをダウンロード").click()
     saved = OUT / "resume_a.json"
@@ -182,16 +182,16 @@ with sync_playwright() as pw:
     click(g, "資料・議事録を取り込む")
     paste(g, "要望書", "申込から受講履歴までを一つのアプリで管理したい。", other="要望")
     check(next_button(g).first.inner_text() == "会議の準備へ進む →", "3 要望書を登録した直後は「会議の準備へ進む」")
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     check(next_button(g).first.inner_text() == "会議の準備へ進む →", "3 要望書だけの案件の準備画面は「会議の準備へ進む」")
     click(g, "会議の準備へ進む →", 3000)
     check(title(g) == "質問・議題", "3 1クリックで会議の準備（質問・議題）が開く")
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     click(g, "資料・議事録を取り込む")
     g.get_by_text("議事録を取り込む", exact=True).click()
     wait(g, 1200)
     paste(g, "第1回議事録", "受講者は研修を選んで申し込む。")
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     check(next_button(g).first.inner_text() == "会議の記録を整理する →" and "未入力" in body(g), "4 背景が未入力でも、議事録を追加すると記録の整理へ案内が変わる")
     c.close()
 
@@ -201,8 +201,8 @@ with sync_playwright() as pw:
         c = b.new_context(viewport={"width": 1440, "height": H})
         g = c.new_page()
         resume(g, path)
-        if title(g) != "案件の準備":  # 再開は保存時の画面で開く
-            click(g, "← 案件の準備に戻る")
+        if title(g) != "準備の概要":  # 再開は保存時の画面で開く
+            click(g, "← 準備の概要に戻る")
         got = next_button(g).first.inner_text()
         check(got == want, f"{label}（{got}）")
         if want.startswith("AI候補"):

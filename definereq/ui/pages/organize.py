@@ -112,7 +112,7 @@ def _req_focus(p: dict) -> list[str] | None:
     return ids
 
 
-PAGE_NAMES = {"overview": "現在の状況", "setup": "案件の準備"}
+PAGE_NAMES = {"overview": "現在の状況", "setup": "準備の概要"}
 
 
 def requirements(p: dict) -> None:

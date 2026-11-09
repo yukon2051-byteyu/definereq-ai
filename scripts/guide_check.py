@@ -150,7 +150,7 @@ with sync_playwright() as pw:
     g.get_by_role("button", name="確認状態を見る").click()
     g.wait_for_timeout(3000)
     check("機能画面" in g.inner_text("body"), "詳細へ移動すると機能画面の説明が出る")
-    g.get_by_role("button", name=re.compile(r"^← ステップ\d+「")).click()  # 開いた元のステップへ戻る
+    g.get_by_role("button", name=re.compile(r"^← デモステップ \d+/")).click()  # 開いた元のステップへ戻る
     g.wait_for_selector(".dr-g-h", timeout=60000)
     g.wait_for_timeout(2500)
     check(g.locator(".dr-g-h").inner_text() == title, "ガイドの元の画面へ戻る")

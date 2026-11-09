@@ -119,7 +119,7 @@ with sync_playwright() as pw:
     check("AI整理完了" in main(g).locator(".dr-now").first.inner_text() and btn(g, "AI候補を確認する →").count() == 1, "1 AIは押したときに実行され、件数と「AI候補を確認する」が出る（代替応答）")
 
     # 準備画面と記録整理の案内が状態と一致
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     nx = main(g).locator(".dr-next").inner_text()
     check("確認待ちの要件候補" in nx and btn(g, "AI候補を確認する →").count() == 1, f"2 候補あり：準備画面は「AI候補を確認する」（{nx.splitlines()[0]}）")
 
@@ -134,7 +134,7 @@ with sync_playwright() as pw:
     saved = main(g).get_by_text("案件情報を保存しました", exact=False)
     nxt = btn(g, "次へ：AI候補を確認する →")
     check(saved.count() == 1 and nxt.count() == 1, "3 保存後：フォームの近くに「案件情報を保存しました」と、状態に合う次の操作")
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     click(g, "背景・目的・関係者を編集")
     check(g.get_by_label("背景", exact=True).first.input_value() == "申込をメールで受け、Excelで定員を管理している", "3 最新の入力が保存されている")
 
@@ -168,17 +168,17 @@ with sync_playwright() as pw:
         close_sidebar(g)
         nexts = main(g).get_by_role("button").filter(has_text="次へ：")
         loc = g.locator(".dr-loc").inner_text()
-        check(nexts.count() == 1 and in_view(nexts.first) and main(g).get_by_role("button").filter(has_text="見どころへ：").count() == 0 and loc == "ステップ 1/8 · " + loc.split(" · ")[1],
+        check(nexts.count() == 1 and in_view(nexts.first) and main(g).get_by_role("button").filter(has_text="見どころへ：").count() == 0 and loc == "デモステップ 1/8 · " + loc.split(" · ")[1],
               f"4 {name} 冒頭：「次へ」は1つ、見どころへの近道あり、現在地「{loc}」")
         if name == "d1":
             click(g, "次へ：会議前の準備")
-            check(g.locator(".dr-loc").inner_text() == "ステップ 2/8 · 会議前の準備", "4 d1 順に進むと現在地が更新される")
+            check(g.locator(".dr-loc").inner_text() == "デモステップ 2/8 · 会議前の準備", "4 d1 順に進むと現在地が更新される")
             click(g, "前へ：案件の背景")
             main(g).get_by_role("button", name="ステップ一覧").click()
             wait(g, 700)
             g.locator("[data-testid=stPopoverBody]").get_by_role("button", name="5. 判断", exact=True).click()
             wait(g, 3000)
-            check(g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 判断", "4 d1 見どころから入っても現在地が一致（ステップ 5/8 · 判断）")
+            check(g.locator(".dr-loc").inner_text() == "デモステップ 5/8 · 判断", "4 d1 見どころから入っても現在地が一致（デモステップ 5/8 · 判断）")
             win = g.locator(".dr-vd-win")
             table = g.locator(".dr-t-cmp")
             nxt = btn(g, "次へ：追加要望と影響")
@@ -192,12 +192,12 @@ with sync_playwright() as pw:
             check(main(g).get_by_text("判断に使っていない発言（話者未確認）").is_visible(), "5 詳細を開くと、話者未確認の発言を判断に使っていないことが分かる")
             click(g, "この判断に使った確認メールを見る", 3000)
             picked = g.locator("[data-testid=stSelectbox]").filter(has_text="表示する項目").evaluate("e=>[...e.querySelectorAll('input')].map(i=>i.value).join(' ')+e.textContent")
-            check("判断の確認メール" in picked and btn(g, "← ステップ5「判断」に戻る").count() == 1, "5 確認メールが開き、戻り先を表示")
-            click(g, "← ステップ5「判断」に戻る", 3000)
-            click(g, "決定・合意の一覧を見る", 3000)
+            check("判断の確認メール" in picked and btn(g, "← デモステップ 5/8『判断』に戻る").count() == 1, "5 確認メールが開き、戻り先を表示")
+            click(g, "← デモステップ 5/8『判断』に戻る", 3000)
+            click(g, "この案件の決定・合意を確認する", 3000)
             check(g.locator(".dr-title").first.inner_text() == "決定・合意", "5 決定・合意の一覧が開く")
-            click(g, "← ステップ5「判断」に戻る", 3000)
-            check(g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 判断", "5 元のステップへ戻る")
+            click(g, "← デモステップ 5/8『判断』に戻る", 3000)
+            check(g.locator(".dr-loc").inner_text() == "デモステップ 5/8 · 判断", "5 元のステップへ戻る")
             click(g, "次へ：追加要望と影響")
             click(g, "次へ：判断後の仕様", 3000)
             grid = g.locator(".dr-cs-grid")

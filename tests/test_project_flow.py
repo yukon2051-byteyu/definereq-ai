@@ -627,8 +627,8 @@ def test_deciding_stage_with_requirements_points_to_them(p):
 def test_profile_page_has_back_and_go(p):
     at = open_app(p, "profile")
     labels = [b.label for b in at.button]
-    assert "案件情報を保存" in labels and "保存して資料・議事録へ進む" in labels and "← 案件の準備に戻る" in labels and "資料・議事録へ" in labels
-    assert "案件の準備を開く" not in labels and labels.count("← 案件の準備に戻る") == 1  # 準備へ戻る操作は見出し付近の1か所だけ
+    assert "案件情報を保存" in labels and "保存して資料・議事録へ進む" in labels and "← 準備の概要に戻る" in labels and "資料・議事録へ" in labels
+    assert "準備の概要を開く" not in labels and labels.count("← 準備の概要に戻る") == 1  # 準備へ戻る操作は見出し付近の1か所だけ
     assert any("この欄の入力を案件に反映します" in c.value for c in at.caption)
 
 
@@ -649,7 +649,7 @@ def test_sources_shows_import_first(p):
     at = open_app(p, "sources")
     assert "dr-brief" in html(at) and 'class="dr-sit dr-sit-work"' not in html(at)
     labels = [b.label for b in at.button]
-    assert labels.count("← 案件の準備に戻る") == 1 and "背景・目的・関係者を入力" in labels
+    assert labels.count("← 準備の概要に戻る") == 1 and "背景・目的・関係者を入力" in labels
     assert next(r for r in at.radio if r.key == "src_mode").value == "議事録を取り込む"
     assert "登録する種類<b>議事録</b>" in html(at)
 
@@ -1012,7 +1012,7 @@ def test_work_pages_have_back_to_setup(p):
     p["profile"]["background"].update(value="背景")
     for page in ("prep", "records", "requirements", "overview"):
         at = open_app(p, page)
-        back = next(b for b in at.button if b.label == "← 案件の準備に戻る")
+        back = next(b for b in at.button if b.label == "← 準備の概要に戻る")
         at = back.click().run()
         assert at.session_state["page"] == "setup", page
 
@@ -1149,7 +1149,7 @@ def test_resume_file_records_last_page(p):
     at = AppTest.from_file(APP, default_timeout=60)
     at.session_state["project"], at.session_state["page"] = pj.new_project("t", ["app"]), "zzz"  # 無効な画面は案件の準備で開く
     at.run()
-    assert not at.exception and "案件の準備" in html(at)
+    assert not at.exception and "準備の概要" in html(at)
 
 
 def test_every_project_page_has_next_or_back_in_body(p):
@@ -1166,7 +1166,7 @@ def test_every_project_page_has_next_or_back_in_body(p):
         assert keys & {"guide_go", "setup_next_go", "pf_save", "src_read", "paste_go", "ai_go_extract", "records_go_cand", "cand_go_list", "cand_go_reqs", "cand_go_overview"} \
             or "この画面で作業します" in body, page
         if page not in ("setup", "profile", "sources"):
-            assert any(b.label == "← 案件の準備に戻る" for b in at.button), page
+            assert any(b.label == "← 準備の概要に戻る" for b in at.button), page
 
 
 def test_every_demo_detail_page_returns_to_step():
@@ -1179,7 +1179,7 @@ def test_every_demo_detail_page_returns_to_step():
         for b in [b for b in at.sidebar.button if b.key.startswith("nav_") and b.key[4:] in PAGES_KEYS()]:
             at = next(x for x in at.sidebar.button if x.key == b.key).click().run()
             assert not at.exception and at.session_state["tour_on"] is False, b.key
-            assert next(x for x in at.button if x.key == "tour_back").label == "← ステップ5「判断」に戻る", b.key
+            assert next(x for x in at.button if x.key == "tour_back").label == "← デモステップ 5/8『判断』に戻る", b.key
             opened.add(b.key[4:])
     assert len(opened) >= 15  # 詳細メニュー以外の機能をすべて開いた
     at = next(x for x in at.button if x.key == "tour_back").click().run()

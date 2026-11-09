@@ -334,7 +334,7 @@ def _phases(demo_id: str, steps: list[dict], i: int) -> None:
     前へ・次へは本文の要点の下に置く。サイドバーは工程と機能のメニュー（自分の案件と同じ）。
     """
     with st.container(key="tour_loc", horizontal=True, vertical_alignment="center"):
-        st.html(f'<div class="dr-loc">ステップ {i + 1}/{len(steps)} · {esc(steps[i]["process"])}</div>')
+        st.html(f'<div class="dr-loc">デモステップ {i + 1}/{len(steps)} · {esc(steps[i]["process"])}</div>')
         with st.popover("ステップ一覧"):
             for n, step in enumerate(steps):
                 _, phase = guide.phase_of(demo_id, n)
@@ -434,7 +434,7 @@ def back_label(p: dict) -> str:
     """詳細画面から戻るボタンの名前。実際の戻り先の画面を示す。"""
     steps = guide.load(p["demo"]["id"])
     i = min(st.session_state.get("tour_index", 0), len(steps) - 1)
-    return f"← ステップ{i + 1}「{steps[i]['process']}」に戻る"
+    return f"← デモステップ {i + 1}/{len(steps)}『{steps[i]['process']}』に戻る"
 
 
 def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx, show_next: bool = True) -> None:
@@ -442,10 +442,20 @@ def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx, show_next: bool 
     c1, c2, c3 = st.columns([2, 2, 3])
     if i > 0 and c1.button(f"前へ：{steps[i - 1]['process']}", key="tour_prev", width="stretch"):
         jump(steps, i - 1)
-    if c2.button(step["detail"](ctx), key="tour_detail", type="tertiary", width="stretch"):
+    # 機能ページを開く補助ボタン。開く内容が分かる名前にし、「次へ」と見分ける（工程番号とステップ番号は対応づけない）
+    page_name = st.session_state.get("_page_names", {}).get(step["page"], ("", step["detail"](ctx)))[1]
+    if c2.button(detail_label(page_name), key="tour_detail", type="tertiary", width="stretch"):
         open_detail(step["page"])
     if show_next and c3.button(next_label(steps, i), key="tour_next", type="primary", width="stretch"):
         jump(steps, i + 1)
+
+
+def detail_label(page_name: str) -> str:
+    """機能ページを開く補助ボタンの名前（例：この案件のAI候補を確認する）。画面名の「の確認」は重ねない。"""
+    noun = page_name[:-3] if page_name.endswith("の確認") else page_name
+    if noun.endswith("か"):  # 例：「なぜこの仕様か」
+        noun = f"「{noun}」"
+    return f"この案件の{noun}を確認する"
 
 
 def next_label(steps: list[dict], i: int) -> str:

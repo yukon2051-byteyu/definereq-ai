@@ -138,9 +138,9 @@ with sync_playwright() as pw:
     first = g.get_by_label("背景", exact=True).first
     head_ok, head_y = in_view(g.locator(".dr-title").first)
     input_ok, input_y = in_view(first)
-    back_ok, _ = in_view(button(g, "← 案件の準備に戻る"))
+    back_ok, _ = in_view(button(g, "← 準備の概要に戻る"))
     order = g.evaluate("""(()=>{const y=e=>e.getBoundingClientRect().top;const t=document.querySelector('.dr-title'),f=document.querySelector('textarea'),
-        bk=[...document.querySelectorAll('[data-testid=stMain] button')].find(x=>x.innerText.includes('案件の準備に戻る'));return y(bk)<y(t)&&y(t)<y(f)})()""")
+        bk=[...document.querySelectorAll('[data-testid=stMain] button')].find(x=>x.innerText.includes('準備の概要に戻る'));return y(bk)<y(t)&&y(t)<y(f)})()""")
     g.screenshot(path=OUT / f"{SIZE}_profile_first.png")
     if SIZE == "pc":
         check(title(g) == "背景・目的・関係者" and head_ok and input_ok and back_ok and order, f"1 背景：戻る→見出し→入力欄の順で、最初の入力欄が初期表示に入る（見出し {head_y}px、入力欄 {input_y}px）")
@@ -181,7 +181,7 @@ with sync_playwright() as pw:
     slow_click(g, "保存して会議の記録を整理へ進む")
     t = body(g)
     check(title(g) == "会議の記録を整理" and "案件情報を保存しました" in t, "3 フォーカスを外さずに1回押すと、保存して次工程（記録の整理）が開き、保存したことを表示")
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     click(g, "資料・議事録を取り込む")
     check("第1回打ち合わせ議事録" in g.content(), "4 資料の画面に戻っても登録済みの資料が残る")
 
@@ -194,7 +194,7 @@ with sync_playwright() as pw:
     check(title(g) == "会議の記録を整理", "3 保存済みの状態から編集しても、1回の操作で保存して移動する")
 
     # 4. 関係者・用語はそれぞれの追加で反映する
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     click(g, "背景・目的・関係者を編集")
     check(g.get_by_label("背景", exact=True).first.input_value().endswith("月末に集計している") and
           g.get_by_label("目的", exact=True).first.input_value() == "申込の状況を一つの画面で見られるようにする", "3 保存した最新の内容が背景の画面に出る")
@@ -209,9 +209,9 @@ with sync_playwright() as pw:
     wait(g, 800)
     click(g, "用語を追加")
     check("用語「キャンセル待ち」を追加しました" in body(g), "4 用語も、それぞれの追加で反映")
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     t = body(g)
-    check(title(g) == "案件の準備" and "入力済み" in t and "取り込み済み 1件" in t, "4 案件の準備に「入力済み」「取り込み済み 1件」")
+    check(title(g) == "準備の概要" and "入力済み" in t and "取り込み済み 1件" in t, "4 案件の準備に「入力済み」「取り込み済み 1件」")
     check(t.count("元のWord・PDFファイルは含まれません") == 1, "4 再開用ファイルの説明は本文の1か所だけ")
     g.screenshot(path=OUT / f"{SIZE}_setup.png", full_page=True)
 
@@ -281,8 +281,8 @@ with sync_playwright() as pw:
         wait(g)
         if label == "改修後のファイル":
             close_sidebar(g)
-            if title(g) != "案件の準備":  # 再開は保存時の画面で開く
-                click(g, "← 案件の準備に戻る")
+            if title(g) != "準備の概要":  # 再開は保存時の画面で開く
+                click(g, "← 準備の概要に戻る")
             ok = "入力済み" in body(g) and "取り込み済み 1件" in body(g)
             click(g, "背景・目的・関係者を編集")
             ok = ok and g.get_by_label("背景", exact=True).first.input_value().endswith("月末に集計している") and "架空の研修責任者" in g.content()

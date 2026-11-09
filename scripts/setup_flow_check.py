@@ -116,7 +116,7 @@ with sync_playwright() as pw:
     login(g)
     create(g, "研修申込の管理（架空・背景から）")
     t = body(g)
-    check(title(g) == "案件の準備" and "未入力" in t and "未取り込み" in t, "4 作成直後は案件の準備（未入力・未取り込み）")
+    check(title(g) == "準備の概要" and "未入力" in t and "未取り込み" in t, "4 作成直後は案件の準備（未入力・未取り込み）")
     g.screenshot(path=OUT / f"{SIZE}_setup_new.png")
     click(g, "背景・目的・関係者を入力")
     fill(g, "課題", "メールで申し込み、Excelで定員を管理している")
@@ -136,7 +136,7 @@ with sync_playwright() as pw:
     check(keep.startswith("メールで申し込み"), "1 背景へ戻ると保存済みの入力が見える")
     fill(g, "目的", "申込の状況を一つの画面で見られるようにする")
     click(g, "案件情報を保存")
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     t = body(g)
     check("入力済み" in t and "取り込み済み 1件" in t and "背景・目的・関係者を編集" in t and "資料・議事録を取り込む" in t, "4 準備に戻ると2項目とも選べ、状態と件数が正しい")
 
@@ -146,16 +146,16 @@ with sync_playwright() as pw:
     wait(g, 700)
     fill(g, "時期", "来年4月の開始を希望（未確認）")
     if SIZE == "pc":
-        sidebar(g, "案件の準備")
+        sidebar(g, "準備の概要")
         how = "左メニュー"
     else:
-        click(g, "← 案件の準備に戻る")
+        click(g, "← 準備の概要に戻る")
         how = "本文の戻る操作"
-    check(title(g) == "案件の準備" and "未保存の変更あり" in body(g), f"3 {how}で移動すると「未保存の変更あり」")
+    check(title(g) == "準備の概要" and "未保存の変更あり" in body(g), f"3 {how}で移動すると「未保存の変更あり」")
     click(g, "背景・目的・関係者を編集")
     check(g.get_by_label("時期", exact=True).first.input_value() == "来年4月の開始を希望（未確認）", f"3 {how}で戻っても下書きが残る")
     click(g, "案件情報を保存")
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     g.screenshot(path=OUT / f"{SIZE}_setup_progress.png")
 
     # 5. 再開用ファイル
@@ -187,7 +187,7 @@ with sync_playwright() as pw:
     shown = g.get_by_text("SRC-001 議事録.docx v1").count() + g.locator("input[value*='議事録.docx'], [title*='議事録.docx']").count()
     check(title(g) == "資料・議事録" and "抽出した本文" in t and (shown > 0 or "議事録.docx" in g.content()), "2 資料へ戻ると取り込み済みの内容を確認できる（画面写真でも確認）")
     check(g.get_by_text("議事録1件を登録しました").count() == 0, "2 往復しただけでは再取り込みしない（登録の表示が出ない。件数は下の「4」で確認）")
-    click(g, "← 案件の準備に戻る")
+    click(g, "← 準備の概要に戻る")
     check("入力済み" in body(g) and "取り込み済み 1件" in body(g), "4 資料から始めた案件の状態と件数")
     check(g.evaluate("document.documentElement.scrollWidth-document.documentElement.clientWidth") <= 0, "7 横にはみ出さない")
     c.close()
@@ -203,8 +203,8 @@ with sync_playwright() as pw:
         g.wait_for_selector(".dr-title", timeout=30000)
         wait(g)
         if label == "改修後のファイル":
-            if title(g) != "案件の準備":  # 再開は保存時の画面で開く。案件の準備でなければ本文のボタンで戻る
-                click(g, "← 案件の準備に戻る")
+            if title(g) != "準備の概要":  # 再開は保存時の画面で開く。案件の準備でなければ本文のボタンで戻る
+                click(g, "← 準備の概要に戻る")
             ok = "入力済み" in body(g) and "取り込み済み 1件" in body(g)
             if SIZE == "pc":
                 sidebar(g, "背景・目的・関係者")

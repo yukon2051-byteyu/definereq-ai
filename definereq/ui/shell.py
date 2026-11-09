@@ -15,7 +15,7 @@ from .pages import decide, materials, organize, prepare, trace
 
 # 上位は作業の工程の5つ。デモと自分の案件で同じ定義からサイドバーを描画し、工程名と機能名をそろえる
 GROUPS = [
-    ("案件の準備", [("setup", "案件の準備", prepare.setup), ("overview", "現在の状況", prepare.overview), ("profile", "背景・目的・関係者", prepare.profile)]),
+    ("案件の準備", [("setup", "準備の概要", prepare.setup), ("overview", "現在の状況", prepare.overview), ("profile", "背景・目的・関係者", prepare.profile)]),
     ("会議の準備", [("prep", "質問・議題", prepare.prep), ("meetings", "会議", prepare.meetings)]),
     ("記録の取り込み・整理", [("records", "会議の記録を整理", materials.records), ("sources", "資料・議事録", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
     ("要件の確認・判断", [("candidates", "AI候補の確認", organize.candidates), ("requirements", "要件", organize.requirements), ("refine", "具体化・受入条件", organize.refine), ("decisions", "決定・合意", decide.decisions),
@@ -59,21 +59,16 @@ def sidebar(p: dict) -> None:
         with st.container(key="nav_mode"):
             if p.get("demo"):
                 st.caption("デモ：閲覧専用・架空データ")
-                if tour:  # デモのステップ（本文の現在地と同じ名前）。選んだステップが強調される
-                    steps = demo_guide.load(p["demo"]["id"])
-                    now = min(st.session_state.get("tour_index", 0), len(steps) - 1)
-                    st.caption("デモのステップ")
-                    for n, s in enumerate(steps):
-                        if st.button(f"{n + 1}. {s['process']}", key=f"tour_side_{n}", type="primary" if n == now else "secondary", width="stretch"):
-                            guide.jump(steps, n)
-                if not tour and st.button("案内付きで最初から見る", key="nav_tour", width="stretch"):
+                if st.button("デモを最初から見る", key="nav_tour", width="stretch"):  # ステップ1からやり直す
                     state.open_demo(p["demo"]["id"], tour=True)
                 if st.button("機能対応表", key="nav_map", width="stretch"):
                     st.session_state["tour_on"] = False
                     state.goto("demo_map")
             elif not p.get("is_demo"):
                 save_controls(p, "save_side")
-        current = guide.step_page(p) if tour else st.session_state.get("page", "overview")
+        # 案内中は、ステップに対応する工程の見出しだけを控えめに強調する（開いていない機能ページは選択表示にしない）
+        current = None if tour else st.session_state.get("page", "overview")
+        group_now = GROUP_OF.get(guide.step_page(p) if tour else current)
 
         def open_page(key: str) -> None:
             if tour:  # デモの案内中に機能を開くと、本文に元のステップへ戻る操作が出る
@@ -87,8 +82,8 @@ def sidebar(p: dict) -> None:
 
         st.caption("工程")
         for n, (group, items) in enumerate(GROUPS):
-            active = current in {k for k, _, _ in items}
-            if st.button(group, key=f"nav_group_{n}", type="tertiary" if active else "secondary", width="stretch"):
+            active = group == group_now
+            if st.button(f"{n + 1}. {group}", key=f"nav_group_{n}", type="tertiary" if active else "secondary", width="stretch"):
                 open_page(items[0][0])
             if active:  # 現在の工程の機能だけを表示する
                 with st.container(key=f"nav_sub_{n}"):
@@ -152,7 +147,7 @@ def next_step(key: str, p: dict) -> None:
 
 def back_to_setup(key: str) -> None:  # noqa: D401
     """自分の案件の各画面の最上部に置く戻る操作。左メニューを閉じていても、案件の準備へ戻れる。"""
-    if st.button("← 案件の準備に戻る", key="go_setup_ov" if key == "overview" else f"go_setup_{key}", type="tertiary"):
+    if st.button("← 準備の概要に戻る", key="go_setup_ov" if key == "overview" else f"go_setup_{key}", type="tertiary"):
         state.goto("setup")
 
 
@@ -171,14 +166,14 @@ def render(p: dict) -> None:
     sidebar(p)
     key = st.session_state.get("page", "overview")
     scroll_top_on_change(p, key)
+    st.session_state["_page_names"] = {k: (GROUP_OF[k], v[0]) for k, v in PAGES.items()}  # ボタンの近くに行き先の正式名を出す
     if p.get("demo") and st.session_state.get("tour_on"):
         guide.render(p)
         return
     label = "デモの機能対応表" if key == "demo_map" else PAGES.get(key, PAGES["overview"])[0]
     context_bar(p, label)
     st.session_state["_group"] = GROUP_OF.get(key)  # 見出しの上の工程名（サイドバーと同じ名前）
-    st.session_state["_demo"] = bool(p.get("is_demo"))
-    st.session_state["_page_names"] = {k: (GROUP_OF[k], v[0]) for k, v in PAGES.items()}  # ボタンの近くに行き先の正式名を出す  # デモの機能画面は、見出し付近に「デモデータ · 閲覧専用」
+    st.session_state["_demo"] = bool(p.get("is_demo"))  # デモの機能画面は、見出し付近に「デモデータ · 閲覧専用」
     mine = not p.get("is_demo")
     st.session_state["_main_elsewhere"] = False
     empty = key == "overview" and gd.phase(p) == "empty"

@@ -85,7 +85,7 @@ def look(p: dict, page: str) -> dict:
     primary = [b for b in at.button if b.proto.type == "primary" and b.key and not b.key.startswith("nav_")]
     main = primary[0] if primary else None
     here = "この画面で作業します" in "".join(c.value for c in at.caption)
-    back = any(b.label == "← 案件の準備に戻る" for b in at.button)  # 主ボタンを押して移動する前に判定する
+    back = any(b.label == "← 準備の概要に戻る" for b in at.button)  # 主ボタンを押して移動する前に判定する
     cards = [b.label for b in at.button if b.key in ("setup_profile", "setup_sources")]
     target = ""
     if main and "→" in main.label:
@@ -111,7 +111,7 @@ def main() -> None:
             r = look(p, key)
             menu = names[key] + ("（詳細メニュー）" if key in ADVANCED else "")
             to = names.get(r["target"], r["target"])
-            lines.append(f"| {group_of[key]} | {menu} | {r['status']} | {r['main']} | {to} | {'← 案件の準備に戻る' if r['back'] else '見出し付近に独自の戻る操作' if key in ('profile', 'sources') else 'ー'} |"
+            lines.append(f"| {group_of[key]} | {menu} | {r['status']} | {r['main']} | {to} | {'← 準備の概要に戻る' if r['back'] else '見出し付近に独自の戻る操作' if key in ('profile', 'sources') else 'ー'} |"
                          + (" **エラー**" if r["error"] else ""))
         lines.append("")
     lines += ["## デモ（3件）", "", "| デモ | ステップ | 工程 | 本文の操作 |", "|---|---|---|---|"]

@@ -19,7 +19,7 @@ URL, OUT, CODE = sys.argv[1], Path(sys.argv[2]), sys.argv[3]
 REVIEW = Path(sys.argv[4]) if len(sys.argv) > 4 else None
 OUT.mkdir(parents=True, exist_ok=True)
 H = 900
-GROUPS = ["案件の準備", "会議の準備", "記録の取り込み・整理", "要件の確認・判断", "共有・変更管理"]
+GROUPS = ["1. 案件の準備", "2. 会議の準備", "3. 記録の取り込み・整理", "4. 要件の確認・判断", "5. 共有・変更管理"]
 MINUTES = "第1回打ち合わせ（架空）。講師が出欠を登録し、月別CSVを出力する。繰上げ回答期限の起算点と休日扱いは未確認。本人によるキャンセルは開始前日17時までとする。"
 problems: list[str] = []
 
@@ -201,7 +201,7 @@ with sync_playwright() as pw:
         g = b.new_context(viewport={"width": 1440, "height": H}).new_page()
         resume(g, REVIEW)
         line = now(g)
-        check(title(g) == "案件の準備" and line.startswith("案件を再開しました") and "AI候補が6件確認待ちです" in line and in_view(btn(g, "AI候補を確認する →")),
+        check(title(g) == "準備の概要" and line.startswith("案件を再開しました") and "AI候補が6件確認待ちです" in line and in_view(btn(g, "AI候補を確認する →")),
               f"5 レビュー用JSON：{line}／主操作「AI候補を確認する」が初期表示に入る")
         g.screenshot(path=OUT / "3_レビュー用JSONの再開.png")
         click(g, "AI候補を確認する →", 3000)
@@ -225,11 +225,11 @@ with sync_playwright() as pw:
             wait(g, 700)
             g.locator("[data-testid=stPopoverBody]").get_by_role("button", name="5. 判断", exact=True).click()  # ステップ一覧は本文の外に開く
             wait(g, 3000)
-            check(g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 判断", "3 本文のステップ一覧からステップ5へ")
-            click(g, "決定・合意の一覧を見る", 3000)
-            check(btn(g, "← ステップ5「判断」に戻る").count() == 1, "3 詳細から元のステップへ戻る操作")
-            click(g, "← ステップ5「判断」に戻る", 3000)
-            click(g, "← ステップ5「判断」に戻る", 300) if btn(g, "← ステップ5「判断」に戻る").count() else None
+            check(g.locator(".dr-loc").inner_text() == "デモステップ 5/8 · 判断", "3 本文のステップ一覧からステップ5へ")
+            click(g, "この案件の決定・合意を確認する", 3000)
+            check(btn(g, "← デモステップ 5/8『判断』に戻る").count() == 1, "3 詳細から元のステップへ戻る操作")
+            click(g, "← デモステップ 5/8『判断』に戻る", 3000)
+            click(g, "← デモステップ 5/8『判断』に戻る", 300) if btn(g, "← デモステップ 5/8『判断』に戻る").count() else None
             top(g)
             g.get_by_role("button", name=start).click()
             wait(g, 3500)

@@ -60,14 +60,17 @@ def test_guide_sidebar_shows_steps_only():
     at = run()
     by_key(at, "tour_d1").click()
     at = at.run()
-    # サイドバーは自分の案件と同じ工程メニュー。現在のステップにひもづく工程と機能を強調する
+    # サイドバーは自分の案件と同じ番号つきの工程メニュー。案内中は対応する工程の見出しだけを控えめに強調し、
+    # 開いていない機能ページは選択表示にしない。デモのステップ一覧はサイドバーに出さない（本文に集約）
     keys = {b.key for b in at.sidebar.button}
-    assert "nav_group_0" in keys and "nav_overview" in keys and "tour_go_0" not in keys
-    assert by_key(at, "nav_overview").proto.type == "primary"
+    assert "nav_group_0" in keys and "nav_overview" in keys and not any(k.startswith(("tour_go_", "tour_side_")) for k in keys)
+    assert by_key(at, "nav_group_0").proto.type == "tertiary" and not any(b.proto.type == "primary" for b in at.sidebar.button)
     labels = [b.label for b in at.sidebar.button if b.key.startswith("nav_group_")]
-    assert labels == ["案件の準備", "会議の準備", "記録の取り込み・整理", "要件の確認・判断", "共有・変更管理"]
+    assert labels == ["1. 案件の準備", "2. 会議の準備", "3. 記録の取り込み・整理", "4. 要件の確認・判断", "5. 共有・変更管理"]
+    assert by_key(at, "nav_setup").label == "準備の概要"
     at = by_key(at, "tour_go_4").click().run()  # 本文のステップ一覧
-    assert at.session_state["tour_index"] == 4 and by_key(at, "nav_decisions").proto.type == "primary"
+    assert at.session_state["tour_index"] == 4 and by_key(at, "nav_group_3").proto.type == "tertiary"
+    assert not any(b.proto.type == "primary" for b in at.sidebar.button)
 
 
 def test_detail_and_back_keep_the_step():
@@ -97,7 +100,7 @@ def test_demo_card_has_single_entry_and_tour_can_be_closed():
     at = click(at, "経費申請のデモを見る")
     at = by_key(at, "nav_group_3").click().run()  # 案内中にサイドバーから機能を開く
     assert at.session_state["tour_on"] is False and not at.exception and at.session_state["page"] == "candidates"
-    assert by_key(at, "tour_back").label == "← ステップ1「案件の背景」に戻る"
+    assert by_key(at, "tour_back").label == "← デモステップ 1/8『案件の背景』に戻る"
     assert at.session_state["project"]["is_demo"]
 
 

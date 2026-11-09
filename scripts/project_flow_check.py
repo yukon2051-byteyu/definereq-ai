@@ -103,7 +103,7 @@ with sync_playwright() as pw:
     wait(g, 2300)
     check("案件情報を保存しました" in body(g), "1 保存成功を画面に表示")
     t = body(g)
-    check("空欄のまま進められます" in t and "案件の準備に戻る" in t, "1 保存単位の説明と、戻る操作")
+    check("空欄のまま進められます" in t and "準備の概要に戻る" in t, "1 保存単位の説明と、戻る操作")
     g.get_by_label("氏名・役割").first.fill("架空の研修責任者")
     g.get_by_label("氏名・役割").first.press("Tab")
     wait(g, 800)
@@ -118,18 +118,18 @@ with sync_playwright() as pw:
     g.get_by_role("button", name="保存して資料・議事録へ進む").click()
     wait(g, 2800)
     check("資料・議事録" in g.locator(".dr-title").first.inner_text(), "2 保存して資料・議事録へ進める")
-    nav(g, "案件の準備", "現在の状況")  # 状況案内は、記録の整理以外の作業画面の上部に出る
+    nav(g, "1. 案件の準備", "現在の状況")  # 状況案内は、記録の整理以外の作業画面の上部に出る
 
     # 3. 見出しの直後に状態の1行と主ボタン。理由などは画面の下の開閉式の欄
     t = body(g)
     check(g.get_by_role("button", name="会議を準備する →").count() > 0 and "次にすることの詳しい説明" in t, "3 状態の1行と主ボタン、詳しい説明は画面の下")
-    nav(g, "要件の確認・判断")
+    nav(g, "4. 要件の確認・判断")
     # 「要件の確認・判断」の最初の画面は「AI候補の確認」。画面独自の状態表示と主ボタンを持つ
     check(g.locator(".dr-now").count() > 0 and g.locator("[data-testid=stMain] button[kind=primary]").count() > 0, "3 別の画面でも、見出しの直後に状態の表示と主ボタンが出る")
     shot(g, "02_panel")
 
     # 4. 議事録
-    nav(g, "記録の取り込み・整理")
+    nav(g, "3. 記録の取り込み・整理")
     g.get_by_label("貼り付ける議事録の名称").fill("初回打ち合わせ議事録")
     g.get_by_label("貼り付ける議事録の名称").press("Tab")
     wait(g, 800)
@@ -183,7 +183,7 @@ with sync_playwright() as pw:
     shot(g, "06_decision_draft")
 
     # 8. 判断と合意
-    nav(g, "要件の確認・判断", "決定・合意")
+    nav(g, "4. 要件の確認・判断", "決定・合意")
     pick(g, "採用案", "本人")
     g.get_by_label("採用理由").fill("開始前日までなら代替の受講者を調整できるため（テスト用の判断）")
     pick(g, "判断者", "架空の研修責任者")
@@ -200,7 +200,7 @@ with sync_playwright() as pw:
     wait(g, 3000)
 
     # 9. Word
-    nav(g, "共有・変更管理")
+    nav(g, "5. 共有・変更管理")
     g.get_by_text("要件定義書", exact=True).first.click()
     wait(g, 2500)
     t = body(g)

@@ -408,7 +408,7 @@ def test_first_and_later_banner():
     assert any(e.label.startswith("案件の詳しい背景") for e in at.expander)
     at = button(at, "tour_next").click().run()
     later = "".join(h.proto.body for h in at.get("html"))
-    assert "現場と経理の要望を取りまとめる" not in later and "ステップ 2/8 · 会議前の準備" in later and "経費申請アプリの刷新｜第1回会議の前" in later and "アプリの支援" in later
+    assert "現場と経理の要望を取りまとめる" not in later and "デモステップ 2/8 · 会議前の準備" in later and "経費申請アプリの刷新｜第1回会議の前" in later and "アプリの支援" in later
     assert any(e.label == "案件の背景を確認" for e in at.expander)
 
 
@@ -483,7 +483,7 @@ def test_project_panel_can_close_and_reopen_and_has_no_demo_words(blank):
     at = project_app(blank, "prep")
     html = "".join(h.proto.body for h in at.get("html"))
     assert "案件を作成した直後" in html and "デモ体験中" not in html and not at.exception
-    assert button(at, "guide_go").label == "案件の準備を開く →"
+    assert button(at, "guide_go").label == "準備の概要を開く →"
     assert any(e.label == "次にすることの詳しい説明" for e in at.expander)
     labels = [m.value for m in at.markdown]
     assert "**この操作をおすすめする理由**" in labels  # 開閉式の欄の中にある
@@ -547,7 +547,7 @@ def test_shortcut_goes_to_decision_with_issue_line():
     at = button(app(), "tour_d1_hl").click().run()
     assert at.session_state["tour_index"] == 4 and not at.exception
     h = html_of(at)
-    assert "この案件の論点" in h and "ステップ 5/8 · 判断" in h
+    assert "この案件の論点" in h and "デモステップ 5/8 · 判断" in h
     assert button(at, "tour_next").label == "次へ：追加要望と影響"
 
 
@@ -564,7 +564,7 @@ def test_decision_shows_choice_reason_basis_then_table():
     assert labels.index("この判断に使った確認メールを見る") < labels.index("次へ：追加要望と影響") and labels.count("次へ：追加要望と影響") == 1
     assert "議事録の該当発言を見る" in labels
     assert any(e.label.startswith("判断の根拠と経緯を見る") for e in at.expander)
-    assert button(at, "tour_evidence").label == "この判断に使った確認メールを見る" and button(at, "tour_detail").label == "決定・合意の一覧を見る"
+    assert button(at, "tour_evidence").label == "この判断に使った確認メールを見る" and button(at, "tour_detail").label == "この案件の決定・合意を確認する"
 
 
 def test_evidence_and_decision_list_return_to_origin_step():
@@ -573,16 +573,16 @@ def test_evidence_and_decision_list_return_to_origin_step():
     q = at.session_state["project"]
     assert at.session_state["page"] == "sources" and not at.session_state["tour_on"]
     assert next(s for s in q["sources"] if s["id"] == at.session_state["src_sel"])["name"] == "判断の確認メール"
-    assert button(at, "tour_back").label == "← ステップ5「判断」に戻る"
+    assert button(at, "tour_back").label == "← デモステップ 5/8『判断』に戻る"
     at = button(at, "tour_back").click().run()
     assert at.session_state["tour_on"] and at.session_state["tour_index"] == 4
     at = button(at, "tour_detail").click().run()
-    assert at.session_state["page"] == "decisions" and button(at, "tour_back").label == "← ステップ5「判断」に戻る"
+    assert at.session_state["page"] == "decisions" and button(at, "tour_back").label == "← デモステップ 5/8『判断』に戻る"
     # 別のステップから詳細を開いたときは、そのステップへ戻る
     at = button(at, "tour_back").click().run()
     at = button(at, "tour_next").click().run()
     at = button(at, "tour_detail").click().run()
-    assert button(at, "tour_back").label == "← ステップ6「追加要望と影響」に戻る"
+    assert button(at, "tour_back").label == "← デモステップ 6/8『追加要望と影響』に戻る"
 
 
 def test_after_spec_summary_comes_before_table():
@@ -620,7 +620,7 @@ def test_list_shortcuts_open_highlight_with_premise(demo, index, label):
     at = button(at, f"tour_{demo}_hl").click().run()
     h = html_of(at)
     assert at.session_state["tour_index"] == index and not at.exception
-    assert f"ステップ {index + 1}/8 · " in h and 'class="dr-premise"' in h and button(at, "tour_from_start").label == "案件の背景から見る"
+    assert f"デモステップ {index + 1}/8 · " in h and 'class="dr-premise"' in h and button(at, "tour_from_start").label == "案件の背景から見る"
     at = button(at, "tour_next").click().run()  # 既存の「次へ」で進める
     assert at.session_state["tour_index"] == index + 1 and 'class="dr-premise"' not in html_of(at)
     at = button(at, "tour_go_0").click().run()  # 最初へ戻ったら、近道の案内は残らない
@@ -640,7 +640,7 @@ def test_demo_profile_and_sources_are_browsable(demo):
     at = demo_at(demo)
     at = button(at, "tour_profile").click().run()  # 冒頭の「登録された背景・目的・関係者を見る」
     h = html_of(at)
-    assert at.session_state["page"] == "profile" and "デモデータ · 閲覧専用" in h and button(at, "tour_back").label == "← ステップ1「案件の背景」に戻る"
+    assert at.session_state["page"] == "profile" and "デモデータ · 閲覧専用" in h and button(at, "tour_back").label == "← デモステップ 1/8『案件の背景』に戻る"
     p = at.session_state["project"]
     assert p["stakeholders"] and any(v["value"] for v in p["profile"].values())
     at = button(at, "nav_group_2").click().run()  # 共通サイドバー：記録の取り込み・整理 → 会議の記録を整理
@@ -667,7 +667,7 @@ def test_d3_speech_opens_recording_segment():
     at = button(at, "tour_ev_sp_0").click().run()
     h = html_of(at)
     assert at.session_state["page"] == "recordings" and "開いた発言" in h and "外部からの遠隔保守を提案します" in h
-    assert button(at, "tour_back").label == "← ステップ3「録画の発言」に戻る"
+    assert button(at, "tour_back").label == "← デモステップ 3/8『録画の発言』に戻る"
 
 
 def test_d2_decision_links_to_its_sources():
@@ -694,7 +694,7 @@ def test_d3_todo_opens_its_requirement_and_returns():
     assert "新しいネットワークや運用が満たすべき条件" in h and "に関係する要件 1件" in h and "閲覧専用" in "".join(c.value for c in at.caption)
     assert at.session_state["project"]["demo"]["stage"] == 2  # 段階は変わらない
     at = button(at, "req_back").click().run()
-    assert at.session_state["page"] == "overview" and button(at, "req_back" if False else "tour_back").label.startswith("← ステップ1")
+    assert at.session_state["page"] == "overview" and button(at, "tour_back").label.startswith("← デモステップ 1/8")
     at.session_state["page"] = "requirements"  # 通常の要件一覧には、前の絞り込みが残らない
     at.run()
     assert "に関係する要件" not in html_of(at)
@@ -718,7 +718,7 @@ def test_backlog_link_shows_count_for_multiple_requirements():
 def test_demo_function_page_resumes_tour():
     at = demo_overview("d1")
     resume = next(b for b in at.button if b.key and b.key.startswith("demo_resume_"))
-    assert resume.label == "デモの続きに戻る（ステップ1「案件の背景」）" and resume.proto.type == "primary"
+    assert resume.label == "デモの続きに戻る（デモステップ 1/8『案件の背景』）" and resume.proto.type == "primary"
     assert next(b for b in at.button if b.key == "next_overview").label == "この案件の要件一覧を見る"
     at = resume.click().run()
     assert at.session_state["tour_on"] and at.session_state["tour_index"] == 0
@@ -735,5 +735,42 @@ def test_step_labels_match_destination(demo):
         nxt = button(at, "tour_next")
         assert nxt.label == f"次へ：{steps[n + 1]['process']}", n
         at = nxt.click().run()
-        assert f"ステップ {n + 2}/8 · {steps[n + 1]['process']}" in html_of(at)
-        assert button(at, f"tour_side_{n + 1}").proto.type == "primary"
+        assert f"デモステップ {n + 2}/8 · {steps[n + 1]['process']}" in html_of(at)
+        assert not any(b.key and b.key.startswith("tour_side_") for b in at.sidebar.button)  # ステップ一覧は本文に集約
+
+
+# ---- 工程を開いても、直前のデモステップへ戻って続きを見る ----
+@pytest.mark.parametrize("entry", ["body", "sidebar"])
+def test_open_process_and_return_to_step(entry):
+    at = demo_at("d1", 2)  # デモステップ 3/8
+    if entry == "body":
+        at = button(at, "tour_detail").click().run()  # 本文の補助ボタン（この案件の〇〇を確認する）
+    else:
+        at = button(at, "nav_group_3").click().run()  # サイドバーの工程
+    assert not at.session_state["tour_on"] and button(at, "tour_back").label == "← デモステップ 3/8『会議後の整理』に戻る"
+    page = at.session_state["page"]
+    assert button(at, f"nav_{page}").proto.type == "primary"  # 実際に表示しているページだけを選択
+    assert sum(1 for b in at.sidebar.button if b.proto.type == "primary") == 1
+    at = button(at, "nav_requirements").click().run()  # 工程内で別ページへ移動しても戻り先を保つ
+    assert button(at, "tour_back").label == "← デモステップ 3/8『会議後の整理』に戻る"
+    at = button(at, "tour_back").click().run()
+    assert at.session_state["tour_on"] and at.session_state["tour_index"] == 2 and "デモステップ 3/8 · 会議後の整理" in html_of(at)
+    at = button(at, "tour_next").click().run()
+    assert at.session_state["tour_index"] == 3
+
+
+def test_body_detail_button_names_the_page():
+    at = demo_at("d1", 2)
+    assert button(at, "tour_detail").label == "この案件のAI候補を確認する"
+    assert button(at, "tour_detail").proto.type == "tertiary" and button(at, "tour_next").proto.type == "primary"
+
+
+def test_highlight_start_is_the_return_point_and_restart():
+    at = button(app(), "tour_d1_hl").click().run()
+    at = button(at, "nav_group_1").click().run()
+    assert button(at, "tour_back").label == "← デモステップ 5/8『判断』に戻る"
+    at = button(at, "nav_tour").click().run()  # デモを最初から見る
+    assert at.session_state["tour_on"] and at.session_state["tour_index"] == 0
+    at = button(at, "nav_home").click().run()
+    at = button(at, "tour_d3").click().run()  # 別のデモは、そのデモの開始位置から
+    assert at.session_state["project"]["demo"]["id"] == "d3" and at.session_state["tour_index"] == 0

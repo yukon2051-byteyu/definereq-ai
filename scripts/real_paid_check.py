@@ -40,7 +40,7 @@ with sync_playwright() as pw:
     wait(g)
 
     # 議事録を登録し、状況案内のAI補足を実行する
-    g.get_by_role("button", name="記録の取り込み・整理", exact=True).first.click()
+    g.get_by_role("button", name="3. 記録の取り込み・整理", exact=True).first.click()
     wait(g)
     g.get_by_label("貼り付ける議事録の名称").fill("初回ヒアリング議事録")
     g.get_by_label("貼り付ける議事録の名称").press("Tab")

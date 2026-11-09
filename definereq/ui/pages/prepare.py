@@ -20,7 +20,7 @@ from ..components import main_type, chip, definition, edit_block, esc, guard, he
 
 def setup(p: dict) -> None:
     """案件の準備。背景と資料はどちらからでも始められ、あとから追加・編集できる。"""
-    head("案件の準備", "背景の入力と資料の取り込みは、どちらからでも始められます。あとから追加・編集できます。", "案件ホーム")
+    head("準備の概要", "背景の入力と資料の取り込みは、どちらからでも始められます。あとから追加・編集できます。", "案件ホーム")
     pstate = drafts.profile_state(p)
     count = drafts.records_count(p)
     rstate = f"取り込み済み {count}件" if count else "未取り込み"
@@ -73,7 +73,7 @@ def next_block(p: dict, key: str, lead: str = "次にすること") -> None:
 def top_nav(back_key: str, cross: tuple[str, str, str]) -> None:
     """本文の最上部の移動。左メニューを閉じていても、準備の画面と、背景・資料の間を移動できる。"""
     with st.container(key="dr_topnav", horizontal=True, horizontal_alignment="distribute"):
-        if st.button("← 案件の準備に戻る", key=back_key, type="tertiary"):
+        if st.button("← 準備の概要に戻る", key=back_key, type="tertiary"):
             state.goto("setup")
         label, page, key = cross
         if st.button(label, key=key, type="secondary"):

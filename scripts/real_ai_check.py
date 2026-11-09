@@ -52,7 +52,7 @@ with sync_playwright() as pw:
     g.wait_for_selector(".dr-title", timeout=30000)
     wait(g)
 
-    g.get_by_role("button", name="会議の準備", exact=True).first.click()
+    g.get_by_role("button", name="2. 会議の準備", exact=True).first.click()
     wait(g)
     g.get_by_label("現時点の理解").fill(INITIAL)
     g.get_by_role("button", name="案件内に反映").first.click()
@@ -63,7 +63,7 @@ with sync_playwright() as pw:
     g.screenshot(path=OUT / "prep.png")
 
     # 会議の記録を整理：議事録を貼り付けて登録し、未整理の議事録を選んだ状態でAIを実行する
-    g.get_by_role("button", name="記録の取り込み・整理", exact=True).first.click()
+    g.get_by_role("button", name="3. 記録の取り込み・整理", exact=True).first.click()
     wait(g)
     g.get_by_label("貼り付ける議事録の名称").fill("初回ヒアリング議事録")
     g.get_by_label("貼り付ける議事録の名称").press("Tab")
