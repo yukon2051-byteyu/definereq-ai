@@ -63,7 +63,7 @@ def ai_panel(p: dict, task_key: str, extra: str = "", recordings: bool = False, 
         if same:
             st.info(f"同じ入力の結果 {same[-1]['id']} があります。再実行せずに候補を利用できます。")
             again = st.checkbox("費用がかかることを理解して、もう一度実行する", key=f"ai_again_{task_key}")
-        if st.button("この内容でAIを実行", disabled=not (rd.ai and code and again), key=f"ai_go_{task_key}", type="primary"):
+        if st.button("この内容でAIを実行", disabled=not (rd.ai and code and again), key=f"ai_go_{task_key}"):  # 折りたたみの中の実行は補助の見た目（記録の整理の実行欄だけ主ボタン）
             _run(p, task_key, code, rd, chosen, rec_ids, extra)
 
 
@@ -80,7 +80,7 @@ def _run(p: dict, task_key: str, code: str, rd, chosen: list[str], rec_ids: list
     ok_rerun(f"{len(res['candidates'])}件の候補を作成しました（約{res['cost_jpy']:,.1f}円）" + (f"。重複{skipped}件は追加していません" if skipped else ""))
 
 
-def extract_runner(p: dict, src_ids: list[str], rec_ids: list[str]) -> None:
+def extract_runner(p: dict, src_ids: list[str], rec_ids: list[str], primary: bool = True) -> None:
     """会議の記録を整理する画面の実行欄。対象の選択と実行ボタンを先に出し、送信内容の詳細は開閉式にする。
 
     src_ids / rec_ids：初期状態で選ぶ記録（AIで未整理のもの）。未整理の記録が増えたら選択を作り直す。
@@ -117,7 +117,7 @@ def extract_runner(p: dict, src_ids: list[str], rec_ids: list[str]) -> None:
         st.info(f"同じ対象の結果 {same[-1]['id']} があります。再実行せずに下の候補を利用できます。")
         again = st.checkbox("費用がかかることを理解して、もう一度実行する", key="ai_again_extract")
     ready = rd.ai and bool(code) and again and not too_long and bool(chosen or picked)
-    if st.button("選択した議事録をAIで整理する", disabled=not ready, key="ai_go_extract", type="primary"):
+    if st.button("選択した議事録をAIで整理する", disabled=not ready, key="ai_go_extract", type="primary" if primary else "secondary"):
         _run(p, "extract", code, rd, chosen, picked)
     with st.expander("送信する内容の詳細（案件の情報・送信しないもの）"):
         refs = ai.reference_items(p)

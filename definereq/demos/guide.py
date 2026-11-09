@@ -58,7 +58,7 @@ class Ctx:
                     # 確認が済んでいない話者には役職を付けない（確定した人物のように見えるため）
                     who = self.role(view["name"]) if view["confirmed"] else view["name"]
                     return {"type": "speech", "who_label": view["label"], "who": who, "time": format_time(s["start"]), "text": s["text"], "kind": s.get("kind") or "未分類",
-                            "speaker_check": view["speaker_check"], "content_check": view["content_check"], "note": note, "rec_id": rec["id"], "start": s["start"],
+                            "speaker_check": view["speaker_check"], "content_check": view["content_check"], "note": note, "rec_id": rec["id"], "start": s["start"], "seg_id": s["id"],
                             "where": f"{rec['name']}（{format_time(s['start'])}-{format_time(s['end'])}）"}
         raise KeyError(f"発言がありません: {text}")
 
@@ -82,7 +82,26 @@ class Ctx:
         rows = [{"label": o["label"], "pros": o.get("pros"), "cons": o.get("cons"), "adopted": o["id"] == d.get("adopted"), "verdict": option_verdict(d, o),
                  "reason": d.get("rejected_reasons", {}).get(o["id"])} for o in d["options"]]
         return {"type": "options", "topic": d["topic"], "state": d["state"], "rows": rows, "rationale": d.get("rationale"), "decider": d.get("decider"),
-                "confirmer": d.get("confirmer"), "date": d.get("decided_on"), "confirmation": d.get("confirmation"), "id": d["id"]}
+                "confirmer": d.get("confirmer"), "date": d.get("decided_on"), "confirmation": d.get("confirmation"), "id": d["id"], "evidence": self.sources_of(d)}
+
+    def sources_of(self, item: dict) -> list[dict]:
+        """判断や要件の根拠を、開ける出典（資料ID・発言ID・時刻・話者）として返す。"""
+        out = []
+        for e in item.get("evidence") or []:
+            sid = str(e.get("source_id"))
+            if sid.startswith("REC"):
+                r = pj.get(self.p, "recordings", sid)
+                seg = next((x for x in (r or {}).get("segments", []) if x["id"] == e.get("unit_id")), None)
+                if not seg:
+                    continue
+                v = ev.speaker_view(r, seg)
+                out.append({"source_id": sid, "unit_id": seg["id"], "quote": e.get("quote"), "page": "recordings", "confirmed": v["confirmed"],
+                            "label": f"議事録の該当発言を見る（{format_time(seg['start'])} {v['label']}：{v['name']}）"})
+            else:
+                src = pj.get(self.p, "sources", sid)
+                if src:
+                    out.append({"source_id": sid, "unit_id": e.get("unit_id"), "quote": e.get("quote"), "page": "sources", "confirmed": True, "label": f"「{src['name']}」の該当箇所を見る"})
+        return out
 
     def conflict(self, change: dict) -> list[tuple]:
         """過去の指摘を、当時の要件の版と結び付けて示す。"""
@@ -267,7 +286,7 @@ class Ctx:
                 kind = "本人確認済みの記録"
             else:
                 kind = "資料"
-            basis.append({"kind": kind, "quote": e.get("quote"), "where": where})
+            basis.append({"kind": kind, "quote": e.get("quote"), "where": where, "source_id": e["source_id"], "unit_id": e.get("unit_id")})
         skipped = self.speech(unused)
         if skipped["speaker_check"] == "確認済み":
             raise KeyError(f"話者確認済みの発言です: {unused}")

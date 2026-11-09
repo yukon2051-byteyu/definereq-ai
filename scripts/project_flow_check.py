@@ -118,22 +118,18 @@ with sync_playwright() as pw:
     g.get_by_role("button", name="保存して資料・議事録を取り込む").click()
     wait(g, 2800)
     check("資料・議事録" in g.locator(".dr-title").first.inner_text(), "2 保存して資料・議事録へ進める")
-    nav(g, "案件ホーム", "現在の状況")  # 状況案内は、記録の整理以外の作業画面の上部に出る
+    nav(g, "案件の準備", "現在の状況")  # 状況案内は、記録の整理以外の作業画面の上部に出る
 
-    # 3. 説明を閉じても次の操作が残る
-    g.get_by_role("button", name="詳しい説明を閉じる").click()
-    wait(g, 1800)
+    # 3. 見出しの直後に状態の1行と主ボタン。理由などは画面の下の開閉式の欄
     t = body(g)
-    check("この操作をおすすめする理由" not in t and "詳しい説明を表示" in t and "現在の状況と次にすること" in t, f"3 説明を閉じても現在地が残る（{sit(g)[:44]}）")
-    check(g.get_by_role("button", name="会議を準備する").count() > 0, "3 次の操作が残る")
-    nav(g, "要件を整理・判断")
-    check(g.get_by_role("button", name="会議を準備する").count() > 0 and "詳しい説明を表示" in body(g), "3 別の画面でも次の操作が残る")
-    g.get_by_role("button", name="詳しい説明を表示").click()
-    wait(g, 1800)
+    check(g.get_by_role("button", name="会議を準備する →").count() > 0 and "次にすることの詳しい説明" in t, "3 状態の1行と主ボタン、詳しい説明は画面の下")
+    nav(g, "要件の確認・判断")
+    # 「要件の確認・判断」の最初の画面は「AI候補の確認」。画面独自の状態表示と主ボタンを持つ
+    check(g.locator(".dr-now").count() > 0 and g.locator("[data-testid=stMain] button[kind=primary]").count() > 0, "3 別の画面でも、見出しの直後に状態の表示と主ボタンが出る")
     shot(g, "02_panel")
 
     # 4. 議事録
-    nav(g, "記録を取り込む")
+    nav(g, "記録の取り込み・整理")
     g.get_by_label("貼り付ける議事録の名称").fill("初回打ち合わせ議事録")
     g.get_by_label("貼り付ける議事録の名称").press("Tab")
     wait(g, 800)
@@ -150,15 +146,18 @@ with sync_playwright() as pw:
     g.get_by_role("button", name="選択した議事録をAIで整理する").click()
     g.get_by_text("件の候補を作成しました").first.wait_for(timeout=60000)
     wait(g, 2500)
-    check(g.get_by_role("button", name="要件候補として採用").count() > 0 and "未整理の議事録 0件" in g.locator(".dr-now").first.inner_text(), "4 候補の確認へ進む")
+    check("AI整理完了" in g.locator(".dr-now").first.inner_text() and g.get_by_role("button", name="AI候補を確認する →").count() == 1, "4 AI整理の後、「AI候補を確認する」へ進める")
+    g.get_by_role("button", name="AI候補を確認する →").click()
+    wait(g, 2800)
+    check(g.get_by_role("button", name="要件に採用する内容を確認").count() > 0, "4 AI候補の確認の画面で候補を確認できる")
     shot(g, "04_candidates")
 
     # 5. 分割
-    g.get_by_role("button", name="要件候補として採用").first.click()
+    g.get_by_role("button", name="要件に採用する内容を確認").first.click()
     wait(g, 2300)
     check("要件1の本文" in body(g) and "要件2の本文" in body(g), "5 分割案を1件ずつ確認できる")
     shot(g, "05_split")
-    g.get_by_role("button", name="この内容で要件に採用").click()
+    g.get_by_role("button", name="この内容で採用").click()
     wait(g, 3000)
 
     # 6. 担当の修正
@@ -184,7 +183,7 @@ with sync_playwright() as pw:
     shot(g, "06_decision_draft")
 
     # 8. 判断と合意
-    nav(g, "要件を整理・判断", "決定・合意")
+    nav(g, "要件の確認・判断", "決定・合意")
     pick(g, "採用案", "本人")
     g.get_by_label("採用理由").fill("開始前日までなら代替の受講者を調整できるため（テスト用の判断）")
     pick(g, "判断者", "架空の研修責任者")
@@ -246,7 +245,7 @@ with sync_playwright() as pw:
     h.locator('input[type="file"]').first.set_input_files(str(saved))
     wait(h, 2500)
     h.get_by_role("button", name="この案件を再開する").click()
-    h.wait_for_selector(".dr-sit", timeout=30000)
+    h.wait_for_selector(".dr-title", timeout=30000)
     wait(h)
     menu(h)
     with h.expect_download() as d:

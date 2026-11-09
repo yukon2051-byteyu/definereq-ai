@@ -66,7 +66,7 @@ def _here(a: gd.Advice, page: str) -> bool:
 def _go(a: gd.Advice, page: str, key: str) -> None:
     if _here(a, page):
         return
-    if st.button(a.button, key=key, type="primary"):
+    if st.button(a.button, key=key):  # 画面の下の案内は補助の操作
         st.session_state["resumed"] = False
         _move(a.button, a.page)
 
@@ -160,6 +160,80 @@ def _stage_question(p: dict) -> None:
         if target:
             state.goto(target)
         st.rerun()
+
+
+# 「要件の確認・判断」の工程の画面
+DECIDE_PAGES = {"requirements", "refine", "decisions", "nfr", "scope", "scenarios", "issues", "conflicts", "risks"}
+
+
+def resume_summary(p: dict) -> str:
+    """再開した案件で、次に進める作業を1文で示す（例：AI候補が6件確認待ちです）。"""
+    cands, waiting = gd.requirement_candidates(p), gd.unanalyzed_minutes(p)
+    if waiting:
+        return f"未整理の議事録が{len(waiting)}件あります"
+    if cands:
+        return f"AI候補が{len(cands)}件確認待ちです"
+    return f"要件{len(p['requirements'])}件・判断{len(p['decisions'])}件を復元しました"
+
+
+def resume_line(p: dict, page: str) -> bool:
+    """保存した案件を再開した直後の1行の通知。保存日時と件数の内訳は開閉式にする。表示したら True。"""
+    if not st.session_state.get("resumed"):
+        return False
+    st.html(f'<div class="dr-now dr-resume"><b>案件を再開しました</b><span>{esc(resume_summary(p))}</span></div>')
+    from ..export import jsonio
+
+    with st.expander("再開したファイルの内容（保存日時・件数の内訳）"):
+        when = (p.get("exported_at") or "")[:16].replace("T", " ") or "記録なし"
+        st.caption(f"保存用ファイルの作成：{when}")
+        st.caption("／".join(f"{k}：{v}" for k, v in jsonio.summary(p).items()))
+    return True
+
+
+def headline(p: dict, page: str) -> None:
+    """見出しの直後に出す、状態の1行と主ボタン。主ボタンは、その状態で進める操作を1つだけ強調する。
+
+    判定は案件データからプログラムが行う（logic/guidance.py）。前の工程や別の作業は補助のリンクにする。
+    再開した直後は、復元した案件で次に行える作業を優先する。
+    """
+    resumed = resume_line(p, page)
+    if resumed:
+        nx = gd.setup_next(p)
+        label, target, alts = nx["label"], nx["page"], [] if page == "overview" else [("残件を確認する", "overview")]
+        state_text = None
+    else:
+        result = gd.assess(p, page, False)
+        a = result["main"]
+        if a is None:  # この画面に関係する項目がないときも、案件の状態から次に行える作業を主ボタンで出す
+            nx = gd.setup_next(p)
+            label, target, alts = nx["label"], nx["page"], []
+            state_text = ("この画面で対応が必要な項目は検出されていません", f"次に行える作業：{nx['label']}（登録されていない論点は検出できません）")
+        else:
+            label, target, alts = a.button, a.page, [x for x in a.alt if x[1] != page]
+            state_text = (a.title, a.short or a.situation)
+        if page in DECIDE_PAGES and p["requirements"] and target != "share":  # 要件があれば、いつでも資料の作成へ進める
+            alts = [*alts, ("確認資料・要件定義書を作る", "share")]
+    if state_text:
+        st.html(f'<div class="dr-now"><b>{esc(state_text[0])}</b><span>{esc(state_text[1])}</span></div>')
+    st.session_state["_main_elsewhere"] = bool(target and target != page)
+    with st.container(horizontal=True, vertical_alignment="center", key="head_next"):
+        if target and target != page:
+            if st.button(f"{label} →", key="guide_go", type="primary"):
+                st.session_state["resumed"] = False
+                state.goto(target)
+        elif not resumed:
+            st.caption("この画面で作業します。")
+        for n, (alt, to) in enumerate(alts):
+            if st.button(f"ほかの作業：{alt}", key=f"guide_alt_{n}", type="tertiary"):
+                st.session_state["resumed"] = False
+                state.goto(to)
+
+
+def details_for(p: dict, page: str) -> None:
+    """画面の下にまとめる詳しい案内。主ボタンと同じ移動は重ねて出さない。"""
+    result = gd.assess(p, page, False)
+    skip = {page, "setup"} | ({result["main"].page} if result["main"] else set())
+    details(p, page, result, skip)
 
 
 def brief(p: dict, page: str) -> dict:

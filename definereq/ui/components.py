@@ -42,8 +42,17 @@ def chips(*texts: str) -> None:
 
 
 def head(title: str, lead: str = "", eyebrow: str = "") -> None:
-    st.html(f'<div class="dr-head"><div class="dr-eyebrow">{esc(eyebrow)}</div>'
+    """画面名。上の小さな文字は、サイドバーと同じ工程名にそろえる。
+
+    作業画面では、見出しの直後に状態の1行と主ボタンを出す（shell が _head_hook に設定する。1画面に1回だけ）。
+    """
+    group = st.session_state.get("_group") or eyebrow
+    badge = '<span class="dr-demo-ro">デモデータ · 閲覧専用</span>' if st.session_state.get("_demo") else ""
+    st.html(f'<div class="dr-head"><div class="dr-eyebrow">{esc(group)}{badge}</div>'
             f'<h1 class="dr-title">{esc(title)}</h1><p class="dr-lead">{esc(lead)}</p></div>')
+    hook = st.session_state.pop("_head_hook", None)
+    if hook:
+        hook()
 
 
 def card(title: str, body: str, foot: str = "") -> None:
@@ -113,6 +122,12 @@ def tri_text(label: str, value, key: str, area: bool = False):
     return widget(f"{label}の内容", value="" if value in (None, NA) else str(value), key=f"{key}_t") or None
 
 
+def main_type() -> str:
+    """作業画面の保存や実行のボタンの強さ。見出しの直後の主ボタンが別の画面へ進むときは補助の見た目にし、
+    オレンジの主ボタンを画面に1つだけにする。その画面で作業するときは、保存や実行を主ボタンにする。"""
+    return "secondary" if st.session_state.get("_main_elsewhere") else "primary"
+
+
 def save_controls(p: dict, key: str, note: bool = True) -> None:
     """再開用ファイルのダウンロード。作成日時と、作成後の変更の有無を短く示す。
 
@@ -121,7 +136,9 @@ def save_controls(p: dict, key: str, note: bool = True) -> None:
     from ..export import jsonio
     from . import state
 
-    st.download_button("再開用ファイルをダウンロード", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json",
+    # 再開したときに同じ画面へ戻れるよう、開いている画面を記録する（案件データ自体は変えない）
+    data = jsonio.dumps({**p, "last_page": st.session_state.get("page")})
+    st.download_button("再開用ファイルをダウンロード", data, file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json",
                        key=key, width="stretch" if note else "content", on_click=state.mark_saved, args=(p,))
     made = st.session_state.get("save_time")
     if not state.is_dirty(p):

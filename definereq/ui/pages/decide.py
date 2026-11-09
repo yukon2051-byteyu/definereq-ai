@@ -15,7 +15,7 @@ from ...schema import (AGREEMENT_STATES, OPINION_NATURE, CHANGE_CLASSES, CHANGE_
                        ISSUE_STATES, RISK_NATURE, RISK_STATES)
 from .. import state
 from ..ai_panel import ai_panel, ai_runs_list
-from ..components import add_evidence_form, chip, chips, edit_block, esc, evidence_block, guard, head, meeting_select, ok_rerun, people, select_item, touch
+from ..components import main_type, add_evidence_form, chip, chips, edit_block, esc, evidence_block, guard, head, meeting_select, ok_rerun, people, select_item, touch
 
 
 def issues(p: dict) -> None:
@@ -145,7 +145,7 @@ def decisions(p: dict) -> None:
         date = c3.text_input("判断日（YYYY-MM-DD）", d.get("decided_on") or "", key=f"{k}_date")
         new_state = st.selectbox("状態", AGREEMENT_STATES, index=AGREEMENT_STATES.index(d["state"]), key=f"{k}_st")
         meeting = meeting_select(p, f"{k}_mtg", d.get("meeting_id"))
-        if st.form_submit_button("記録する", type="primary"):
+        if st.form_submit_button("記録する", type=main_type()):
             d["meeting_id"] = meeting
             for o in d["options"]:
                 o["pros"], o["cons"] = pros[o["id"]] or None, cons[o["id"]] or None
@@ -185,7 +185,7 @@ def _reflect_requirements(p: dict, d: dict) -> None:
                     ag.reconfirm_version(p, d["id"], r["id"], "human")
                     touch(p)
                     ok_rerun("判断の対象を更新しました")
-        if st.button("選んだ要件を合意済みにする", key=f"rf_go_{d['id']}", type="primary", disabled=not chosen):
+        if st.button("選んだ要件を合意済みにする", key=f"rf_go_{d['id']}", type=main_type(), disabled=not chosen):
             if guard(ag.apply_decision, p, d["id"], chosen, "human") is not None:
                 touch(p)
                 ok_rerun("要件へ反映しました")
@@ -274,7 +274,7 @@ def changes(p: dict) -> None:
     if req:
         body = st.text_area("変更後の本文", pj.require(p, "requirements", req)["body"], key=f"ab_{k}_{req}")
         date = st.text_input("適用日（不明なら空欄）", key=f"ao_{k}")
-        if st.button("要件へ反映する", type="primary", key=f"ago_{k}"):
+        if st.button("要件へ反映する", type=main_type(), key=f"ago_{k}"):
             if guard(ag.apply_change, p, k, dec, {req: {"body": body}}, "human", applied_on=date or None):
                 touch(p)
                 ok_rerun("反映しました。要件は確認待ちに戻りました。")
@@ -339,7 +339,7 @@ def risks(p: dict) -> None:
                       columns=["ID", "内容", "性質", "条件", "影響", "不確かさ", "対策", "確認相手", "行動", "状態"])
     edited = st.data_editor(df, hide_index=True, width="stretch", disabled=["ID"], key="rk_ed", column_config={
         "性質": st.column_config.SelectboxColumn(options=RISK_NATURE), "状態": st.column_config.SelectboxColumn(options=RISK_STATES, required=True)})
-    if st.button("保存", type="primary", key="rk_s"):
+    if st.button("保存", type=main_type(), key="rk_s"):
         for row in edited.to_dict("records"):
             pj.require(p, "risks", row["ID"]).update(content=row["内容"], nature=row["性質"], condition=row["条件"], impact=row["影響"], uncertainty=row["不確かさ"], mitigation=row["対策"], ask=row["確認相手"], action=row["行動"], state=row["状態"])
         touch(p)

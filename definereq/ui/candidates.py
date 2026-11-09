@@ -15,7 +15,11 @@ from .components import chip, edit_block, esc, evidence_block, guard, ok_rerun, 
 
 # これから確認する内容で、事実の主張ではない種類。根拠がないのが普通なので注意を出さない
 PLANNING_KINDS = {"質問", "議題", "必要資料", "今回決めたいこと", "不足情報"}
-STATE_FILTER = {"未処理": ("候補", "要再確認"), "採用": ("採用", "修正して採用"), "却下": ("却下",), "すべて": None}
+STATE_FILTER = {"すべて": None, "未処理": ("候補", "要再確認"), "採用": ("採用", "修正して採用"), "却下": ("却下",)}
+# 候補を確定したときに登録される場所（logic/intake.py の反映先と同じ）。AIの候補と、人が確定した内容を区別して示す
+DESTINATION = {"requirement": "要件一覧（下書き）", "decision": "判断記録の下書き（決定・合意）", "confirm": "確認事項（質問・議題）", "question": "会議の質問（質問・議題）",
+               "agenda": "議題（質問・議題）", "material": "資料の依頼事項（質問・議題）", "decide_today": "今回決めたいこと（質問・議題）", "action": "確認・依頼事項（現在の状況）",
+               "risk": "リスク一覧", "issue": "意見調整", "profile": "案件情報（背景・目的・関係者）", "note": "記録のみ"}
 
 
 def _run_state(p: dict, c: dict) -> str:
@@ -52,12 +56,12 @@ def _adopt_form(p: dict, c: dict, meeting: str | None) -> None:
 
     with st.form(f"cand_req_{c['id']}_{len(rows)}"):
         values = [row(n, item) for n, item in enumerate(rows)]
-        if st.form_submit_button("この内容で要件に採用", type="primary"):
+        if st.form_submit_button("この内容で採用", type="primary"):
             created = guard(intake.adopt_requirement, p, c["id"], None, values, "利用者", meeting)
             if created:
                 touch(p)
                 st.session_state.pop("cand_open", None)
-                ok_rerun("、".join(r["id"] for r in created) + " を要件（下書き）として採用しました。次は「要件」の画面で内容を確認できます")
+                ok_rerun("、".join(r["id"] for r in created) + " を要件（下書き）として採用しました")
 
 
 def _decision_form(p: dict, c: dict, meeting: str | None) -> None:
@@ -100,15 +104,15 @@ def _actions(p: dict, c: dict, meeting: str | None, key: str) -> None:
             due = d.text_input("期限（未設定可）", c.get("due") or "", key=f"due_{c['id']}")
         b1, b2, b3, b4 = st.columns([3, 2, 1, 2])
         if route.kind == "requirement":
-            if b1.button(route.button, key=f"go_req_{c['id']}", type="primary", width="stretch"):
+            if b1.button(route.button, key=f"go_req_{c['id']}", width="stretch"):
                 st.session_state["cand_open"] = c["id"]
                 st.rerun()
         elif route.kind == "decision":
-            if b1.button(route.button, key=f"go_dec_{c['id']}", type="primary", width="stretch"):
+            if b1.button(route.button, key=f"go_dec_{c['id']}", width="stretch"):
                 st.session_state["cand_open"] = c["id"]
                 st.rerun()
         elif route.kind == "profile":
-            if b1.button(route.button, key=f"go_prof_{c['id']}", type="primary", width="stretch"):
+            if b1.button(route.button, key=f"go_prof_{c['id']}", width="stretch"):
                 st.session_state["page"] = "profile"
                 st.rerun()
         elif route.kind == "note":
@@ -116,7 +120,7 @@ def _actions(p: dict, c: dict, meeting: str | None, key: str) -> None:
                 c.update(state="採用", resolved_label="記録のみ")
                 touch(p)
                 ok_rerun("記録として残しました")
-        elif b1.button(route.button, key=f"apply_{c['id']}", type="primary", width="stretch"):
+        elif b1.button(route.button, key=f"apply_{c['id']}", width="stretch"):
             label = guard(intake.apply, p, c["id"], owner, due, "利用者", meeting, ask)
             if label:
                 touch(p)
@@ -137,7 +141,8 @@ def _actions(p: dict, c: dict, meeting: str | None, key: str) -> None:
 
 def _row(p: dict, c: dict, meeting: str | None, key: str) -> None:
     run = _run_state(p, c)
-    flags = chip(c["state"]) + chip(run, "ok" if run == "最新の解析" else "plain")
+    done = c["state"] in ("採用", "修正して採用")
+    flags = (chip("採用済み", "ok") if done else chip(c["state"])) + chip(run, "ok" if run == "最新の解析" else "plain")
     if c.get("no_evidence") and c["kind"] not in PLANNING_KINDS:
         flags += chip("根拠なし（推測）", "warn")
     if c.get("unsupported_numbers"):
@@ -154,8 +159,8 @@ def _row(p: dict, c: dict, meeting: str | None, key: str) -> None:
     elif c.get("resolved_as") or c.get("resolved_label"):
         target = c.get("resolved_items") or ([c["resolved_as"]] if c.get("resolved_as") else [])
         names = "、".join(pj.label_of(p, x) for x in target) or c.get("resolved_label")
-        st.caption(f"反映先：{names}")
-        if c.get("resolved_page") and st.button("反映先を見る", key=f"go_to_{key}_{c['id']}"):
+        st.caption(f"反映先：{names}（人が確定した内容です）")
+        if c.get("resolved_page") and st.button("反映先を確認する", key=f"go_to_{key}_{c['id']}"):
             st.session_state["page"] = c["resolved_page"]
             st.rerun()
 
@@ -167,20 +172,22 @@ def board(p: dict, tasks: tuple[str, ...] | None, key: str, meeting: str | None 
     if not items:
         return
     open_n = sum(1 for c in items if c["state"] in ("候補", "要再確認"))
-    st.markdown(f"**{heading}**　全{len(items)}件／未処理{open_n}件")
+    st.markdown(f"**{heading}**　全{len(items)}件／確認待ち{open_n}件")
     skipped = sum(r.get("skipped_duplicates") or 0 for r in p["ai_runs"] if tasks is None or r["task"] in tasks)
     if skipped:
         st.caption(f"既存の候補と同じ内容だった{skipped}件は、重複として追加していません。")
-    view = st.segmented_control("表示", list(STATE_FILTER), default="未処理" if open_n else "すべて", key=f"{key}_state", required=True)
+    # 初期表示は「すべて」。確認待ちを先に並べ、採用した候補にも「採用済み」と反映先を出す
+    view = st.segmented_control("表示", list(STATE_FILTER), default="すべて", key=f"{key}_state", required=True)
     states = STATE_FILTER.get(view or "すべて")
-    shown = [c for c in items if states is None or c["state"] in states]
+    shown = sorted((c for c in items if states is None or c["state"] in states), key=lambda c: c["state"] not in ("候補", "要再確認"))
     if not shown:
         st.caption("該当する候補はありません。")
     kinds = list(dict.fromkeys(c["kind"] for c in shown))
     for kind in kinds:
         group = [c for c in shown if c["kind"] == kind]
         route = intake.route_for(kind)
-        with st.expander(f"{kind}　{len(group)}件" + (f"（反映先：{route.button.replace('に追加', '').replace('として採用', '').replace('として追加', '')}）" if route.kind != "note" else ""), expanded=len(shown) <= 12 or kind == kinds[0]):
+        waiting = sum(1 for c in group if c["state"] in ("候補", "要再確認"))
+        with st.expander(f"{kind}　{len(group)}件（確認待ち{waiting}件）→ 確定すると：{DESTINATION.get(route.kind, '記録のみ')}", expanded=len(shown) <= 12 or kind == kinds[0]):
             for n, c in enumerate(group):
                 if n:
                     st.divider()

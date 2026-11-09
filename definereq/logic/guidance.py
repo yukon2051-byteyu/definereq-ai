@@ -109,13 +109,30 @@ def requirement_candidates(p: dict) -> list[dict]:
     return [c for c in p["candidates"] if c["state"] in ("候補", "要再確認") and tasks.get(c.get("origin_run")) != "prep"]
 
 
+def candidate_status(p: dict) -> dict:
+    """AI候補（会議準備の候補を除く）の状態。確認待ちの件数と、確定した反映先ごとの件数。"""
+    tasks = {r["id"]: r["task"] for r in p["ai_runs"]}
+    items = [c for c in p["candidates"] if tasks.get(c.get("origin_run")) != "prep"]
+    waiting = [c for c in items if c["state"] in ("候補", "要再確認")]
+    done: dict[str, int] = {}
+    for c in items:
+        if c["state"] in ("採用", "修正して採用"):
+            label = c.get("resolved_label") or "記録"
+            done[label] = done.get(label, 0) + 1
+    words = {"要件": "要件に採用"}
+    parts = [f"{words.get(k, k + 'へ反映')} {v}件" for k, v in done.items()]
+    adopted = [r for r in p["requirements"] if r.get("from_candidate")]
+    return {"total": len(items), "waiting": len(waiting), "done": done, "text": " · ".join([f"確認待ち{len(waiting)}件", *parts]), "adopted": adopted,
+            "extracted": any(t == "extract" for t in tasks.values())}
+
+
 def has_profile(p: dict) -> bool:
     return any(v.get("value") for v in p["profile"].values()) or bool(p["stakeholders"])
 
 
 PREP = ("会議の準備へ進む", "prep", "背景と資料をもとに、次の打ち合わせで確認することを整理できます。")
 RECORDS = ("会議の記録を整理する", "records", "取り込んだ議事録から、要望・決定事項・未決事項を整理できます。")
-CANDIDATES = ("要件候補を確認する", "candidates", "整理した候補を確認し、要件として採用するか判断できます。")
+CANDIDATES = ("AI候補を確認する", "candidates", "整理した候補を確認し、要件として採用するか判断できます。")  # デモと同じ機能名
 
 
 def setup_next(p: dict) -> dict:
@@ -231,7 +248,8 @@ def _candidates(p: dict) -> list[Advice]:
         breakdown = "、".join(f"{k}{v}件" for k, v in kinds.items())
         title = "議事録・資料の解析が完了" if any(tasks.get(c.get("origin_run")) == "extract" for c in rest) else "AI候補の確認"
         out.append(Advice("candidates", title, f"{len(rest)}件の候補を整理しました（{breakdown}）。{note}候補のままでは要件になりません。", "内容と引用を確認し、必要なものを案件へ反映してください。",
-                          f"未処理の候補が{len(rest)}件あるため。", "records", f"候補{len(rest)}件を確認する", 26, {"records", "candidates", "requirements"}, _titles([c["text"] for c in rest])))
+                          f"未処理の候補が{len(rest)}件あるため。", "candidates", "AI候補を確認する", 26, {"records", "candidates", "requirements"}, _titles([c["text"] for c in rest]),
+                          short=f"確認待ち{len(rest)}件。候補のままでは要件になりません。"))
     return out
 
 

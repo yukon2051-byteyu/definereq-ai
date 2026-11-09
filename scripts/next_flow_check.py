@@ -196,15 +196,16 @@ with sync_playwright() as pw:
     c.close()
 
     # ---- 要件候補がある案件（条件3）と、再開用ファイルからの復元（条件5） ----
-    for path, want, label in ((candidate_file(), "要件候補を確認する →", "3 確認する要件候補がある案件は「要件候補を確認する」"),
+    for path, want, label in ((candidate_file(), "AI候補を確認する →", "3 確認する要件候補がある案件は「AI候補を確認する」"),
                               (saved, "会議の記録を整理する →", "5 再開用ファイルから復元した案件にも、状態に合う案内が出る")):
         c = b.new_context(viewport={"width": 1440, "height": H})
         g = c.new_page()
         resume(g, path)
-        click(g, "← 案件の準備に戻る")
+        if title(g) != "案件の準備":  # 再開は保存時の画面で開く
+            click(g, "← 案件の準備に戻る")
         got = next_button(g).first.inner_text()
         check(got == want, f"{label}（{got}）")
-        if want.startswith("要件候補"):
+        if want.startswith("AI候補"):
             g.screenshot(path=OUT / "3_candidates.png")
             click(g, want, 3000)
             check(title(g) == "AI候補の確認", "3 1クリックでAI候補の確認画面が開く")

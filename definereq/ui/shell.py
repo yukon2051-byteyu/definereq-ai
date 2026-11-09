@@ -12,18 +12,21 @@ from .readonly import HIDE_CSS
 from .components import esc, save_controls, show_flash
 from .pages import decide, materials, organize, prepare, trace
 
-# 上位は作業単位の5つ。機能は削除せず、選んだ作業の下に並べる
+# 上位は作業の工程の5つ。デモと自分の案件で同じ定義からサイドバーを描画し、工程名と機能名をそろえる
 GROUPS = [
-    ("案件ホーム", [("setup", "案件の準備", prepare.setup), ("overview", "現在の状況", prepare.overview), ("profile", "背景・目的・関係者", prepare.profile)]),
+    ("案件の準備", [("setup", "案件の準備", prepare.setup), ("overview", "現在の状況", prepare.overview), ("profile", "背景・目的・関係者", prepare.profile)]),
     ("会議の準備", [("prep", "質問・議題", prepare.prep), ("meetings", "会議", prepare.meetings)]),
-    ("記録を取り込む", [("records", "会議の記録を整理", materials.records), ("sources", "資料・議事録", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
-    ("要件を整理・判断", [("candidates", "AI候補の確認", organize.candidates), ("requirements", "要件", organize.requirements), ("refine", "具体化・受入条件", organize.refine), ("decisions", "決定・合意", decide.decisions),
+    ("記録の取り込み・整理", [("records", "会議の記録を整理", materials.records), ("sources", "資料・議事録", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
+    ("要件の確認・判断", [("candidates", "AI候補の確認", organize.candidates), ("requirements", "要件", organize.requirements), ("refine", "具体化・受入条件", organize.refine), ("decisions", "決定・合意", decide.decisions),
                   ("nfr", "非機能の確認", organize.nfr), ("scope", "範囲・優先順位", organize.scope), ("scenarios", "シナリオ", organize.scenarios), ("issues", "意見調整", decide.issues),
                   ("conflicts", "矛盾", decide.conflicts), ("risks", "リスク", decide.risks)]),
     ("共有・変更管理", [("share", "確認資料・要件定義書", trace.share_page), ("changes", "追加要望と影響", decide.changes), ("trail", "変更履歴", trace.trail), ("why", "なぜこの仕様か", trace.why),
                  ("baseline", "基準版・再確認", decide.baseline), ("usage", "AI・費用", trace.usage)]),
 ]
 PAGES = {key: (label, fn) for _, items in GROUPS for key, label, fn in items}
+GROUP_OF = {key: group for group, items in GROUPS for key, _, _ in items}
+# 画面の上部に独自の状態表示と主ボタンを持つ画面。共通の状態表示（situation.headline）は出さない
+CUSTOM_TOP = {"setup", "profile", "sources", "records", "candidates"}
 # 使う頻度の低い機能は「詳細メニュー」にまとめる。関連する作業の画面からも移動できる
 ADVANCED = {"refine", "nfr", "scope", "scenarios", "issues", "conflicts", "risks", "baseline", "usage"}
 
@@ -38,6 +41,12 @@ NEXT = {"setup": ("背景・目的・関係者を入力します", "profile"), "
 
 
 def sidebar(p: dict) -> None:
+    """サイドバー：案件名 → モード固有の情報と操作 → 共通の工程メニュー。
+
+    工程メニューはデモと自分の案件で同じ定義（GROUPS）から描画する。デモの案内中は、現在のステップに
+    ひもづく工程と機能を強調し、機能を開いた後は本文の「← 戻る」で元のステップへ戻れる。
+    """
+    tour = bool(p.get("demo")) and st.session_state.get("tour_on")
     with st.sidebar:
         if st.button("DefineReq_AI", key="nav_logo", width="stretch"):
             state.go_home()
@@ -45,24 +54,35 @@ def sidebar(p: dict) -> None:
         st.caption("・".join(DOMAINS[d] for d in p["domains"]))
         if st.button("← トップへ戻る", key="nav_home"):
             state.go_home()
-        if not p.get("is_demo"):
-            save_controls(p, "save_side")
-        if p.get("demo") and st.session_state.get("tour_on"):
-            guide.sidebar(p)  # 案内中は工程の一覧だけにする
-            return
-        current = st.session_state.get("page", "overview")
+        # モード固有の情報と操作（共通の工程メニューとは分ける）
+        with st.container(key="nav_mode"):
+            if p.get("demo"):
+                st.caption("デモ：閲覧専用・架空データ")
+                if not tour and st.button("案内付きで最初から見る", key="nav_tour", width="stretch"):
+                    state.open_demo(p["demo"]["id"], tour=True)
+                if st.button("機能対応表", key="nav_map", width="stretch"):
+                    st.session_state["tour_on"] = False
+                    state.goto("demo_map")
+            elif not p.get("is_demo"):
+                save_controls(p, "save_side")
+        current = guide.step_page(p) if tour else st.session_state.get("page", "overview")
+
+        def open_page(key: str) -> None:
+            if tour:  # デモの案内中に機能を開くと、本文に元のステップへ戻る操作が出る
+                guide.open_detail(key)
+            st.session_state["tour_on"] = False
+            state.goto(key)
 
         def nav(key: str, label: str) -> None:
             if st.button(label, key=f"nav_{key}", type="primary" if key == current else "secondary", width="stretch"):
-                st.session_state["tour_on"] = False
-                state.goto(key)
+                open_page(key)
 
+        st.caption("工程")
         for n, (group, items) in enumerate(GROUPS):
             active = current in {k for k, _, _ in items}
             if st.button(group, key=f"nav_group_{n}", type="tertiary" if active else "secondary", width="stretch"):
-                st.session_state["tour_on"] = False
-                state.goto(items[0][0])
-            if active:  # 選んだ作業の機能だけを表示する
+                open_page(items[0][0])
+            if active:  # 現在の工程の機能だけを表示する
                 with st.container(key=f"nav_sub_{n}"):
                     for key, label, _ in items:
                         if key not in ADVANCED:
@@ -72,12 +92,6 @@ def sidebar(p: dict) -> None:
                         with st.expander("詳細メニュー", expanded=current in ADVANCED):
                             for key, label, _ in more:
                                 nav(key, label)
-        if p.get("demo"):
-            st.divider()
-            if st.button("機能対応表", key="nav_map", width="stretch"):
-                state.goto("demo_map")
-            if st.button("案内を最初から見る", key="nav_tour", width="stretch"):
-                state.open_demo(p["demo"]["id"], tour=True)
 
 
 def context_bar(p: dict, page_label: str) -> None:
@@ -126,7 +140,7 @@ def next_step(key: str, p: dict) -> None:
         state.goto(target)
 
 
-def back_to_setup(key: str) -> None:
+def back_to_setup(key: str) -> None:  # noqa: D401
     """自分の案件の各画面の最上部に置く戻る操作。左メニューを閉じていても、案件の準備へ戻れる。"""
     if st.button("← 案件の準備に戻る", key="go_setup_ov" if key == "overview" else f"go_setup_{key}", type="tertiary"):
         state.goto("setup")
@@ -135,7 +149,7 @@ def back_to_setup(key: str) -> None:
 def demo_bar(p: dict) -> None:
     """機能画面（詳細）の上部に、開いた元のステップへの戻り道を示す。戻り先の番号と名前をボタンに出す。"""
     with st.container(key="demo_back", horizontal=True, vertical_alignment="center"):
-        if st.button(guide.back_label(p), key="tour_back", type="primary"):
+        if st.button(guide.back_label(p), key="tour_back"):  # 戻る操作は補助の見た目
             guide.back_to_guide(p)
         st.caption("いま見ているのは機能画面（実際の一覧と記録）です。閲覧専用のため編集はできません。編集は「あなたの案件で試す」から行えます。")
 
@@ -152,18 +166,26 @@ def render(p: dict) -> None:
         return
     label = "デモの機能対応表" if key == "demo_map" else PAGES.get(key, PAGES["overview"])[0]
     context_bar(p, label)
+    st.session_state["_group"] = GROUP_OF.get(key)  # 見出しの上の工程名（サイドバーと同じ名前）
+    st.session_state["_demo"] = bool(p.get("is_demo"))  # デモの機能画面は、見出し付近に「デモデータ · 閲覧専用」
+    mine = not p.get("is_demo")
+    st.session_state["_main_elsewhere"] = False
+    empty = key == "overview" and gd.phase(p) == "empty"
     if p.get("demo"):
         demo_bar(p)
-    elif not p.get("is_demo") and key not in ("setup", "profile", "sources") and not (key == "overview" and gd.phase(p) == "empty"):
-        # 自分の案件の作業画面は、同じ位置に「戻る」（案件の準備へ）と「次に進む」（状況案内の主ボタン）を置く。
-        # 背景と資料の画面は入力を先に見せるため、戻る操作を各画面の見出し付近に置く。
-        # 記録の整理の画面は、未整理の件数と実行ボタンを先頭に出すため、長い状況案内を画面の下にまとめる
-        back_to_setup(key)
-        if key != "records":
-            situation.project_panel(p, key)  # 案件の準備の画面は、それ自体が進み先を示す
+    elif mine and key not in ("setup", "profile", "sources") and not empty:
+        back_to_setup(key)  # 背景と資料の画面は、戻る操作を見出しの近くに独自に置く
+    if mine and key not in CUSTOM_TOP and not empty:
+        # 画面名 → 状態の1行と主ボタン の順にするため、見出しの直後に状態表示を出す（components.head が呼ぶ）
+        st.session_state["_head_hook"] = lambda: situation.headline(p, key)
+    elif mine:
+        st.session_state["_head_hook"] = lambda: situation.resume_line(p, key)
     stage_control(p)
     if key == "demo_map":
         trace.demo_map(p)
     else:
-        PAGES.get(key, PAGES["overview"])[1](p)
+        PAGES.get(key, PAGES["setup"] if mine else PAGES["overview"])[1](p)  # 記録された画面が無効なら案件の準備
         next_step(key if key in PAGES else "overview", p)
+        if mine and key not in CUSTOM_TOP and not empty:
+            situation.details_for(p, key)  # 理由・作業の段階・AIの補足は、画面の下にまとめる
+    st.session_state.pop("_head_hook", None)

@@ -26,7 +26,7 @@ class Route:
 
 _QUESTION = Route("question", "会議の質問に追加", "prep")
 _CONFIRM = Route("confirm", "確認事項に追加", "prep")
-_REQUIREMENT = Route("requirement", "要件候補として採用", "requirements")
+_REQUIREMENT = Route("requirement", "要件に採用する内容を確認", "requirements")  # 押すと確認欄が開く。確定は「この内容で採用」
 _RISK = Route("risk", "リスク候補として追加", "risks")
 _NOTE = Route("note", "記録として残す", None)
 

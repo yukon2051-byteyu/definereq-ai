@@ -479,15 +479,14 @@ def project_app(p, page="overview", **state):
 
 
 def test_project_panel_can_close_and_reopen_and_has_no_demo_words(blank):
-    at = project_app(blank, "prep")  # 背景・資料の画面は見出しの下に短い1行だけを出すため、ほかの作業画面で確認する
+    """見出しの直後に状態の1行と主ボタン。理由などの詳しい説明は画面の下の開閉式の欄にまとめる。"""
+    at = project_app(blank, "prep")
     html = "".join(h.proto.body for h in at.get("html"))
-    assert "案件を作成した直後" in html and "デモ体験中" not in html and "この操作をおすすめする理由" in html
-    assert button(at, "guide_hide").label == "詳しい説明を閉じる"
-    at = button(at, "guide_hide").click().run()
-    folded = "".join(h.proto.body for h in at.get("html"))
-    assert "この操作をおすすめする理由" not in folded and "案件を作成した直後" in folded and not at.exception
-    at = button(at, "guide_show").click().run()
-    assert "この操作をおすすめする理由" in "".join(h.proto.body for h in at.get("html"))
+    assert "案件を作成した直後" in html and "デモ体験中" not in html and not at.exception
+    assert button(at, "guide_go").label == "案件の準備を開く →"
+    assert any(e.label == "次にすることの詳しい説明" for e in at.expander)
+    labels = [m.value for m in at.markdown]
+    assert "**この操作をおすすめする理由**" in labels  # 開閉式の欄の中にある
 
 
 def test_profile_shows_brief_guidance_and_details_below(blank):
@@ -502,12 +501,12 @@ def test_profile_shows_brief_guidance_and_details_below(blank):
 def test_next_action_stays_after_closing_detail_on_other_pages(blank):
     """説明を閉じても、状況の文と次の操作は別の画面でも残る。"""
     blank["profile"]["problem"].update(value="申込をメールで受けている")
-    at = project_app(blank, "overview", guidance_hidden=True)
-    assert button(at, "guide_go").label == "会議を準備する" and button(at, "guide_alt_0").label == "議事録を取り込む"
+    at = project_app(blank, "overview")
+    assert button(at, "guide_go").label == "会議を準備する →" and button(at, "guide_alt_0").label == "ほかの作業：議事録を取り込む"
     assert "背景・目的を登録しました" in "".join(h.proto.body for h in at.get("html"))
     at.session_state["page"] = "requirements"
     at.run()
-    assert button(at, "guide_go").label == "会議を準備する" and button(at, "guide_show").label == "詳しい説明を表示"
+    assert button(at, "guide_go").label == "会議を準備する →"
 
 
 def test_project_panel_works_without_ai_and_never_calls_it(blank, monkeypatch):
@@ -561,7 +560,9 @@ def test_decision_shows_choice_reason_basis_then_table():
     assert [h.index(x) for x in order] == sorted(h.index(x) for x in order)
     assert "発言（話者確認済み）" in h and 'class="dr-t-win"' in h
     labels = [b.label for b in at.button]
-    assert labels.index("次へ：追加要望の影響を見る") < labels.index("この判断に使った確認メールを見る") and labels.count("次へ：追加要望の影響を見る") == 1
+    # 出典を開く操作は採用案と理由の近く（「次へ」より前）。「次へ」は1つだけ
+    assert labels.index("この判断に使った確認メールを見る") < labels.index("次へ：追加要望の影響を見る") and labels.count("次へ：追加要望の影響を見る") == 1
+    assert "議事録の該当発言を見る" in labels
     assert any(e.label.startswith("判断の根拠と経緯を見る") for e in at.expander)
     assert button(at, "tour_evidence").label == "この判断に使った確認メールを見る" and button(at, "tour_detail").label == "決定・合意の一覧を見る"
 
@@ -617,3 +618,54 @@ def test_other_demo_shortcuts(demo, index, label):
     assert at.label == label
     at = at.click().run()
     assert at.session_state["tour_index"] == index and "この案件の論点" in html_of(at) and not at.exception
+
+
+# ---- デモの登録内容と根拠の閲覧 ----
+def demo_at(demo="d1", step=None):
+    at = button(app(), f"tour_{demo}").click().run()
+    if step is not None:
+        at = button(at, f"tour_go_{step}").click().run()
+    return at
+
+
+@pytest.mark.parametrize("demo", ["d1", "d2", "d3"])
+def test_demo_profile_and_sources_are_browsable(demo):
+    at = demo_at(demo)
+    at = button(at, "tour_profile").click().run()  # 冒頭の「登録された背景・目的・関係者を見る」
+    h = html_of(at)
+    assert at.session_state["page"] == "profile" and "デモデータ · 閲覧専用" in h and button(at, "tour_back").label == "← 1. 案件の背景に戻る"
+    p = at.session_state["project"]
+    assert p["stakeholders"] and any(v["value"] for v in p["profile"].values())
+    at = button(at, "nav_group_2").click().run()  # 共通サイドバー：記録の取り込み・整理 → 会議の記録を整理
+    at = button(at, "nav_sources").click().run()
+    h = html_of(at)
+    assert at.session_state["page"] == "sources" and "デモデータ · 閲覧専用" in h and "収録されている本文" in h
+    assert not any(t.key and t.key.startswith("paste_b_") for t in at.text_area)  # 登録の操作は出さない
+
+
+def test_d1_decision_opens_mail_and_speech_then_returns():
+    at = demo_at("d1", 4)
+    at = button(at, "tour_evidence").click().run()
+    h = html_of(at)
+    assert at.session_state["page"] == "sources" and "開いた根拠の箇所" in h and "金額の訂正は再申請とする方式を承認します" in h
+    at = button(at, "tour_back").click().run()
+    assert at.session_state["tour_index"] == 4 and button(at, "tour_next").label == "次へ：追加要望の影響を見る"
+    at = button(at, "tour_ev_speech").click().run()
+    h = html_of(at)
+    assert at.session_state["page"] == "recordings" and "開いた発言" in h and "話者確認：確認済み" in h
+
+
+def test_d3_speech_opens_recording_segment():
+    at = demo_at("d3", 2)
+    at = button(at, "tour_ev_sp_0").click().run()
+    h = html_of(at)
+    assert at.session_state["page"] == "recordings" and "開いた発言" in h and "外部からの遠隔保守を提案します" in h
+    assert button(at, "tour_back").label == "← 3. 録画の発言に戻る"
+
+
+def test_d2_decision_links_to_its_sources():
+    at = demo_at("d2", 4)  # 停止の調整（判断あり）
+    evs = [b for b in at.button if b.key and b.key.startswith("tour_ev_")]
+    assert evs and all("該当" in b.label for b in evs)
+    at = evs[0].click().run()
+    assert at.session_state["page"] in ("sources", "recordings") and ("開いた根拠の箇所" in html_of(at) or "開いた発言" in html_of(at))

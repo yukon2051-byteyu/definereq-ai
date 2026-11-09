@@ -22,7 +22,7 @@ from ...usage.ledger import BudgetExceeded, LedgerUnavailable, Limits
 from ...logic.guidance import unanalyzed_minutes
 from ..ai_panel import ai_panel, current_code
 from ..candidates import board
-from ..components import chips, edit_block, esc, head, meeting_select, ok_rerun, play_at, select_item, touch
+from ..components import main_type, chips, edit_block, esc, head, meeting_select, ok_rerun, play_at, select_item, touch
 
 
 MODES = {"議事録を取り込む": "議事録", "その他の資料を取り込む": None}
@@ -100,7 +100,7 @@ def _source_import(p: dict) -> None:
             title = st.text_input("貼り付ける文章の名称", key=f"paste_t_{m}")
             text = st.text_area("文章を貼り付ける", key=f"paste_b_{m}")
             st.html(kind_note)
-            if st.button("貼り付けた文章を案件内に登録", key="paste_go"):
+            if st.button("貼り付けた文章を案件内に登録", key="paste_go", type="primary"):  # 表示中のタブの登録ボタンが主操作
                 if not (text or "").strip():
                     st.error("貼り付ける文章を入力してください。")
                 else:
@@ -144,12 +144,25 @@ def _source_list(p: dict) -> None:
     if not p["sources"]:
         st.caption("取り込んだ資料はまだありません。")
         return
-    rows = [{"ID": s["id"], "名称": s["name"], "版": f"v{s['version']}", "種類": s["kind"], "日付": s.get("occurred_at") or "未設定", "公開範囲": s["visibility"],
+    demo = p.get("is_demo")
+    rows = [{"ID": s["id"], "名称": s["name"], "版": f"v{s['version']}", "種類": s["kind"], "日付": s.get("occurred_at") or "未設定",
+             "この案件で使った箇所": _usage_short(p, s["id"]), "公開範囲": s["visibility"],
              "会議": continuity.label(p, s.get("meeting_id")), "単位数": len(s["units"]), "警告": len(s["warnings"]), "状態": "旧版" if s.get("superseded_by") else "最新"} for s in p["sources"]]
-    st.dataframe(pd.DataFrame(rows, columns=["ID", "名称", "版", "種類", "日付", "公開範囲", "会議", "単位数", "警告", "状態"]), hide_index=True, width="stretch")
+    cols = ["ID", "名称", "種類", "日付", "この案件で使った箇所", "単位数", "状態"] if demo else ["ID", "名称", "版", "種類", "日付", "公開範囲", "会議", "単位数", "警告", "状態"]
+    st.dataframe(pd.DataFrame(rows, columns=cols), hide_index=True, width="stretch")
+    if demo and p["recordings"]:  # 録画・字幕は、録画・発言の画面で発言ごとに確認する
+        st.markdown("**録画・字幕**")
+        for r in p["recordings"]:
+            c1, c2 = st.columns([3, 1])
+            c1.caption(f"{r['id']} {r['name']}（発言{len(r['segments'])}件／{tr.METHOD_LABEL.get(r['method'], r['method'])}）　使った箇所：{_usage_short(p, r['id'])}")
+            if c2.button("録画・発言の画面で見る", key=f"src_rec_{r['id']}"):
+                from .. import state
+                st.session_state["rec_sel"] = r["id"]
+                state.goto("recordings")
     src = select_item(p["sources"], lambda s: f"{s['id']} {s['name']} v{s['version']}", "src_sel", "資料はまだありません。")
     if not src:
         return
+    focus = _focus_unit(p, src)
     st.caption(f"出所：{src['origin']}／登録日時：{src['registered_at'][:16].replace('T', ' ')}")
     for w in src["warnings"]:
         st.warning(w)
@@ -157,6 +170,12 @@ def _source_list(p: dict) -> None:
         st.markdown("**スライド別の抽出結果**")
         st.dataframe(pd.DataFrame([{"スライド": s["no"], "タイトル": s["title"], "抽出した箇所": s["units"], "発表者ノート": "あり（初期状態は対象外）" if s["has_notes"] else "なし",
                                     "文字以外（未理解）": "、".join(s["not_understood"]) or "なし"} for s in src["extra"]["slides"]]), hide_index=True, width="stretch")
+    if demo:
+        uses = _usage(p, src["id"])
+        st.markdown("**この案件で使った箇所**")
+        st.caption("／".join(uses) if uses else "要件・判断・質問の根拠としての引用はありません（資料として登録されています）。")
+        _units_readonly(src, focus)
+        return
     st.markdown("**抽出した本文**（「対象」を外すとAIへ送信しません）")
     df = pd.DataFrame([{"対象": u.get("target", True), "位置": u["locator"], "本文": u["text"], "_id": u["id"]} for u in src["units"]])
     if df.empty:
@@ -176,6 +195,48 @@ def _source_list(p: dict) -> None:
             src["supplement"] = note or None
             touch(p)
             ok_rerun("保存しました")
+
+
+def _usage(p: dict, source_id: str) -> list[str]:
+    """この資料（または録画）を根拠として引用している要件・判断・質問・候補。"""
+    found: list[str] = []
+    for col, name, label in (("requirements", "要件", "title"), ("decisions", "判断", "topic"), ("questions", "質問", "text")):
+        for item in p[col]:
+            if any(e.get("source_id") == source_id for e in item.get("evidence") or []):
+                found.append(f"{name} {item['id']}「{str(item[label])[:24]}」")
+    return found
+
+
+def _usage_short(p: dict, source_id: str) -> str:
+    uses = _usage(p, source_id)
+    kinds: dict[str, int] = {}
+    for u in uses:
+        kinds[u.split(" ")[0]] = kinds.get(u.split(" ")[0], 0) + 1
+    return "、".join(f"{k}{v}件の根拠" for k, v in kinds.items()) or "根拠としての引用なし"
+
+
+def _focus_unit(p: dict, src: dict) -> str | None:
+    """デモの判断などから開いた根拠の箇所。開いた箇所を先頭に示し、本文の一覧でも強調する。"""
+    focus = st.session_state.get("ev_focus") or {}
+    if focus.get("source_id") != src["id"]:
+        return None
+    unit = next((u for u in src["units"] if u["id"] == focus.get("unit_id")), None) or         next((u for u in src["units"] if focus.get("quote") and focus["quote"] in u["text"]), None)
+    if unit:
+        st.html(f'<div class="dr-focus"><div class="dr-v-lab">開いた根拠の箇所：{esc(src["name"])}（{esc(unit["locator"])}）</div>'
+                f'<div class="dr-key-s">「{esc(unit["text"])}」</div><div class="dr-meta">{esc(focus.get("note") or "")}</div></div>')
+        return unit["id"]
+    return None
+
+
+def _units_readonly(src: dict, focus: str | None) -> None:
+    """デモの本文：デモ用の架空の資料から抽出した範囲を、閲覧専用で表示する。"""
+    st.markdown("**収録されている本文**")
+    st.caption("デモ用に作成した架空の資料から抽出した範囲です。図などの文字以外の内容は含みません。")
+    if not src["units"]:
+        st.info("この資料から抽出できた本文はありません。この画面では本文を確認できません。")
+        return
+    rows = "".join(f'<li class="{"on" if u["id"] == focus else ""}"><span class="dr-meta">{esc(u["locator"])}</span>{esc(u["text"])}</li>' for u in src["units"])
+    st.html(f'<ol class="dr-units">{rows}</ol>')
 
 
 def _save_upload(up) -> str:
@@ -240,7 +301,7 @@ def _transcribe_ui(p: dict, meeting: str | None) -> None:
         ready = tr.local_available()
         if not ready:
             st.caption("このサーバーにはローカル処理の部品（faster-whisper）が入っていません。")
-    if st.button("この内容で文字起こしを実行", type="primary", disabled=not ready or end - start > max_min, key="rec_go"):
+    if st.button("この内容で文字起こしを実行", type=main_type(), disabled=not ready or end - start > max_min, key="rec_go"):
         run_id = None
         try:
             if choice == "openai":
@@ -296,7 +357,7 @@ def _import_files(p: dict, files: list, visibility: str, date: str | None, meeti
     return done
 
 
-def minutes_import(p: dict, meeting: str | None, key: str) -> None:
+def minutes_import(p: dict, meeting: str | None, key: str, main: str | None = None) -> None:
     """議事録・字幕の取込み。録画がない会議でも、この欄だけで記録を登録できる。"""
     st.markdown("**議事録・字幕を取り込む**（Word / Excel / PDF / PowerPoint / テキスト / SRT / VTT）")
     st.caption("議事録として登録します。録画は必要ありません。")
@@ -305,7 +366,10 @@ def minutes_import(p: dict, meeting: str | None, key: str) -> None:
     c1, c2 = st.columns(2)
     date = c1.text_input("開催日（不明なら空欄）", key=f"{key}_date")
     visibility = c2.selectbox("公開範囲", VISIBILITY, key=f"{key}_vis")
-    if st.button("ファイルを取り込む", type="primary", disabled=not files, key=f"{key}_go"):
+    kind = main or main_type()  # 記録がまだないときだけ取り込みを主操作にする（呼び出し側が指定）
+    # 主操作は1つ：ファイルを選んだらファイルの取り込み、選んでいなければ貼り付けた文章の登録
+    file_kind, paste_kind = (kind, "secondary") if files else ("secondary", kind)
+    if st.button("ファイルを取り込む", type=file_kind, disabled=not files, key=f"{key}_go"):
         done = _import_files(p, files, visibility, date or None, meeting)
         if done:
             st.session_state[f"{key}_round"] = round_no + 1
@@ -313,7 +377,7 @@ def minutes_import(p: dict, meeting: str | None, key: str) -> None:
             ok_rerun(f"{done}件読み込みました")
     title = st.text_input("貼り付ける議事録の名称", key=f"{key}_paste_t")
     text = st.text_area("議事録の文章を貼り付ける", key=f"{key}_paste_b")
-    if st.button("貼り付けた文章を議事録として登録", key=f"{key}_paste_go") and text.strip():
+    if st.button("貼り付けた文章を議事録として登録", key=f"{key}_paste_go", type=paste_kind) and text.strip():
         registry.ingest_paste(p, title, text, kind="議事録", visibility=visibility, occurred_at=date or None, meeting_id=meeting)
         touch(p)
         ok_rerun("登録しました")
@@ -346,26 +410,38 @@ def records(p: dict) -> None:
         with st.container(border=True, key="records_run"):
             ai_panel_extract(p, wait_src, wait_rec)
     elif names:
-        st.html(_status("未整理の議事録 0件", f"整理済みの記録：{'、'.join(names)}" + (f"／確認待ちの候補 {len(pending)}件" if pending else "")))
+        cs = gd.candidate_status(p)
+        if cs["extracted"]:  # AIで整理した後は、件数と「AI候補を確認する」を先頭に出す
+            st.html(_status("AI整理完了", f"{cs['text']}（整理済みの記録：{'、'.join(names)}）"))
+            if cs["waiting"]:
+                if st.button("AI候補を確認する →", key="records_go_cand", type="primary"):
+                    from .. import state
+                    state.goto("candidates")
+            elif cs["adopted"] and st.button("採用した要件を確認する →", key="records_go_reqs", type="primary"):
+                from .. import state
+                state.goto("requirements")
+        else:
+            st.html(_status("未整理の議事録 0件", f"整理済みの記録：{'、'.join(names)}"))
     else:
         st.html(_status("会議の記録はまだありません", "議事録のファイルを選ぶか、文章を貼り付けて登録してください。録画がなくても進められます。"))
     meeting = None
     if names:
-        if tasks:
-            st.subheader("AIが整理した候補")
-            board(p, tasks, "records_cand", None)
+        if waiting and gd.candidate_status(p)["waiting"]:  # 前回の整理の候補が残っているときは、補助の操作として出す
+            if st.button("前回の整理で作成したAI候補を確認する", key="records_go_cand_prev", type="tertiary"):
+                from .. import state
+                state.goto("candidates")
         if not waiting:
             with st.expander("AIでもう一度整理する（対象を選んで実行）"):
-                ai_panel_extract(p, [], [])
+                ai_panel_extract(p, [], [], primary=False)
         with edit_block("records"), st.expander("議事録・録画を追加する"):
             meeting = meeting_select(p, "records_mtg")
-            minutes_import(p, meeting, "records")
+            minutes_import(p, meeting, "records", main="secondary")
             st.markdown("**録画から文字起こしする（録画がある場合）**")
             _transcribe_ui(p, meeting)
     else:
         with edit_block("records"), st.container(border=True):
             meeting = meeting_select(p, "records_mtg")
-            minutes_import(p, meeting, "records")
+            minutes_import(p, meeting, "records", main="primary")
             with st.expander("録画から文字起こしする（録画がある場合）"):
                 _transcribe_ui(p, meeting)
     if st.button("ほかの作業：次回の質問を準備する", key="records_prep", type="tertiary"):
@@ -378,10 +454,10 @@ def _status(title: str, detail: str) -> str:
     return f'<div class="dr-now"><b>{esc(title)}</b><span>{esc(detail)}</span></div>'
 
 
-def ai_panel_extract(p: dict, src_ids: list[str], rec_ids: list[str]) -> None:
+def ai_panel_extract(p: dict, src_ids: list[str], rec_ids: list[str], primary: bool = True) -> None:
     from ..ai_panel import extract_runner
 
-    extract_runner(p, src_ids, rec_ids)
+    extract_runner(p, src_ids, rec_ids, primary)
 
 
 def _records_demo(p: dict, names: list[str], tasks: tuple) -> None:
@@ -404,6 +480,14 @@ def recordings(p: dict) -> None:
     rec = select_item(p["recordings"], lambda r: f"{r['id']} {r['name']} v{r['version']}", "rec_sel", "録画はまだありません。")
     if not rec:
         return
+    focus = st.session_state.get("ev_focus") or {}
+    seg = next((x for x in rec["segments"] if focus.get("source_id") == rec["id"] and (x["id"] == focus.get("unit_id") or (focus.get("quote") and focus["quote"] in x["text"]))), None)
+    if seg:  # デモの判断などから開いた発言を先頭に示す
+        view = speaker_view(rec, seg)
+        st.html(f'<div class="dr-focus"><div class="dr-v-lab">開いた発言：{esc(rec["name"])} {esc(format_time(seg["start"]))}　{esc(view["label"])}：{esc(view["name"])}'
+                f'（話者確認：{esc(view["speaker_check"])}・区分：{esc(seg.get("kind") or "未分類")}）</div><div class="dr-key-s">「{esc(seg["text"])}」</div>'
+                f'<div class="dr-meta">{esc(focus.get("note") or "")}</div></div>')
+        play_at(rec, seg["start"], f"focus_{seg['id']}")
     st.caption(f"会議：{continuity.label(p, rec.get('meeting_id'))}")
     st.caption(f"方式：{tr.METHOD_LABEL.get(rec['method'], rec['method'])}／開催日：{rec.get('meeting_date') or '記録なし'}／長さ：{format_time(rec.get('duration') or 0)}"
                + (f"／{rec['note']}" if rec.get("note") else ""))
@@ -414,7 +498,7 @@ def recordings(p: dict) -> None:
     edited = st.data_editor(df, hide_index=True, width="stretch", disabled=["時刻", "話者ラベル"], key=f"seg_{rec['id']}", column_config={
         "_id": None, "話者": st.column_config.SelectboxColumn(options=names), "話者の確認": st.column_config.SelectboxColumn(options=SPEAKER_CONFIRM, required=True),
         "性質": st.column_config.SelectboxColumn(options=UTTERANCE_KINDS), "内容の確認": st.column_config.SelectboxColumn(options=CONTENT_CONFIRM, required=True)})
-    if st.button("発言の確認を保存", type="primary"):
+    if st.button("発言の確認を保存", type=main_type()):
         for row in edited.to_dict("records"):
             seg = tr.edit_segment(rec, row["_id"], text=row["発言"], speaker=row["話者"] or "", speaker_status=row["話者の確認"],
                                   content_status=row["内容の確認"], kind=row["性質"])

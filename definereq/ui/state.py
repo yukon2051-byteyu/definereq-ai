@@ -36,7 +36,9 @@ def mark_saved(p: dict) -> None:
 def open_project(p: dict, loaded: bool = False) -> None:
     _clear_widgets()
     st.session_state["project"] = p
-    st.session_state["page"] = "overview" if loaded else "setup"  # 新しい案件は案件の準備から始める
+    # 新しい案件は案件の準備から始める。再開した案件は、保存時に開いていた画面へ戻る（記録がなければ案件の準備）
+    last = p.pop("last_page", None) if loaded else None
+    st.session_state["page"] = last if isinstance(last, str) and last.isascii() and last.isalpha() else "setup"
     st.session_state["tour_on"] = False
     st.session_state["show_home"] = False
     st.session_state["save_time"] = None
@@ -88,6 +90,7 @@ def open_demo(demo_id: str, tour: bool = True, stage: int | None = None) -> None
 def goto(page: str) -> None:
     st.session_state.pop("src_done", None)  # 資料の登録直後の案内は、別の画面へ移ったら閉じる
     st.session_state.pop("pf_saved", None)  # 背景の保存直後の案内も同じ
+    st.session_state["resumed"] = False  # 再開の通知は、作業を始めたら閉じる
     st.session_state["page"] = page
     st.rerun()
 

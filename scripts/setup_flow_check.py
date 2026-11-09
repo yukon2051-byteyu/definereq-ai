@@ -142,6 +142,8 @@ with sync_playwright() as pw:
 
     # 3. 入力途中で移動しても下書きが残る
     click(g, "背景・目的・関係者を編集")
+    g.get_by_text("案件情報を詳しく入力").first.click()  # 時期は任意項目の欄にある
+    wait(g, 700)
     fill(g, "時期", "来年4月の開始を希望（未確認）")
     if SIZE == "pc":
         sidebar(g, "案件の準備")
@@ -201,8 +203,8 @@ with sync_playwright() as pw:
         g.wait_for_selector(".dr-title", timeout=30000)
         wait(g)
         if label == "改修後のファイル":
-            g.locator(".st-key-go_setup_ov button").click()  # 本文のボタン（左メニューを使わない）
-            wait(g, 2300)
+            if title(g) != "案件の準備":  # 再開は保存時の画面で開く。案件の準備でなければ本文のボタンで戻る
+                click(g, "← 案件の準備に戻る")
             ok = "入力済み" in body(g) and "取り込み済み 1件" in body(g)
             if SIZE == "pc":
                 sidebar(g, "背景・目的・関係者")
@@ -211,7 +213,7 @@ with sync_playwright() as pw:
             ok = ok and g.get_by_label("時期", exact=True).first.input_value() == "来年4月の開始を希望（未確認）"
             check(ok, "5 改修後のファイルから、保存済みの入力と取り込み件数が戻る")
         else:
-            check(g.locator("[data-testid=stException]").count() == 0 and "再開" in g.locator(".dr-sit-work").first.inner_text(), "5 旧形式のファイルも読み込める")
+            check(g.locator("[data-testid=stException]").count() == 0 and "案件を再開しました" in body(g), "5 旧形式のファイルも読み込める（1行の再開の通知）")
         g.context.close()
     b.close()
 

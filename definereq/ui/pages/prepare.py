@@ -15,7 +15,7 @@ from .. import state
 from ..ai_panel import ai_panel, ai_runs_list
 from ..candidates import board
 from .. import drafts, situation
-from ..components import chip, definition, edit_block, esc, guard, head, ok_rerun, save_controls, select_item, touch
+from ..components import main_type, chip, definition, edit_block, esc, guard, head, ok_rerun, save_controls, select_item, touch
 
 
 def setup(p: dict) -> None:
@@ -173,24 +173,41 @@ def profile(p: dict) -> None:
         situation.details(p, "profile", guide, skip={"setup", "sources", "profile"})
 
 
+MAIN_FIELDS = ("background", "purpose", "problem")  # 最初に見せる項目
+
+
 def _profile_form(p: dict) -> None:
     """背景・目的などの欄。入力途中の内容は下書きとして残り、ボタンを押したときだけ案件に反映する。"""
     with edit_block("profile"), st.container(border=True, key="pf_form"):
         st.markdown("**案件情報**")
-        st.caption("入力途中の内容は、ほかの画面へ移っても残ります。「確かさ」は、確認済み・本人申告・仮説・未確認から選びます。")
+        st.caption("分かる項目だけで進められます。空欄のままでも保存できます。入力途中の内容は、ほかの画面へ移っても残ります。")
         new = {}
-        for key, label in PROFILE_FIELDS.items():
+
+        def field(key: str, label: str) -> None:
             cur = p["profile"][key]
             c1, c2 = st.columns([4, 1])
             value = drafts.widget(p["id"], f"v_{key}", c1.text_area, label, cur["value"] or "", height=68)
             cert = drafts.widget(p["id"], f"c_{key}", c2.selectbox, "確かさ", cur["certainty"], options=CERTAINTY)
             new[key] = {"value": (value or "").strip() or None, "certainty": cert}
+
+        for key in MAIN_FIELDS:  # 背景・目的・課題を先に見せ、すぐ下に保存の操作を置く
+            field(key, PROFILE_FIELDS[key])
+        rest = [k for k in PROFILE_FIELDS if k not in MAIN_FIELDS]
+        filled = sum(1 for k in rest if p["profile"][k]["value"])
+        # 任意の項目は折りたたむ。閉じていても入力欄は描画されるため、保存済みの値や編集中の内容は残る
+        with st.expander(f"案件情報を詳しく入力（{'・'.join(PROFILE_FIELDS[k] for k in ('scope_in', 'constraints', 'timeline', 'budget'))}など{len(rest)}項目" + (f"、入力済み{filled}項目" if filled else "") + "）"):
+            st.caption("「確かさ」は、確認済み・本人申告・仮説・未確認から選びます。")
+            for key in rest:
+                field(key, PROFILE_FIELDS[key])
         # ボタンより上には、入力中に表示が変わる部品を置かない。
         # 入力欄の確定（フォーカスが外れたとき）で上の表示が増えると、押している最中にボタンが下へずれ、クリックが成立しないため
         st.caption("背景・目的・課題など、この欄の入力を案件に反映します。関係者と用語は、それぞれの「追加」で反映します。")
         go_label, go_page = _after_save(p)
+        saved = st.session_state.get("pf_saved")
+        # 保存した直後（未保存の変更なし）は「次へ」を主ボタンにし、保存は補助の見た目にする
+        just_saved = bool(saved and saved["project"] == p["id"] and not drafts.profile_fields_pending(p))
         b1, b2 = st.columns(2)
-        save_now = b1.button("案件情報を保存", type="primary", key="pf_save", width="stretch")
+        save_now = b1.button("案件情報を保存", type="secondary" if just_saved else "primary", key="pf_save", width="stretch")
         save_go = b2.button(f"保存して{go_label}", key="pf_save_go", width="stretch")
         if save_now or save_go:
             error = _save_profile(p, new)
@@ -202,7 +219,6 @@ def _profile_form(p: dict) -> None:
             else:  # 保存の結果と次の操作は、別の画面へ移るまで残す（押す前に消えるとクリックが届かないため）
                 st.session_state["pf_saved"] = {"project": p["id"], "time": pj.now_iso()[11:16]}
                 st.rerun()
-        saved = st.session_state.get("pf_saved")
         if drafts.profile_fields_pending(p):
             st.caption("保存していない変更があります。")
         elif saved and saved["project"] == p["id"]:
@@ -327,7 +343,7 @@ def prep(p: dict) -> None:
         materials = c2.text_area("必要な資料・計測（1行に1件）", value="\n".join(pr.get("materials", [])))
         agenda = c1.text_area("議題（1行に1件）", value="\n".join(pr.get("agenda", [])))
         decide = c2.text_area("今回決めたいこと（1行に1件）", value="\n".join(pr.get("decide_today", [])))
-        if st.form_submit_button("案件内に反映", type="primary"):
+        if st.form_submit_button("案件内に反映", type=main_type()):
             def lines(x: str) -> list[str]:
                 return [v.strip() for v in x.splitlines() if v.strip()]
             pr.update(understanding=understanding or None, purpose=purpose or None, gaps=lines(gaps), materials=lines(materials),
@@ -397,7 +413,7 @@ def _reflect_panel(p: dict) -> None:
                         intake.apply_profile(p, s, "append")
                         touch(p)
                         ok_rerun("案件情報を更新しました")
-                elif st.button("確認して案件情報へ反映する", key=f"pf_set_{s['id']}", type="primary"):
+                elif st.button("確認して案件情報へ反映する", key=f"pf_set_{s['id']}"):
                     intake.apply_profile(p, s)
                     touch(p)
                     ok_rerun("案件情報へ反映しました")

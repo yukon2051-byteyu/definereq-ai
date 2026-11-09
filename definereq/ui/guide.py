@@ -210,7 +210,7 @@ def _finale(p: dict, ctx: guide.Ctx, steps: list[dict], i: int, intro: dict) -> 
             f'<div class="dr-end-row"><div class="dr-end-box"><div class="dr-v-lab">体験したこと</div><div class="dr-g-sub">{esc(intro["done"])}</div></div>{rest}</div></div>')
     # 次の選択肢は、末尾までスクロールしなくても見える位置に置く
     with st.container(key="tour_end_next", horizontal=True):
-        if st.button("ほかのデモを見る", key="tour_others", type="primary"):
+        if st.button("ほかのデモを見る", key="tour_others"):  # 終了画面の主操作は「要件定義書の内容を見る」
             state.go_home("dr-demo")
         if st.button("この案件の機能画面を詳しく見る", key="tour_end"):
             open_detail("overview")
@@ -285,14 +285,20 @@ def render(p: dict) -> None:
     situation.demo_banner(p["name"], intro, step, i == 0, step["date"](ctx) if step.get("date") else None, point, ctx.background())
     _phases(demo_id, steps, i)
     st.html(f'<h1 class="dr-g-h">{esc(step["title"])}</h1>' + _focus(demo_id, i) + _lead(step, ctx))
+    if step["page"] in RECORD_PAGES:  # 記録の取り込み・整理のステップ：使った資料名と、登録内容を開く入口
+        _used_materials(p)
     blocks = step["main"](ctx)
     inline = blocks[0]["type"] in ("story", "verdict", "change_sum")  # 「次へ」を本文の途中に1つだけ置く画面
     for n, block in enumerate(blocks):
         if block["type"] == "speech":
             _speech(p, block, f"guide_{i}_{n}")
+            if st.button("録画・発言の画面でこの発言を見る", key=f"tour_ev_sp_{n}", type="tertiary"):
+                open_detail("recordings", rec_sel=block["rec_id"], ev_focus={"source_id": block["rec_id"], "unit_id": block["seg_id"], "note": "デモのステップから開いた発言です。"})
         elif block["type"] == "story":
             _story(block)
             _start(steps, i, demo_id)  # 論点の直下に、順に見る操作と見どころへの近道を1組だけ出す
+            if st.button("登録された背景・目的・関係者を見る", key="tour_profile", type="tertiary"):
+                open_detail("profile")
             _story_more(block)
         elif block["type"] == "verdict":
             _verdict(block, step, steps, i)
@@ -301,11 +307,13 @@ def render(p: dict) -> None:
             _next_inline(steps, i, "次へ：要件定義書を見る" if steps[i + 1].get("finale") else None)
             with st.expander("判断の詳細を見る（追加要望と過去の判断の衝突、比較表、根拠、仕様の履歴）"):
                 _change_flow(block)
-                for rest in blocks[n + 1:]:
+                for m, rest in enumerate(blocks[n + 1:]):
                     RENDER[rest["type"]](rest)
+                    _evidence_links(rest, f"cs{m}")
             break
         else:
             RENDER[block["type"]](block)
+            _evidence_links(block, str(n))
     if step.get("media_note"):
         st.caption(step["media_note"])
     done = step["done"](ctx) if step.get("done") else None
@@ -321,9 +329,27 @@ def render(p: dict) -> None:
 
 
 def _phases(demo_id: str, steps: list[dict], i: int) -> None:
-    """本文の現在地を短い1行で示す（例：ステップ 5/8 · 比較と判断）。ステップ間の移動は左メニューと前後のボタンで行う。"""
+    """本文のデモ用ナビゲーション：現在地（例：ステップ 5/8 · 比較と判断）、ステップ一覧、見どころへの近道。
+
+    前へ・次へは本文の要点の下に置く。サイドバーは工程と機能のメニュー（自分の案件と同じ）。
+    """
     _, name = guide.phase_of(demo_id, i)
-    st.html(f'<div class="dr-loc">ステップ {i + 1}/{len(steps)} · {esc(name)}</div>')
+    target, label = guide.SHORTCUTS[demo_id]
+    with st.container(key="tour_loc", horizontal=True, vertical_alignment="center"):
+        st.html(f'<div class="dr-loc">ステップ {i + 1}/{len(steps)} · {esc(name)}</div>')
+        with st.popover("ステップ一覧"):
+            for n, step in enumerate(steps):
+                _, phase = guide.phase_of(demo_id, n)
+                if st.button(f"{n + 1}. {step['process']}（{phase}）", key=f"tour_go_{n}", type="secondary" if n == i else "tertiary", disabled=n == i):
+                    jump(steps, n)
+        if i not in (0, target) and not steps[i].get("finale") and st.button(label, key="tour_shortcut_any", type="tertiary"):
+            jump(steps, target)
+
+
+def step_page(p: dict) -> str:
+    """案内中のステップにひもづく機能の画面。サイドバーで、対応する工程と機能を強調するために使う。"""
+    steps = guide.load(p["demo"]["id"])
+    return steps[min(st.session_state.get("tour_index", 0), len(steps) - 1)]["page"]
 
 
 def _next_inline(steps: list[dict], i: int, label: str | None = None) -> None:
@@ -332,15 +358,53 @@ def _next_inline(steps: list[dict], i: int, label: str | None = None) -> None:
         jump(steps, i + 1)
 
 
+RECORD_PAGES = {"sources", "recordings", "records"}  # 「記録の取り込み・整理」の工程の画面
+
+
+def open_evidence(e: dict, note: str) -> None:
+    """根拠の出典を、資料ID・発言IDで該当箇所に直接開く。戻る操作で元のステップへ戻れる。"""
+    focus = {"source_id": e["source_id"], "unit_id": e.get("unit_id"), "quote": e.get("quote"), "note": note}
+    if e["page"] == "recordings":
+        open_detail("recordings", rec_sel=e["source_id"], ev_focus=focus)
+    else:
+        open_detail("sources", src_sel=e["source_id"], ev_focus=focus)
+
+
+def _evidence_links(block: dict, key: str) -> None:
+    """判断の根拠を開く操作。開く内容が分かる名前にし、「次へ」より控えめにする。"""
+    items = (block.get("evidence") or []) if block.get("type") == "decision" else []
+    if not items:
+        return
+    with st.container(horizontal=True, key=f"tour_evl_{key}"):
+        for k, e in enumerate(items[:3]):
+            if st.button(e["label"], key=f"tour_ev_{key}_{k}", type="tertiary"):
+                open_evidence(e, "デモの判断の根拠として開いた箇所です。")
+
+
+def _used_materials(p: dict) -> None:
+    """記録の取り込み・整理のステップ：この時点で登録されている資料と記録の名前、登録内容を開く入口。"""
+    names = [s["name"] for s in p["sources"] if not s.get("superseded_by")] + [r["name"] for r in p["recordings"]]
+    with st.container(horizontal=True, vertical_alignment="center", key="tour_used"):
+        st.caption("使用した資料：" + ("、".join(names) if names else "なし"))
+        if st.button("使用した資料・議事録を見る", key="tour_used_open", type="tertiary"):
+            open_detail("sources")
+
+
 def _verdict(c: dict, step: dict, steps: list[dict], i: int) -> None:
     """判断の画面：採用案と理由 → 案の比較 → 次へ。根拠の引用と話者確認の経緯は開閉式にする。"""
     _verdict_top(c)
+    # 根拠の出典を、採用案と理由のすぐ下から開く（資料ID・発言IDで該当箇所を開く）
+    with st.container(horizontal=True, key="tour_ev_row"):
+        mail = next((b for b in c["basis"] if b["kind"] == "本人確認済みの記録"), None)
+        if mail and step.get("evidence_button") and st.button(step["evidence_button"], key="tour_evidence", type="tertiary"):
+            open_evidence({"source_id": mail["source_id"], "unit_id": mail["unit_id"], "quote": mail["quote"], "page": "sources"}, "この判断の確認に使った記録です。")
+        speech = next((b for b in c["basis"] if b["kind"] == "発言（話者確認済み）"), None)
+        if speech and st.button("議事録の該当発言を見る", key="tour_ev_speech", type="tertiary"):
+            open_evidence({"source_id": speech["source_id"], "unit_id": speech["unit_id"], "quote": speech["quote"], "page": "recordings"}, "この判断の根拠に使った発言（話者確認済み）です。")
     _options_table(c, "3案の比較" if len(c["rows"]) == 3 else "案の比較")
     _next_inline(steps, i)
     with st.expander("判断の根拠と経緯を見る（引用の全文、話者の確認）"):
         _verdict_basis(c)
-        if step.get("evidence_button") and st.button(step["evidence_button"], key="tour_evidence"):
-            open_detail("sources", src_sel=c["mail_id"])
 
 
 def _focus(demo_id: str, i: int) -> str:
@@ -375,19 +439,6 @@ def back_label(p: dict) -> str:
     return f"← {i + 1}. {steps[i]['short']}に戻る"
 
 
-def sidebar(p: dict) -> None:
-    """案内中は工程の一覧だけを見せる。全機能のメニューは案内を閉じると表示される。"""
-    steps = guide.load(p["demo"]["id"])
-    current = min(st.session_state.get("tour_index", 0), len(steps) - 1)
-    for n, s in enumerate(steps):
-        if st.button(f"{n + 1}. {s['process']}", key=f"tour_go_{n}", type="primary" if n == current else "secondary", width="stretch"):
-            jump(steps, n)
-    st.divider()
-    if st.button("全機能のメニューを見る", key="tour_close", width="stretch"):
-        st.session_state["tour_on"] = False
-        st.rerun()
-
-
 def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx, show_next: bool = True) -> None:
     """画面下の移動。「次へ」を本文の途中に置いた画面では、ここに同じボタンを重ねて出さない。"""
     c1, c2, c3 = st.columns([2, 2, 3])
@@ -400,6 +451,7 @@ def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx, show_next: bool 
 
 
 def jump(steps: list[dict], i: int) -> None:
+    st.session_state.pop("ev_focus", None)  # 根拠から開いた箇所の強調は、ステップへ戻ったら消す
     st.session_state["tour_index"] = i
     state.set_stage(steps[i]["stage"], steps[i]["page"])
 

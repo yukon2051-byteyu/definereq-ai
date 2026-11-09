@@ -126,7 +126,7 @@ __PALETTE_CSS__
 .dr-stat-l{font-size:12.5px;color:var(--muted)}
 /* トップページ */
 .dr-hero{position:relative;overflow:hidden;background:#F3F0EA;border-radius:6px;padding:34px 44px 30px}
-.dr-hero-shape{position:absolute;right:0;top:0;bottom:0;width:27%;background:url("__HERO__") right center/100% 100% no-repeat;pointer-events:none}
+.dr-hero-shape{position:absolute;right:0;top:0;bottom:0;aspect-ratio:653/712;width:auto;background:url("__HERO__") right center/100% 100% no-repeat;pointer-events:none}
 .dr-markimg{display:inline-block;width:26px;height:26px;background:url("__MARK__") center/contain no-repeat}
 .dr-hero-in{position:relative;max-width:68%}
 .dr-mark{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink);letter-spacing:.01em}
@@ -140,8 +140,9 @@ __PALETTE_CSS__
 .dr-label{font-size:13px;font-weight:700;color:var(--muted);margin-top:8px}
 .dr-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
 .dr-btn{display:inline-block;padding:11px 22px;border-radius:4px;font-size:15px;font-weight:700;text-decoration:none;line-height:1.3}
-.dr-btn-p,.dr-btn-p:visited{background:#D9330F;color:#fff}
-.dr-btn-p:hover{background:#B8290A;color:#fff}
+.dr-btn-p,.dr-btn-p:visited{background:#F95C0E;color:#171717;border:1px solid #F95C0E}
+.dr-btn-p:hover{background:#FF7433;color:#171717;border-color:#FF7433}
+.dr-btn:focus-visible{outline:3px solid #171717;outline-offset:2px}
 .dr-btn-s,.dr-btn-s:visited{background:#fff;color:var(--ink);border:1px solid #CFCDC6}
 .dr-btn-s:hover{border-color:#D9330F;color:#B8290A}
 .dr-note{font-size:12.5px;color:var(--muted);margin-top:10px}
@@ -215,14 +216,16 @@ __PALETTE_CSS__
 .dr-q-t{font-size:22px;font-weight:900;line-height:1.5;color:var(--ink)}
 .st-key-tour_start,.st-key-tour_end_next{gap:10px;flex-wrap:wrap;margin:6px 0}
 /* 判断の画面：採用案 → 理由 → 根拠 → 比較 */
-.dr-vd section{margin-top:12px}
+.dr-vd section{margin-top:6px}
 .dr-vd-win{padding:12px 16px;border-left:5px solid #1C7A4D;background:#F1F9F4}
 .dr-vd-t{font-size:24px;font-weight:900;line-height:1.45;color:var(--ink)}
 .dr-vd-list{list-style:none;margin:0;padding:0}
 .dr-vd-list li,.dr-vd-skip{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:6px 0;border-bottom:1px solid var(--line)}
 .dr-vd-skip{border-bottom:0;opacity:.9}
 .dr-key-s{font-size:16px;font-weight:700;line-height:1.6;color:var(--ink)}
-.dr-t-h{margin-top:14px}
+.dr-t-h{margin-top:2px}
+.st-key-tour_ev_row{margin:-10px 0 -12px}
+.st-key-tour_loc{margin-bottom:-6px}
 .dr-t-cmp td:nth-child(3){min-width:16em}
 .dr-t-cmp td:first-child{white-space:nowrap}
 .dr-t-cmp .dr-t-win td{background:#F1F9F4;font-weight:400}
@@ -246,6 +249,13 @@ __PALETTE_CSS__
 .dr-end-n{font-size:24px;font-weight:900;color:#8A4B00;line-height:1.3}
 /* 資料の登録直後は、追加のフォームを閉じる（入力途中の内容は保つ） */
 .st-key-src_form_hidden{display:none}
+/* デモ：閲覧専用の表示、根拠から開いた箇所、収録されている本文 */
+.dr-demo-ro{margin-left:10px;padding:1px 8px;border-radius:999px;background:#EFEFF2;color:#45474D;font-size:11.5px;font-weight:700}
+.dr-focus{border-left:5px solid #D9330F;background:#FFF8F3;padding:10px 14px;margin:6px 0 10px}
+.dr-units{margin:4px 0 0;padding-left:0;list-style:none}
+.dr-units li{padding:6px 10px;border-bottom:1px solid var(--line);font-size:15px;line-height:1.65;color:var(--ink)}
+.dr-units li .dr-meta{display:block}
+.dr-units li.on{background:#FFF3E9;border-left:4px solid #D9330F}
 /* 画面上部の短い状態表示（記録の整理など） */
 .dr-now{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;margin:2px 0 8px;padding:8px 14px;border-left:4px solid #2A5DB0;background:#F7F9FC}
 .dr-now b{font-size:17px;font-weight:900;color:var(--ink)}
@@ -331,17 +341,27 @@ button:focus-visible,a:focus-visible{outline:2px solid #2A5DB0;outline-offset:2p
 .st-key-home [data-testid="stColumn"] p,.st-key-home_new p{margin-bottom:0}
 .st-key-home [data-testid="stColumn"] [data-testid="stMarkdownContainer"],.st-key-home [data-testid="stColumn"] [data-testid="stCaptionContainer"],.st-key-home_new [data-testid="stMarkdownContainer"],.st-key-home_new [data-testid="stCaptionContainer"]{margin-bottom:0}
 .st-key-home_new{gap:10px}
+/* 主ボタン：その場で進める操作。ヒーローの斜線と同じオレンジに濃い文字（コントラスト比 約5.4:1）。
+   テーマの赤（注意・エラー・選択の表示）は変えず、本文の主ボタンだけに適用する */
+[data-testid="stMain"] button[kind="primary"],[data-testid="stMain"] button[kind="primaryFormSubmit"]{background:#F95C0E;border:1px solid #F95C0E;color:#171717}
+[data-testid="stMain"] button[kind="primary"] p,[data-testid="stMain"] button[kind="primaryFormSubmit"] p{color:#171717;font-weight:700}
+[data-testid="stMain"] button[kind="primary"]:hover,[data-testid="stMain"] button[kind="primaryFormSubmit"]:hover{background:#FF7433;border-color:#FF7433;color:#171717}
+[data-testid="stMain"] button[kind="primary"]:active,[data-testid="stMain"] button[kind="primaryFormSubmit"]:active{background:#E8520A;border-color:#E8520A}
+[data-testid="stMain"] button:focus-visible{outline:3px solid #171717 !important;outline-offset:2px;box-shadow:none}
+/* 押せない主ボタン：色を抜き、点線の枠で押せるボタンと区別する */
+[data-testid="stMain"] button[kind="primary"]:disabled,[data-testid="stMain"] button[kind="primaryFormSubmit"]:disabled{background:#F2EEE8;border:1px dashed #C9C1B6;color:#7A756E;cursor:not-allowed}
+[data-testid="stMain"] button[kind="primary"]:disabled p,[data-testid="stMain"] button[kind="primaryFormSubmit"]:disabled p{color:#7A756E}
 </style>
 """
 
 # 独自の図形：根拠（細い線）から判断（太い帯）へ渡る斜めの帯。
 # st.html は SVG 要素を取り除くため、CSS の背景画像として埋め込む
-_HERO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 400" preserveAspectRatio="none">
+_HERO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 653 712" preserveAspectRatio="none">
 <defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="__orange__"/><stop offset=".55" stop-color="__coral__"/><stop offset="1" stop-color="__magenta__"/></linearGradient></defs>
-<polygon points="95,400 335,0 350,0 350,75 165,400" fill="url(#g)"/>
-<polygon points="215,400 350,165 350,285 285,400" fill="url(#g)"/>
-<polygon points="30,345 215,40 240,40 55,345" fill="#161618"/>
-<polygon points="5,215 118,30 130,30 17,215" fill="#E2E3E7"/>
+<polygon points="100,712 535,0 653,0 653,72 278,712" fill="url(#g)"/>
+<polygon points="445,659 653,284 653,344 477,659" fill="url(#g)"/>
+<polygon points="15,659 260,197 302,197 55,659" fill="#161618"/>
+<polygon points="65,464 248,122 263,122 80,464" fill="#E2E3E7"/>
 </svg>"""
 
 _MARK_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26">

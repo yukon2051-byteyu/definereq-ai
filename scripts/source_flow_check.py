@@ -281,7 +281,8 @@ with sync_playwright() as pw:
         wait(g)
         if label == "改修後のファイル":
             close_sidebar(g)
-            click(g, "← 案件の準備に戻る")
+            if title(g) != "案件の準備":  # 再開は保存時の画面で開く
+                click(g, "← 案件の準備に戻る")
             ok = "入力済み" in body(g) and "取り込み済み 1件" in body(g)
             click(g, "背景・目的・関係者を編集")
             ok = ok and g.get_by_label("背景", exact=True).first.input_value().endswith("月末に集計している") and "架空の研修責任者" in g.content()
@@ -289,7 +290,7 @@ with sync_playwright() as pw:
             ok = ok and "第1回打ち合わせ議事録" in g.content()
             check(ok, "5 新しいセッションで、保存した背景・関係者と資料が戻り、準備の状態も一致")
         else:
-            check(g.locator("[data-testid=stException]").count() == 0 and "再開" in g.locator(".dr-sit-work").first.inner_text(), "5 旧形式のファイルも読み込める")
+            check(g.locator("[data-testid=stException]").count() == 0 and "案件を再開しました" in body(g), "5 旧形式のファイルも読み込める（1行の再開の通知）")
         g.context.close()
     b.close()
 

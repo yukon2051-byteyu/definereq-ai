@@ -46,7 +46,7 @@ with sync_playwright() as pw:
     print("案件作成", "ブラウザ確認の案件" in page.inner_text("body"))
 
     # 資料のアップロード
-    btn(page, "記録を取り込む")
+    btn(page, "記録の取り込み・整理")
     page.locator('input[type="file"]').first.set_input_files(str(FILES / "d2_移行計画案.pptx"))
     wait(page)
     btn(page, "読み込む")

@@ -17,7 +17,7 @@ from ...usage import gate
 from ...usage.ledger import LedgerUnavailable
 from .. import artifacts, state
 from ..ai_panel import current_code
-from ..components import chip, chips, edit_block, esc, evidence_block, head, ok_rerun, save_controls, select_item, touch
+from ..components import main_type, chip, chips, edit_block, esc, evidence_block, head, ok_rerun, save_controls, select_item, touch
 
 
 def trail(p: dict) -> None:
@@ -191,7 +191,7 @@ def share_page(p: dict) -> None:
         if check:
             _precheck(p, check)
         label = "下書きとしてWordを作成する" if check and check["is_draft"] else f"{DOC_TYPES[doc_type]}を作成する（Word）"
-        if st.button(label, type="primary", key="share_word"):
+        if st.button(label, type=main_type(), key="share_word"):
             title = DOC_TYPES[doc_type]
             if p.get("is_demo"):  # 閲覧専用では発行の記録を増やさない。発行済みの資料と同じ版で出力する
                 doc = share.latest_doc(p, doc_type) or {"id": "DEMO", "version": 1, "issued_at": pj.now_iso()}
@@ -202,7 +202,7 @@ def share_page(p: dict) -> None:
         w = st.session_state.get("word")
         if w:
             st.success(f"{w['title']}を作成しました。下のボタンからダウンロードしてください。")
-            st.download_button(f"{w['title']}をダウンロード（Word）", w["data"], file_name=w["name"], mime=artifacts.WORD, key="dl_word", on_click="ignore", type="primary")
+            st.download_button(f"{w['title']}をダウンロード（Word）", w["data"], file_name=w["name"], mime=artifacts.WORD, key="dl_word", on_click="ignore", type=main_type())
             st.caption("PDFが必要な場合は、Wordで開いて「名前を付けて保存」からPDFを選んでください。")
             c1, c2 = st.columns(2)
             if c1.button("未確認事項を確認する", key="go_overview_open", width="stretch"):

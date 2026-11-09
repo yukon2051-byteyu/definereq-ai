@@ -600,7 +600,9 @@ def test_records_page_paste_to_candidates_without_moving(p):
     assert not any(b.key == "guide_go" for b in at.button)  # 同じ画面なので移動のボタンを出さない
     run(q, "extract", [cand("要望", "出欠を登録する")], source_ids=[q["sources"][0]["id"]])
     at.run()
-    assert "要件候補として採用" in [b.label for b in at.button]
+    assert "AI整理完了" in html(at) and key(at, "records_go_cand").label == "AI候補を確認する →"
+    at = key(at, "records_go_cand").click().run()
+    assert at.session_state["page"] == "candidates" and "要件に採用する内容を確認" in [b.label for b in at.button]
 
 
 def test_recordings_page_accepts_minutes_files(p):
@@ -871,7 +873,7 @@ def test_new_project_opens_setup_and_loaded_opens_overview():
     from definereq.ui import state
 
     src = inspect.getsource(state.open_project)
-    assert '"overview" if loaded else "setup"' in src
+    assert 'p.pop("last_page", None) if loaded' in src and 'else "setup"' in src  # 再開は保存時の画面へ。なければ案件の準備
 
 
 def test_home_has_separate_entrances():
@@ -961,10 +963,10 @@ def test_setup_next_follows_project_state(p):
     nx = gd.setup_next(p)
     assert (nx["label"], nx["page"]) == ("会議の記録を整理する", "records") and "第1回議事録" in nx["detail"]
     run(p, "extract", [cand("要望", "出欠を登録する")], source_ids=[m["id"]])
-    assert (gd.setup_next(p)["label"], gd.setup_next(p)["page"]) == ("要件候補を確認する", "candidates")
+    assert (gd.setup_next(p)["label"], gd.setup_next(p)["page"]) == ("AI候補を確認する", "candidates")
     registry.ingest_paste(p, "第2回議事録", "定員は30名。", kind="議事録")
     nx = gd.setup_next(p)  # 未整理の議事録が増えたら、記録の整理を先に勧め、候補の確認はほかの作業に出す
-    assert nx["page"] == "records" and ("要件候補を確認する", "candidates") in nx["alts"]
+    assert nx["page"] == "records" and ("AI候補を確認する", "candidates") in nx["alts"]
 
 
 def test_setup_next_without_profile_goes_to_records(p):
@@ -1040,8 +1042,8 @@ def test_records_after_extract_shows_zero_and_candidates(p):
     m = registry.ingest_paste(p, "議事録", "講師が出欠を登録する。", kind="議事録")
     run(p, "extract", [cand("要望", "出欠を登録する")], source_ids=[m["id"]])
     at = open_app(p, "records")
-    assert "未整理の議事録 0件" in html(at) and "確認待ちの候補 1件" in html(at)
-    assert "要件候補として採用" in [b.label for b in at.button]
+    assert "AI整理完了" in html(at) and "確認待ち1件" in html(at)
+    assert key(at, "records_go_cand").label == "AI候補を確認する →"
 
 
 def test_empty_setup_uses_cards_as_start(p):
@@ -1068,3 +1070,177 @@ def test_profile_save_go_follows_project_state(p):
     next(t for t in at.text_area if t.key == bg_key(p, "v_purpose")).set_value("目的の最新").run()
     at = key(at, "pf_save_go").click().run()
     assert at.session_state["page"] == "records" and at.session_state["project"]["profile"]["purpose"]["value"] == "目的の最新"
+
+
+# ---- 全ページの次の操作、候補の確認と採用、背景の任意項目、再開 ----
+def reviewed(p):
+    """レビュー用JSONと同じ状態：候補7件のうち1件を要件に採用、6件が確認待ち。"""
+    m = registry.ingest_paste(p, "第1回打ち合わせ議事録", "容器と配膳先のコードを照合する。", kind="議事録")
+    items = [cand("要望", "容器と配膳先のコードを読み取り照合する"), cand("要望", "変更の確認時刻を記録する"), cand("決定", "第1期は照合と履歴の閲覧のみ"),
+             cand("保留", "通信障害時の扱い"), cand("保留", "照合記録の保存期間"), cand("未回答", "当日変更が第1期に含まれるか"), cand("次の行動", "次回会議で保存期間を確認する")]
+    cs = run(p, "extract", items, source_ids=[m["id"]])
+    intake.adopt_requirement(p, cs[0]["id"])
+    return p
+
+
+def test_candidate_status_follows_adoption(p):
+    reviewed(p)
+    at = open_app(p, "candidates")
+    assert "AI整理完了" in html(at) and "確認待ち6件 · 要件に採用 1件" in html(at)
+    assert key(at, "cand_go_list").label == "未確認の候補を確認する ↓"
+    assert "採用済み" in html(at)  # 採用した候補にも表示する
+    labels = [e.label for e in at.expander]
+    assert any("要望" in x and "確定すると：要件一覧（下書き）" in x for x in labels)
+    assert any("決定" in x and "判断記録の下書き" in x for x in labels) and any("保留" in x and "確認事項" in x for x in labels)
+    # 1件を確認欄で採用（確認と確定は別の操作）
+    at = next(b for b in at.button if b.label == "要件に採用する内容を確認").click().run()
+    at = next(b for b in at.button if b.label == "この内容で採用").click().run()
+    assert "確認待ち5件 · 要件に採用 2件" in html(at) and len(at.session_state["project"]["requirements"]) == 2
+    assert not any(b.label == "この内容で採用" for b in at.button)  # 確定後は確認欄を閉じ、同じ候補を再び採用できない
+
+
+def test_candidates_zero_waiting_points_to_requirements(p):
+    reviewed(p)
+    for c in p["candidates"]:
+        if c["state"] == "候補":
+            c["state"] = "却下"
+    at = open_app(p, "candidates")
+    assert "確認待ち0件" in html(at) and key(at, "cand_go_reqs").label == "採用した要件を確認する →"
+    at = key(at, "cand_go_reqs").click().run()
+    assert at.session_state["page"] == "requirements"
+
+
+def test_double_adoption_is_rejected(p):
+    reviewed(p)
+    done = next(c for c in p["candidates"] if c["state"] == "採用")
+    with pytest.raises(ValueError):
+        intake.adopt_requirement(p, done["id"])
+    assert len(p["requirements"]) == 1
+
+
+def test_profile_optional_fields_fold_and_keep_values(p):
+    p["profile"]["budget"].update(value="未定（架空）")
+    at = open_app(p, "profile")
+    assert any(e.label.startswith("案件情報を詳しく入力") and "入力済み1項目" in e.label for e in at.expander)
+    areas = [t.key for t in at.text_area if t.key.startswith(f"draft_{p['id']}_v_")]
+    assert areas[:3] == [bg_key(p, "v_background"), bg_key(p, "v_purpose"), bg_key(p, "v_problem")]  # 背景・目的・課題を先に
+    next(t for t in at.text_area if t.key == bg_key(p, "v_timeline")).set_value("来年4月").run()
+    at = key(at, "pf_save").click().run()
+    q = at.session_state["project"]
+    assert q["profile"]["timeline"]["value"] == "来年4月" and q["profile"]["budget"]["value"] == "未定（架空）"
+
+
+def test_resume_shows_one_line_and_next(p):
+    reviewed(p)
+    q = jsonio.loads(jsonio.dumps(p))
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.session_state["project"], at.session_state["page"], at.session_state["resumed"] = q, "setup", True
+    at.run()
+    assert "案件を再開しました" in html(at) and "AI候補が6件確認待ちです" in html(at)
+    assert key(at, "setup_next_go").label == "AI候補を確認する →"
+    at.session_state["page"] = "overview"
+    at.run()
+    assert key(at, "guide_go").label == "AI候補を確認する →" and "保存した案件を再開しました" not in html(at)
+
+
+def test_resume_file_records_last_page(p):
+    q = jsonio.loads(jsonio.dumps({**p, "last_page": "candidates"}))
+    assert q["last_page"] == "candidates"
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.session_state["project"], at.session_state["page"] = pj.new_project("t", ["app"]), "zzz"  # 無効な画面は案件の準備で開く
+    at.run()
+    assert not at.exception and "案件の準備" in html(at)
+
+
+def test_every_project_page_has_next_or_back_in_body(p):
+    """全ページの遷移：本文に、次の操作（主ボタン）か、この画面で作業する表示と戻る操作がある。"""
+    from definereq.ui.shell import PAGES
+
+    reviewed(p)
+    p["profile"]["background"].update(value="背景")
+    for page in PAGES:
+        at = open_app(p, page)
+        assert not at.exception, page
+        keys = {b.key for b in at.button}
+        body = html(at) + "".join(c.value for c in at.caption)
+        assert keys & {"guide_go", "setup_next_go", "pf_save", "src_read", "paste_go", "ai_go_extract", "records_go_cand", "cand_go_list", "cand_go_reqs", "cand_go_overview"} \
+            or "この画面で作業します" in body, page
+        if page not in ("setup", "profile", "sources"):
+            assert any(b.label == "← 案件の準備に戻る" for b in at.button), page
+
+
+def test_every_demo_detail_page_returns_to_step():
+    """デモのステップから、サイドバーの全工程・全機能を開いても、本文に元のステップへ戻る操作がある。"""
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at = next(b for b in at.button if b.key == "tour_d1").click().run()
+    at = next(b for b in at.button if b.key == "tour_shortcut").click().run()
+    opened = set()
+    for n in range(5):
+        at = next(b for b in at.sidebar.button if b.key == f"nav_group_{n}").click().run()
+        for b in [b for b in at.sidebar.button if b.key.startswith("nav_") and b.key[4:] in PAGES_KEYS()]:
+            at = next(x for x in at.sidebar.button if x.key == b.key).click().run()
+            assert not at.exception and at.session_state["tour_on"] is False, b.key
+            assert next(x for x in at.button if x.key == "tour_back").label == "← 5. 訂正方法の比較に戻る", b.key
+            opened.add(b.key[4:])
+    assert len(opened) >= 15  # 詳細メニュー以外の機能をすべて開いた
+    at = next(x for x in at.button if x.key == "tour_back").click().run()
+    assert at.session_state["tour_on"] and at.session_state["tour_index"] == 4
+
+
+def PAGES_KEYS():
+    from definereq.ui.shell import PAGES
+
+    return set(PAGES)
+
+
+# ---- 主ボタン（オレンジ）は、その状態で進める操作を1つだけ ----
+def primaries(at):
+    """本文の主ボタン（サイドバーの選択表示を除く）。タブで切り替わる登録ボタンは、表示中のタブの1つとして数える。"""
+    labels = [b.label for b in at.button if b.proto.type == "primary" and not (b.key or "").startswith("nav_")]
+    labels += [b.label for b in at.get("download_button") if b.proto.type == "primary"]
+    if {"読み込む", "貼り付けた文章を案件内に登録"} <= set(labels):
+        labels.remove("貼り付けた文章を案件内に登録")
+    return labels
+
+
+def test_one_primary_per_page_in_each_state(p):
+    from definereq.ui.shell import PAGES
+
+    reviewed(p)
+    p["profile"]["background"].update(value="背景")
+    for page in PAGES:
+        found = primaries(open_app(p, page))
+        assert len(found) <= 1, (page, found)
+
+
+def test_primary_follows_the_state(p):
+    at = open_app(p, "profile")
+    assert primaries(at) == ["案件情報を保存"]  # 編集中は保存
+    next(t for t in at.text_area if t.key == bg_key(p, "v_background")).set_value("背景").run()
+    at = key(at, "pf_save").click().run()
+    assert primaries(at) == ["次へ：資料・議事録を取り込む →"]  # 保存した直後は次の工程
+    q = at.session_state["project"]
+    registry.ingest_paste(q, "議事録", "講師が出欠を登録する。", kind="議事録")
+    assert primaries(open_app(q, "records")) == ["選択した議事録をAIで整理する"]
+    run(q, "extract", [cand("要望", "出欠を登録する")], source_ids=[q["sources"][0]["id"]])
+    assert primaries(open_app(q, "records")) == ["AI候補を確認する →"]
+    at = open_app(q, "candidates")
+    assert primaries(at) == ["未確認の候補を確認する ↓"]
+    at = next(b for b in at.button if b.label == "要件に採用する内容を確認").click().run()
+    assert primaries(at) == ["この内容で採用"]  # 開いた候補の確定ボタンを強調する
+
+
+def test_home_primary_is_only_demo_start():
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    assert sorted(primaries(at)) == sorted(["経費申請のデモを見る", "売上集計・クラウド移行のデモを見る", "ネットワーク更新のデモを見る"])
+    assert 'class="dr-btn dr-btn-p" href="#dr-demo">案内付きでデモを見る' in html(at)
+
+
+def test_demo_steps_have_one_primary():
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at = next(b for b in at.button if b.key == "tour_d1").click().run()
+    for n in range(8):
+        at = next(b for b in at.button if b.key == f"tour_go_{n}").click().run() if n else at
+        found = primaries(at)
+        assert len(found) == 1, (n, found)
+    assert found == ["要件定義書の内容を見る"]  # 終了画面は成果物の確認を主操作にする

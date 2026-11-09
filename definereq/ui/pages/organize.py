@@ -12,11 +12,13 @@ from .. import state
 from ...schema import AGREEMENT_STATES, CANDIDATE_KINDS, DOMAINS, MEASURE_KINDS, MEASURE_ORIGINS, MEASURE_STATUS, PRIORITIES, REQ_KINDS, SCOPE_CHOICES
 from ..ai_panel import ai_panel, ai_runs_list
 from ..candidates import board
-from ..components import STATUS_TONE, add_evidence_form, chip, chips, edit_block, evidence_block, flow, guard, head, meeting_select, ok_rerun, people, select_item, touch, tri_text
+from ..components import main_type, STATUS_TONE, add_evidence_form, chip, chips, edit_block, evidence_block, flow, guard, head, meeting_select, ok_rerun, people, select_item, touch, tri_text
 
 
 def candidates(p: dict) -> None:
-    head("AI候補の確認", "議事録や資料からAIが整理した候補を確認し、内容に合う場所へ反映します。候補のままでは要件や合意になりません。", "要件を整理・判断")
+    head("AI候補の確認", "議事録や資料からAIが整理した候補を確認し、内容に合う場所へ反映します。候補のままでは要件や合意になりません。確定は人の操作だけで行います。", "要件の確認・判断")
+    if not p.get("is_demo"):
+        _candidates_top(p)
     if p.get("is_demo"):
         st.caption("準備済みのAI候補と、担当者が採用・却下した結果を確認できます。")
     elif not p["candidates"]:
@@ -30,9 +32,42 @@ def candidates(p: dict) -> None:
     if not p["candidates"]:
         st.info("候補はありません。")
     elif p.get("is_demo") or other:
-        board(p, None if p.get("is_demo") else other, "cand", meeting)
+        with st.container(key="cand_board"):
+            board(p, None if p.get("is_demo") else other, "cand", meeting)
     ai_panel(p, "extract")
     ai_runs_list(p, "extract")
+
+
+def _candidates_top(p: dict) -> None:
+    """件数の状態（例：AI整理完了 · 確認待ち6件 · 要件に採用1件）と、その状態で進める主な操作。"""
+    from ...logic import guidance as gd
+    from ..components import esc
+
+    s = gd.candidate_status(p)
+    if not s["total"]:
+        st.html('<div class="dr-now"><b>AI候補はまだありません</b><span>議事録を取り込み、「会議の記録を整理」でAIを実行すると、ここに候補が並びます。</span></div>')
+        if st.button("会議の記録を整理する →", key="cand_go_records", type="primary"):
+            state.goto("records")
+        return
+    title = "AI整理完了" if s["extracted"] else "AI候補"
+    st.html(f'<div class="dr-now"><b>{esc(title)}</b><span>{esc(s["text"])}</span></div>')
+    if s["waiting"]:
+        # 候補の確認欄を開いているときは、その確定ボタンを主操作にする
+        if st.button("未確認の候補を確認する ↓", key="cand_go_list", type="secondary" if st.session_state.get("cand_open") else "primary"):
+            # 一覧の位置へ移動する（絞り込まない。確認待ちが先に並び、採用した候補にも「採用済み」が残る）
+            st.session_state["cand_scroll"] = pj.now_iso()
+            st.rerun()
+    elif s["adopted"]:
+        if st.button("採用した要件を確認する →", key="cand_go_reqs", type="primary"):
+            state.goto("requirements")
+    else:
+        if st.button("確認事項と次の作業を確認する →", key="cand_go_overview", type="primary"):
+            state.goto("overview")
+    if s["waiting"] and s["adopted"] and st.button("採用した要件を確認する", key="cand_go_reqs_sub", type="tertiary"):
+        state.goto("requirements")
+    nonce = st.session_state.pop("cand_scroll", None)
+    if nonce:
+        st.iframe(f"<script>/*{nonce}*/const t=()=>window.parent.document.querySelector('.st-key-cand_board')?.scrollIntoView({{block:'start'}});setTimeout(t,200);setTimeout(t,600)</script>", height=1)
 
 
 def _shortcuts(*items: tuple[str, str]) -> None:
@@ -62,7 +97,7 @@ def requirements(p: dict) -> None:
         with st.form("add_req", clear_on_submit=True):
             title = st.text_input("名称")
             body = st.text_area("本文")
-            if st.form_submit_button("追加", type="primary") and title.strip():
+            if st.form_submit_button("追加", type=main_type()) and title.strip():
                 r = pj.add(p, "requirements", pj.new_requirement(title=title.strip(), body=body.strip()))
                 touch(p)
                 ok_rerun(f"{r['id']} を追加しました")
@@ -119,7 +154,7 @@ def requirements(p: dict) -> None:
         due = c3.text_input("期限（人が決めます）", r.get("due") or "", key=k + "due")
         note = st.text_input("内部メモ", r.get("internal_note") or "", key=k + "n")
         reason = st.text_input("変更の理由", key=k + "r")
-        if st.button("案件内に反映（版が上がります）", type="primary", key=k + "s"):
+        if st.button("案件内に反映（版が上がります）", type=main_type(), key=k + "s"):
             pj.update_requirement(p, r["id"], {"title": title, "body": body, "domain": domain, "kind": kind, "priority": prio, "decider": decider or None,
                                                "confirm_with": ask or None, "due": due or None, "internal_note": note or None, **values}, reason=reason or None)
             touch(p)
@@ -192,7 +227,7 @@ def refine(p: dict) -> None:
     acc = [a for a in r.get("acceptance") or [] if isinstance(a, dict)]
     adf = pd.DataFrame([{"前提": a.get("given"), "条件": a.get("when"), "期待結果": a.get("then"), "確認方法": a.get("how")} for a in acc], columns=acols)
     aed = st.data_editor(adf, hide_index=True, width="stretch", num_rows="dynamic", key=f"ac_{r['id']}_{r['version']}")
-    if st.button("数値と受入条件を保存", type="primary", key=f"rf_s_{r['id']}"):
+    if st.button("数値と受入条件を保存", type=main_type(), key=f"rf_s_{r['id']}"):
         def clean(v):
             return None if v is None or (isinstance(v, float) and pd.isna(v)) or v == "" else v
         measures = [{"metric": clean(x["指標"]), "value": clean(x["値"]), "unit": clean(x["単位"]), "kind": clean(x["区分"]), "origin": clean(x["出所"]), "condition": clean(x["測定条件"]),
@@ -213,7 +248,7 @@ def nfr(p: dict) -> None:
     df = pd.DataFrame([{"項目": n["label"], "確認すること": n["question"], "状態": n["state"], "補足": n.get("note"), "関連要件": "、".join(n["requirements"]) or "未設定", "_id": n["id"]} for n in data])
     edited = st.data_editor(df, hide_index=True, width="stretch", disabled=["項目", "確認すること", "関連要件"], key="nfr_ed",
                             column_config={"_id": None, "状態": st.column_config.SelectboxColumn(options=["未確認", "確認済み", "該当なし"], required=True)})
-    if st.button("確認状況を保存", type="primary"):
+    if st.button("確認状況を保存", type=main_type()):
         for row in edited.to_dict("records"):
             p["nfr_status"][row["_id"]] = {"state": row["状態"], "note": row["補足"] or None}
         touch(p)
@@ -232,7 +267,7 @@ def scope(p: dict) -> None:
                         "判断者": r.get("scope_decider"), "判断日": r.get("scope_decided_at")} for r in active], columns=["ID", "名称", "範囲", "理由", "影響", "依存", "判断者", "判断日"])
     edited = st.data_editor(df, hide_index=True, width="stretch", disabled=["ID", "名称"], key="sc_ed",
                             column_config={"範囲": st.column_config.SelectboxColumn(options=SCOPE_CHOICES, required=True)})
-    if st.button("範囲を保存", type="primary"):
+    if st.button("範囲を保存", type=main_type()):
         for row in edited.to_dict("records"):
             pj.update_requirement(p, row["ID"], {"scope": row["範囲"], "scope_reason": row["理由"] or None, "scope_impact": row["影響"] or None,
                                                  "scope_depends": [x.strip() for x in (row["依存"] or "").replace(",", "、").split("、") if x.strip()],
