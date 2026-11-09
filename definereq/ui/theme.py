@@ -342,6 +342,8 @@ button:focus-visible,a:focus-visible{outline:2px solid #2A5DB0;outline-offset:2p
 .st-key-home [data-testid="stColumn"] p,.st-key-home_new p{margin-bottom:0}
 .st-key-home [data-testid="stColumn"] [data-testid="stMarkdownContainer"],.st-key-home [data-testid="stColumn"] [data-testid="stCaptionContainer"],.st-key-home_new [data-testid="stMarkdownContainer"],.st-key-home_new [data-testid="stCaptionContainer"]{margin-bottom:0}
 .st-key-home_new{gap:10px}
+/* AIパスワード欄の「表示」ボタンは出さない。Tabキーでこのボタンへ移ると入力が確定されず、「案件を作成」が押せないままになるため */
+.st-key-home_code button{display:none}
 /* 主ボタン：その場で進める操作。やや柔らかいオレンジに濃い文字（コントラスト比 通常 約6.6:1、ホバー 約5.4:1）。色は :root の --btn-main で管理。
    テーマの赤（注意・エラー・選択の表示）は変えず、本文の主ボタンだけに適用する */
 [data-testid="stMain"] button[kind="primary"],[data-testid="stMain"] button[kind="primaryFormSubmit"]{background:var(--btn-main);border:1px solid var(--btn-main);color:var(--btn-main-ink)}
