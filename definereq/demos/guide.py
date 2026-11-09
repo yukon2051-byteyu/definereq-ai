@@ -294,7 +294,7 @@ class Ctx:
         label = next(o["label"] for o in d["options"] if o["id"] == rejected[0])
         clash = f"「{label}」は不採用。{rejected[1]}"
         return {"type": "change_sum", "before": before[0], "after": after[0], "keep": keep[0], "scope": scope,
-                "request": c["content"], "clash": clash, "adopted": adopted["label"], "before_v": r["versions"][-1]["version"], "after_v": r["version"]}
+                "request": c["content"], "clash": clash, "adopted": adopted["label"], "rationale": d.get("rationale"), "before_v": r["versions"][-1]["version"], "after_v": r["version"]}
 
     def summary(self) -> dict:
         bl = checks.backlog(self.p)
@@ -576,10 +576,6 @@ def _request_lead(g: Ctx, text: str) -> str:
     return f"要望者：{r['who']}。背景：{r['why']} 要望は受け付けただけで、要件はまだ変わっていません。"
 
 
-def _adopted(g: Ctx, topic: str) -> str:
-    return g.decision(topic)["adopted"]
-
-
 AI, PROGRAM = "AIの支援（準備済みの結果）", "プログラムの処理"
 AFTER = "判断後の仕様を要件の新しい版として記録し、変更前後の差分と履歴を残す"
 
@@ -598,7 +594,7 @@ SCENES = {
              support=[("入力・根拠", "3つの案、第2回の発言、確認メール"), (PROGRAM, "採用案・判断者・判断日がそろわない記録は合意にしない"), ("人が行うこと", "案を比べ、採否と理由を判断する（AIは比較も判断もしていません）")]),
         dict(scene="追加要望の受付", date=lambda g: g.requests("直接訂正")["date"], check="判断の後、経理担当者から直接訂正の要望が届きました。過去の判断と衝突していないかを確認します。", detail=lambda g: "変更影響の詳細を見る",
              support=[("入力・根拠", "追加要望のメールと過去の判断"), (AI, "影響しそうな点の候補を作成"), (PROGRAM, "登録済みの関連から影響をたどり、文型の照合で矛盾の候補を検出し、未調査の領域を示す"), ("人が行うこと", "影響を確認し、採否を判断する")]),
-        dict(scene="第3回会議の後", date=lambda g: g.on("第3回"), check=lambda g: f"関係者の判断で、直接訂正は認めず「{_adopted(g, '経理担当者による直接訂正')}」を採用しました。変更された部分と理由を確認します。", detail=lambda g: "仕様の変遷と理由を見る",
+        dict(scene="第3回会議の後", date=lambda g: g.on("第3回"), check="第3回会議で、追加要望への判断が決まりました。何が変わり、何を守ったかを確認します。", detail=lambda g: "仕様の変遷と理由を見る",
              support=[("入力・根拠", "第3回打ち合わせメモと判断の記録"), (PROGRAM, AFTER), ("人が行うこと", "採否を判断し、要件への反映を確認する")]),
         dict(scene="デモの終了", check="", support=None, detail=lambda g: "機能画面を見る"),
     ],
@@ -614,7 +610,7 @@ SCENES = {
              support=[("入力・根拠", "業務の希望と基盤の条件"), (PROGRAM, "意見の立場と根拠を分けて記録する"), ("人が行うこと", "条件を調整し、判断する（AIは判断していません）")]),
         dict(scene="追加要望の受付", date=lambda g: g.requests("再集計")["date"], check="合意の後、福岡拠点から当月の再集計の要望が届きました。固定のルールと衝突していないかを確認します。", detail=lambda g: "変更影響の詳細を見る",
              support=[("入力・根拠", "拠点からの要望と過去の判断"), (AI, "朝の集計と重なる可能性を影響の候補として提示（未計測）"), (PROGRAM, "登録済みの関連から影響をたどり、文型の照合で矛盾の候補を検出し、未調査の領域を示す"), ("人が行うこと", "影響を確認し、採否を判断する")]),
-        dict(scene="第3回会議の後", date=lambda g: g.on("第3回"), check=lambda g: f"関係者の判断で、当月の再集計は認めず「{_adopted(g, '締め後の再集計')}」を採用しました。変更された部分と理由を確認します。", detail=lambda g: "「なぜこの仕様か」を試す",
+        dict(scene="第3回会議の後", date=lambda g: g.on("第3回"), check="第3回会議で、追加要望への判断が決まりました。何が変わり、何を守ったかを確認します。", detail=lambda g: "「なぜこの仕様か」を試す",
              support=[("入力・根拠", "第3回打ち合わせメモと判断の記録"), (PROGRAM, AFTER + "。「なぜこの仕様か」には登録情報から回答する"), ("人が行うこと", "採否を判断し、要件への反映を確認する")]),
         dict(scene="デモの終了", check="", support=None, detail=lambda g: "機能画面を見る"),
     ],
@@ -630,7 +626,7 @@ SCENES = {
              support=[("入力・根拠", "保守会社の提案、規程、第2回定例メモ"), (AI, "「遠隔保守を採用する」という候補を出したが、提案のため人が却下"), (PROGRAM, "採用案・判断者・判断日がそろわない記録は合意にしない"), ("人が行うこと", "案を比べ、判断する")]),
         dict(scene="追加要望の受付", date=lambda g: g.requests("常時接続")["date"], check="判断が決まらないうちに、保守会社から常時接続の要望が届きました。規程と衝突していないかを確認します。", detail=lambda g: "変更影響の詳細を見る",
              support=[("入力・根拠", "保守会社の要望と規程"), (AI, "影響しそうな点の候補を作成"), (PROGRAM, "登録済みの関連から影響をたどり、文型の照合で矛盾の候補を検出し、未調査の領域を示す"), ("人が行うこと", "影響を確認し、採否を判断する")]),
-        dict(scene="第3回定例の後", date=lambda g: g.on("第3回定例"), check=lambda g: f"関係者の判断で、常時接続は認めず「{_adopted(g, '遠隔保守の扱い')}」を採用しました。変更された部分と理由を確認します。", detail=lambda g: "「なぜこの仕様か」を試す",
+        dict(scene="第3回定例の後", date=lambda g: g.on("第3回定例"), check="第3回定例で、追加要望への判断が決まりました。何が変わり、何を守ったかを確認します。", detail=lambda g: "「なぜこの仕様か」を試す",
              support=[("入力・根拠", "第3回定例メモと判断の記録"), (PROGRAM, AFTER), ("人が行うこと", "採否を判断し、要件への反映を確認する")]),
         dict(scene="デモの終了", check="", support=None, detail=lambda g: "機能画面を見る"),
     ],

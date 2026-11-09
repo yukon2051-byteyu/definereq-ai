@@ -124,17 +124,30 @@ def _story_more(c: dict) -> None:
 
 
 def _verdict_top(c: dict) -> None:
-    """判断画面の 1.採用した案 2.採用理由 3.この判断の根拠。要望・発言・本人確認済みの記録・関係者の判断を分けて示す。"""
+    """判断画面の上部：採用した案と理由1文、根拠の短い要約。関係者による判断であることを示す。"""
     who = f'判断者：{esc(c["decider"] or "記録なし")}／確認者：{esc(c["confirmer"] or "記録なし")}／判断日：{esc(c["date"] or "記録なし")}'
+    kinds = [b["kind"] for b in c["basis"]]
+    parts = []
+    if "本人確認済みの記録" in kinds:
+        parts.append(f"本人の確認メール（{c['mail_name']}）で判断を確認")
+    speech = kinds.count("発言（話者確認済み）")
+    if speech:
+        parts.append(f"話者確認済みの発言{speech}件を参照")
+    summary = "根拠：" + "・".join(parts) if parts else "根拠の記録がありません"
+    st.html(f'<div class="dr-vd"><section class="dr-vd-win"><div class="dr-v-lab">採用した案</div><div class="dr-vd-t">{esc(c["adopted"])}を採用</div>'
+            f'<div class="dr-g-body">{esc(c["rationale"] or "理由の記録がありません")}</div>'
+            f'<div class="dr-chips">{chip("関係者による判断", "ok")}<span class="dr-meta">{who}</span></div>'
+            f'<div class="dr-vd-sum">{esc(summary)}</div></section></div>')
+
+
+def _verdict_basis(c: dict) -> None:
+    """根拠の詳細：引用の全文と種類、判断に使っていない（話者未確認の）発言、確認の経緯。"""
     tone = {"本人確認済みの記録": "ok", "発言（話者確認済み）": "info", "資料": "plain"}
     basis = "".join(f'<li>{chip(b["kind"], tone.get(b["kind"], "warn"))}<span class="dr-key-s">「{esc(b["quote"])}」</span><span class="dr-meta">{esc(b["where"])}</span></li>' for b in c["basis"])
     skipped = (f'<div class="dr-vd-skip">{chip("判断に使っていない発言（話者未確認）", "warn")}<span class="dr-key-s">「{esc(c["skipped"]["text"])}」</span>'
                f'<span class="dr-meta">{esc(c["skipped"]["where"])}</span></div>')
     note = f'<div class="dr-meta">{esc(c["confirmation"])}</div>' if c.get("confirmation") else ""
-    st.html(f'<div class="dr-vd"><section class="dr-vd-win"><div class="dr-v-lab">1. 採用した案</div><div class="dr-vd-t">{esc(c["adopted"])}を採用</div>'
-            f'<div class="dr-chips">{chip("関係者による判断", "ok")}</div><div class="dr-meta">{who}</div></section>'
-            f'<section><div class="dr-v-lab">2. 採用理由</div><div class="dr-g-body">{esc(c["rationale"] or "理由の記録がありません")}</div></section>'
-            f'<section><div class="dr-v-lab">3. この判断の根拠</div><ul class="dr-vd-list">{basis}</ul>{skipped}{note}</section></div>')
+    st.html(f'<div class="dr-vd"><ul class="dr-vd-list">{basis}</ul>{skipped}{note}</div>')
 
 
 def _options_table(c: dict, heading: str = "") -> None:
@@ -150,14 +163,19 @@ def _options_table(c: dict, heading: str = "") -> None:
 
 
 def _change_sum(c: dict) -> None:
-    """判断後の仕様の要約。比較表より先に、何が変わり、何を守ったかを示す。"""
-    cols = [(f"変更前（v{c['before_v']}）", c["before"], "before"), (f"変更後（v{c['after_v']}）", c["after"], "after"), ("引き続き守る制約", c["keep"], "keep")]
-    grid = "".join(f'<div class="dr-cs-{k}"><div class="dr-v-lab">{esc(a)}</div><div class="dr-key-s">{esc(b)}</div></div>' for a, b, k in cols)
+    """判断後の仕様の主役：変更前／変更後／引き続き守る制約の3枚と、採用理由1文。"""
     scope = f'<div class="dr-cs-scope">{esc(c["scope"])}</div>' if c.get("scope") else ""
+    cols = [(f"変更前（v{c['before_v']}）", c["before"], "before", ""), (f"変更後（v{c['after_v']}）", c["after"], "after", scope), ("引き続き守る制約", c["keep"], "keep", "")]
+    grid = "".join(f'<div class="dr-cs-{k}"><div class="dr-v-lab">{esc(a)}</div><div class="dr-key-s">{esc(b)}</div>{x}</div>' for a, b, k, x in cols)
+    reason = f'<div class="dr-cs-why"><b>採用理由</b>{esc(c["rationale"])}</div>' if c.get("rationale") else ""
+    st.html(f'<div class="dr-cs"><div class="dr-cs-grid">{grid}</div>{reason}</div>')
+
+
+def _change_flow(c: dict) -> None:
+    """追加要望 → 過去の判断との衝突 → 採用した対応。判断の詳細の中に置く。"""
     flow = [("追加要望", c["request"]), ("過去の判断との衝突", c["clash"]), ("採用した対応", c["adopted"])]
     steps = '<div class="dr-cs-arrow">→</div>'.join(f'<div class="dr-cs-step"><div class="dr-v-lab">{esc(a)}</div><div class="dr-g-sub">{esc(b)}</div></div>' for a, b in flow)
-    st.html(f'<div class="dr-cs"><div class="dr-cs-grid">{grid}</div>{scope}<div class="dr-cs-flow">{steps}</div></div>'
-            '<div class="dr-meta dr-cs-next">以下で、案の比較表、変更された部分、仕様の変遷を確認できます。</div>')
+    st.html(f'<div class="dr-cs-flow">{steps}</div>')
 
 
 def _timeline(c: dict) -> None:
@@ -167,7 +185,7 @@ def _timeline(c: dict) -> None:
     st.html(f'<div class="dr-tl"><div class="dr-v-lab">仕様の変遷</div><ul>{rows}</ul></div>')
 
 
-RENDER = {"story": _story, "versus": _versus, "decision": _decision, "flow3": _flow3, "conflict": _conflict, "convert": _convert, "timeline": _timeline, "change_sum": _change_sum}
+RENDER = {"story": _story, "versus": _versus, "decision": _decision, "flow3": _flow3, "conflict": _conflict, "convert": _convert, "timeline": _timeline}
 
 
 def _more(step: dict, ctx: guide.Ctx) -> None:
@@ -185,7 +203,7 @@ def _finale(p: dict, ctx: guide.Ctx, steps: list[dict], i: int, intro: dict) -> 
     s = ctx.summary()
     total = s["todo_total"]
     shown = 3  # 要約に出す件数
-    _phases(p["demo"]["id"], steps, i, None)
+    _phases(p["demo"]["id"], steps, i)
     rest = (f'<div class="dr-end-box dr-end-left"><div class="dr-v-lab">案件に残る未確認の項目</div><div class="dr-end-n">{total}件</div>'
             '<div class="dr-meta">要件定義の完了を示すものではありません。内容は下の「残っていること」で確認できます。</div></div>') if total else            ('<div class="dr-end-box"><div class="dr-v-lab">案件に残る未確認の項目</div><div class="dr-g-sub">登録された内容からは検出されていません。登録されていない論点は検出できません。</div></div>')
     st.html(f'<div class="dr-sit dr-end"><div class="dr-sit-tag">{esc(p["name"])}｜ステップ {i + 1}/{len(steps)}</div><h1 class="dr-g-h dr-end-h">✓ デモ体験はここで終了です</h1>'
@@ -265,20 +283,27 @@ def render(p: dict) -> None:
         return
     point = step["check"](ctx) if callable(step["check"]) else step["check"]
     situation.demo_banner(p["name"], intro, step, i == 0, step["date"](ctx) if step.get("date") else None, point, ctx.background())
-    _phases(demo_id, steps, i, step["count"](ctx))
+    _phases(demo_id, steps, i)
     st.html(f'<h1 class="dr-g-h">{esc(step["title"])}</h1>' + _focus(demo_id, i) + _lead(step, ctx))
-    for n, block in enumerate(step["main"](ctx)):
+    blocks = step["main"](ctx)
+    inline = blocks[0]["type"] in ("story", "verdict", "change_sum")  # 「次へ」を本文の途中に1つだけ置く画面
+    for n, block in enumerate(blocks):
         if block["type"] == "speech":
             _speech(p, block, f"guide_{i}_{n}")
         elif block["type"] == "story":
             _story(block)
-            _start(steps, i, demo_id)  # 冒頭で、順に見る操作と見どころへの近道を出す
+            _start(steps, i, demo_id)  # 論点の直下に、順に見る操作と見どころへの近道を1組だけ出す
             _story_more(block)
         elif block["type"] == "verdict":
-            _verdict_top(block)
-            if step.get("evidence_button") and st.button(step["evidence_button"], key="tour_evidence"):
-                open_detail("sources", src_sel=block["mail_id"])
-            _options_table(block, "4. 3案の比較" if len(block["rows"]) == 3 else "4. 案の比較")
+            _verdict(block, step, steps, i)
+        elif block["type"] == "change_sum":
+            _change_sum(block)
+            _next_inline(steps, i, "次へ：要件定義書を見る" if steps[i + 1].get("finale") else None)
+            with st.expander("判断の詳細を見る（追加要望と過去の判断の衝突、比較表、根拠、仕様の履歴）"):
+                _change_flow(block)
+                for rest in blocks[n + 1:]:
+                    RENDER[rest["type"]](rest)
+            break
         else:
             RENDER[block["type"]](block)
     if step.get("media_note"):
@@ -289,15 +314,33 @@ def render(p: dict) -> None:
     _support(step)
     _open(step["open"](ctx))
     _more(step, ctx)
-    _nav(steps, i, step, ctx)
+    count = step["count"](ctx)
+    if count:  # 代表例と全件の数は、詳細の画面へ移るボタンの近くに置く
+        st.caption(f"この画面の表示：{count}")
+    _nav(steps, i, step, ctx, show_next=not inline)
 
 
-def _phases(demo_id: str, steps: list[dict], i: int, count: str | None) -> None:
-    """大きな区分と現在地。区分の名前は各デモの内容に合わせる。"""
-    now, _ = guide.phase_of(demo_id, i)
-    items = "".join(f'<li class="{"on" if n == now else ("done" if n < now else "")}"><b>{n + 1}</b>{esc(name)}</li>' for n, (name, _) in enumerate(guide.PHASES[demo_id]))
-    extra = f"<span>{esc(count)}</span>" if count else ""
-    st.html(f'<div class="dr-ph"><ol>{items}</ol><div class="dr-ph-now">ステップ {i + 1}/{len(steps)}：{esc(steps[i]["process"])}{extra}</div></div>')
+def _phases(demo_id: str, steps: list[dict], i: int) -> None:
+    """本文の現在地を短い1行で示す（例：ステップ 5/8 · 比較と判断）。ステップ間の移動は左メニューと前後のボタンで行う。"""
+    _, name = guide.phase_of(demo_id, i)
+    st.html(f'<div class="dr-loc">ステップ {i + 1}/{len(steps)} · {esc(name)}</div>')
+
+
+def _next_inline(steps: list[dict], i: int, label: str | None = None) -> None:
+    """本文の要点のすぐ下に置く「次へ」。詳細を開いたり最後まで読んだりしなくても押せる。"""
+    if st.button(label or f"次へ：{steps[i + 1]['short']}を見る", key="tour_next", type="primary"):
+        jump(steps, i + 1)
+
+
+def _verdict(c: dict, step: dict, steps: list[dict], i: int) -> None:
+    """判断の画面：採用案と理由 → 案の比較 → 次へ。根拠の引用と話者確認の経緯は開閉式にする。"""
+    _verdict_top(c)
+    _options_table(c, "3案の比較" if len(c["rows"]) == 3 else "案の比較")
+    _next_inline(steps, i)
+    with st.expander("判断の根拠と経緯を見る（引用の全文、話者の確認）"):
+        _verdict_basis(c)
+        if step.get("evidence_button") and st.button(step["evidence_button"], key="tour_evidence"):
+            open_detail("sources", src_sel=c["mail_id"])
 
 
 def _focus(demo_id: str, i: int) -> str:
@@ -311,7 +354,7 @@ def _start(steps: list[dict], i: int, demo_id: str) -> None:
     """最初の画面の進み方。順に見る人と、見どころから入りたい人の両方に対応する。"""
     target, label = guide.SHORTCUTS[demo_id]
     with st.container(key="tour_start", horizontal=True):
-        if st.button(f"次へ：{steps[i + 1]['short']}を見る", key="tour_next_top", type="primary"):
+        if st.button(f"次へ：{steps[i + 1]['short']}を見る", key="tour_next", type="primary"):
             jump(steps, i + 1)
         if st.button(label, key="tour_shortcut"):
             jump(steps, target)
@@ -345,13 +388,14 @@ def sidebar(p: dict) -> None:
         st.rerun()
 
 
-def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx) -> None:
+def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx, show_next: bool = True) -> None:
+    """画面下の移動。「次へ」を本文の途中に置いた画面では、ここに同じボタンを重ねて出さない。"""
     c1, c2, c3 = st.columns([2, 2, 3])
     if i > 0 and c1.button(f"前へ：{steps[i - 1]['short']}", key="tour_prev", width="stretch"):
         jump(steps, i - 1)
     if c2.button(step["detail"](ctx), key="tour_detail", type="tertiary", width="stretch"):
         open_detail(step["page"])
-    if c3.button(f"次へ：{steps[i + 1]['short']}を見る", key="tour_next", type="primary", width="stretch"):
+    if show_next and c3.button(f"次へ：{steps[i + 1]['short']}を見る", key="tour_next", type="primary", width="stretch"):
         jump(steps, i + 1)
 
 

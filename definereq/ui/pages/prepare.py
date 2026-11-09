@@ -36,7 +36,7 @@ def setup(p: dict) -> None:
             st.space("stretch")
             if st.button(label, key=key, width="stretch"):
                 state.goto(page)
-    if not p.get("is_demo"):
+    if not p.get("is_demo") and not gd.setup_next(p).get("empty"):  # 何も登録していないときは、上の2枚のカードが開始の操作
         st.caption("上の2つは、背景や資料をあとから追加・編集するときの入口です。")
         next_block(p, "setup_next")
     if not p.get("is_demo"):  # 続きの作業に備える補助の操作。「次にすること」より下に、控えめに置く
@@ -57,8 +57,8 @@ def next_block(p: dict, key: str, lead: str = "次にすること") -> None:
     """
     nx = gd.setup_next(p)
     with st.container(border=True, key=key):
-        st.html(f'<div class="dr-next"><b>{esc(lead)}</b><span>{esc(nx["reason"])}</span></div>'
-                + (f'<div class="dr-meta">{esc(nx["detail"])}</div>' if nx.get("detail") else ""))
+        st.html(f'<div class="dr-next"><b>{esc(lead)}</b><span class="dr-next-s">{esc(nx["status"])}</span></div>'
+                f'<div class="dr-meta">{esc(nx["reason"])}' + (f'　{esc(nx["detail"])}' if nx.get("detail") else "") + "</div>")
         with st.container(horizontal=True, vertical_alignment="center"):
             if st.button(f"{nx['label']} →", key=f"{key}_go", type="primary"):
                 state.goto(nx["page"])
@@ -160,7 +160,8 @@ def profile(p: dict) -> None:
         top_nav("go_setup_top", ("資料・議事録へ", "sources", "go_sources_top"))
     head("背景・目的・関係者", "案件の背景・目的・課題を記録します。分からない項目は空欄のまま進められます。" if not demo else
          "確認済み・本人申告・仮説・未確認を区別して記録します。要件定義書の背景と目的はここを参照します。", "案件ホーム")
-    guide = None if demo else situation.brief(p, "profile")
+    # 編集中は「案件情報を保存」を主な操作にするため、上部に別の工程を勧める案内は出さない（詳しい案内は画面の下）
+    guide = None if demo else gd.assess(p, "profile", st.session_state.get("resumed", False))
     if demo:
         definition([(label, p["profile"][key]["value"]) for key, label in PROFILE_FIELDS.items()])
     _profile_form(p)
@@ -187,21 +188,37 @@ def _profile_form(p: dict) -> None:
         # ボタンより上には、入力中に表示が変わる部品を置かない。
         # 入力欄の確定（フォーカスが外れたとき）で上の表示が増えると、押している最中にボタンが下へずれ、クリックが成立しないため
         st.caption("背景・目的・課題など、この欄の入力を案件に反映します。関係者と用語は、それぞれの「追加」で反映します。")
+        go_label, go_page = _after_save(p)
         b1, b2 = st.columns(2)
         save_now = b1.button("案件情報を保存", type="primary", key="pf_save", width="stretch")
-        save_go = b2.button("保存して資料・議事録を取り込む", key="pf_save_go", width="stretch")
+        save_go = b2.button(f"保存して{go_label}", key="pf_save_go", width="stretch")
         if save_now or save_go:
             error = _save_profile(p, new)
             if error:  # 入力内容は下書きに残したまま、理由をボタンの近くに出す
                 st.error(f"案件情報を保存できませんでした。{error} 入力内容はそのまま残っています。")
             elif save_go:  # 保存を確認してから移動する
                 st.session_state["flash"] = "案件情報を保存しました"
-                state.goto("sources")
-            else:
-                done("pf", f"案件情報を保存しました（{pj.now_iso()[11:16]}）。")
-        note_slot("pf")
+                state.goto(go_page)
+            else:  # 保存の結果と次の操作は、別の画面へ移るまで残す（押す前に消えるとクリックが届かないため）
+                st.session_state["pf_saved"] = {"project": p["id"], "time": pj.now_iso()[11:16]}
+                st.rerun()
+        saved = st.session_state.get("pf_saved")
         if drafts.profile_fields_pending(p):
             st.caption("保存していない変更があります。")
+        elif saved and saved["project"] == p["id"]:
+            label, page = _after_save(p)
+            with st.container(key="pf_saved_box"):
+                st.success(f"案件情報を保存しました（{saved['time']}）。")
+                if st.button(f"次へ：{label} →", key="pf_next_go", type="primary"):
+                    state.goto(page)
+
+
+def _after_save(p: dict) -> tuple[str, str]:
+    """案件情報を保存した後の次の操作。資料が未登録なら取り込み、登録済みなら案件の状態に合う工程。"""
+    if not p["sources"] and not p["recordings"]:
+        return "資料・議事録を取り込む", "sources"
+    nx = gd.setup_next(p)
+    return nx["label"], nx["page"]
 
 
 def _save_profile(p: dict, new: dict) -> str | None:

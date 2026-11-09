@@ -127,20 +127,22 @@ def setup_next(p: dict) -> dict:
     waiting, cands = unanalyzed_minutes(p), requirement_candidates(p)
     if waiting:
         main, alts = RECORDS, [CANDIDATES] if cands else [PREP]
+        status = f"未整理の議事録 {len(waiting)}件"
         detail = f"AIで整理していない記録：{'、'.join(waiting[:3])}" + (f" ほか{len(waiting) - 3}件" if len(waiting) > 3 else "")
     elif cands:
-        main, alts, detail = CANDIDATES, [PREP], f"確認待ちの候補：{len(cands)}件"
+        main, alts, status, detail = CANDIDATES, [PREP], f"確認待ちの要件候補 {len(cands)}件", f"確認待ちの候補：{len(cands)}件"
     elif p["requirements"]:  # 要件の整理が進んだ後は、状況の判定（assess）の結果を使う
         a = assess(p, "setup")["main"]
         if a and a.page not in ("setup", "profile", "sources"):
-            return {"label": a.button, "page": a.page, "reason": a.short or a.reason, "detail": None, "alts": [PREP[:2]] if a.page != "prep" else []}
-        main, alts, detail = PREP, [], None
+            return {"label": a.button, "page": a.page, "reason": a.short or a.reason, "status": a.title, "detail": None, "alts": [PREP[:2]] if a.page != "prep" else []}
+        main, alts, status, detail = PREP, [], "要件を整理中", None
     elif p["sources"] or has_profile(p):
         main, alts, detail = PREP, [("議事録を取り込む", "sources")] if not p["sources"] else [], None
+        status = "資料を登録済み" if p["sources"] else "背景を入力済み・資料は未登録"
     else:
         return {"label": "資料・議事録を取り込む", "page": "sources", "reason": "議事録や要望書があれば取り込むと、次の作業を案内できます。背景の入力から始めることもできます。",
-                "detail": None, "alts": [("背景・目的・関係者を入力", "profile")]}
-    return {"label": main[0], "page": main[1], "reason": main[2], "detail": detail, "alts": [x[:2] for x in alts]}
+                "status": "背景・資料とも未登録", "detail": None, "alts": [("背景・目的・関係者を入力", "profile")], "empty": True}
+    return {"label": main[0], "page": main[1], "reason": main[2], "status": status, "detail": detail, "alts": [x[:2] for x in alts]}
 
 
 def _after_profile(p: dict) -> list[Advice]:

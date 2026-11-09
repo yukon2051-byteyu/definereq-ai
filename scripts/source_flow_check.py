@@ -146,7 +146,7 @@ with sync_playwright() as pw:
         check(title(g) == "背景・目的・関係者" and head_ok and input_ok and back_ok and order, f"1 背景：戻る→見出し→入力欄の順で、最初の入力欄が初期表示に入る（見出し {head_y}px、入力欄 {input_y}px）")
     else:
         check(title(g) == "背景・目的・関係者" and head_ok and back_ok and order, f"1 背景：戻る→見出し→入力欄の順。見出しが初期表示に入る（見出し {head_y}px、最初の入力欄 {input_y}px）")
-    check(g.locator(".dr-sit-work").count() == 0 and g.locator(".dr-brief").count() == 1, "1 背景：大きな案内の枠を出さず、見出しの下に短い1行だけ")
+    check(g.locator(".dr-sit-work").count() == 0 and g.locator(".dr-brief").count() == 0, "1 背景：編集中は上部に別工程の案内を出さない")
 
     # 3. 背景に入力 → 保存せず資料へ → 資料を登録 → 背景へ戻る
     first.click()
@@ -167,7 +167,9 @@ with sync_playwright() as pw:
     g.get_by_label("文章を貼り付ける").press("Tab")
     wait(g, 900)
     click(g, "貼り付けた文章を案件内に登録")
-    check("種類：議事録" in body(g), "2 貼り付けた議事録を「議事録」で登録")
+    check("議事録1件を登録しました" in body(g), "2 貼り付けた議事録を「議事録」で登録")
+    click(g, "続けて資料を追加する")
+    paste_tab(g)
     check(g.get_by_label("文章を貼り付ける").input_value() == "", "2 登録後は貼り付け欄を空にする（二重登録を防ぐ）")
     click(g, "背景・目的・関係者を編集")
     box = g.get_by_label("背景", exact=True).first
@@ -175,9 +177,12 @@ with sync_playwright() as pw:
     box.click()
     g.keyboard.press("End")
     g.keyboard.type("。月末に集計している")  # 入力欄にフォーカスを置いたまま押す
-    slow_click(g, "保存して資料・議事録を取り込む")
+    # 資料（議事録）を登録済みのため、保存と移動のボタンは案件の状態に合う次工程（会議の記録の整理）になる
+    slow_click(g, "保存して会議の記録を整理する")
     t = body(g)
-    check(title(g) == "資料・議事録" and "案件情報を保存しました" in t, "3 フォーカスを外さずに1回押すと、保存して資料の画面が開き、保存したことを表示")
+    check(title(g) == "会議の記録を整理" and "案件情報を保存しました" in t, "3 フォーカスを外さずに1回押すと、保存して次工程（記録の整理）が開き、保存したことを表示")
+    click(g, "← 案件の準備に戻る")
+    click(g, "資料・議事録を取り込む")
     check("第1回打ち合わせ議事録" in g.content(), "4 資料の画面に戻っても登録済みの資料が残る")
 
     # 3. 保存済みの状態から編集して、1回で保存・移動する（以前、1回目のクリックが無効になった条件）
@@ -185,10 +190,11 @@ with sync_playwright() as pw:
     box = g.get_by_label("目的", exact=True).first
     box.click()
     g.keyboard.type("申込の状況を一つの画面で見られるようにする")
-    slow_click(g, "保存して資料・議事録を取り込む")
-    check(title(g) == "資料・議事録", "3 保存済みの状態から編集しても、1回の操作で保存して移動する")
+    slow_click(g, "保存して会議の記録を整理する")
+    check(title(g) == "会議の記録を整理", "3 保存済みの状態から編集しても、1回の操作で保存して移動する")
 
     # 4. 関係者・用語はそれぞれの追加で反映する
+    click(g, "← 案件の準備に戻る")
     click(g, "背景・目的・関係者を編集")
     check(g.get_by_label("背景", exact=True).first.input_value().endswith("月末に集計している") and
           g.get_by_label("目的", exact=True).first.input_value() == "申込の状況を一つの画面で見られるようにする", "3 保存した最新の内容が背景の画面に出る")
@@ -239,17 +245,19 @@ with sync_playwright() as pw:
     keep_file = g.get_by_text("申込手順.txt").count() > 0
     check(keep_text and keep_file, "2 種類と取り込み方法を切り替えても、入力中の文章と選んだファイルが残る")
     click(g, "読み込む")
-    check("種類：手順" in body(g), "2 その他の資料（ファイル）を選んだ種類で登録")
+    check("手順1件を登録しました" in body(g), "2 その他の資料（ファイル）を選んだ種類で登録")
+    click(g, "続けて資料を追加する")
     g.get_by_text("議事録を取り込む", exact=True).click()
     wait(g, 1500)
     g.locator('input[type="file"]').first.set_input_files(str(OUT / "第2回議事録.docx"))
     wait(g, 2000)
     click(g, "読み込む")
-    check("種類：議事録" in body(g), "2 議事録のファイル（Word）を「議事録」で登録")
+    check("議事録1件を登録しました" in body(g), "2 議事録のファイル（Word）を「議事録」で登録")
+    click(g, "続けて資料を追加する")
     paste_tab(g)
     check(g.get_by_label("文章を貼り付ける").input_value() == "切り替えても残る文章", "2 ファイルを登録しても、貼り付け欄の入力は残る")
     click(g, "貼り付けた文章を案件内に登録")
-    check("種類：議事録" in body(g), "2 貼り付けた文章を「議事録」で登録")
+    check("議事録1件を登録しました" in body(g), "2 貼り付けた文章を「議事録」で登録")
     # 既存の判定：会議の記録を整理する画面に、議事録だけが会議の記録として並ぶ
     g.evaluate("window.scrollTo(0,0)")
     if SIZE == "sp":
@@ -257,8 +265,8 @@ with sync_playwright() as pw:
         wait(g, 900)
     g.locator("[data-testid=stSidebar]").get_by_role("button", name="会議の記録を整理", exact=True).click()
     wait(g, 2500)
-    rec = next((x for x in g.locator("[data-testid=stCaptionContainer]").all_inner_texts() if x.startswith("登録済みの記録")), "")
-    check("第2回議事録.docx" in rec and "申込手順.txt" not in rec and "AIで候補を作る：会議後の整理" in body(g), f"2 議事録はAIで整理する会議の記録に入り、手順は入らない（{rec}）")
+    rec = " ".join(g.locator(".dr-now").first.inner_text().split())  # 上部の状態表示：未整理の議事録の件数と名前
+    check("第2回議事録.docx" in rec and "申込手順.txt" not in rec and g.locator("[data-testid=stMain]").get_by_role("button", name="選択した議事録をAIで整理する").count() == 1, f"2 議事録はAIで整理する会議の記録に入り、手順は入らない（{rec}）")
     check(g.evaluate("document.documentElement.scrollWidth-document.documentElement.clientWidth") <= 0, "1 横にはみ出さない")
     c.close()
 

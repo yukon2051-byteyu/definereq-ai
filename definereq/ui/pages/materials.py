@@ -39,9 +39,15 @@ def sources(p: dict) -> None:
         prepare.top_nav("go_setup_src", ("背景・目的・関係者を入力" if pstate == "未入力" else "背景・目的・関係者を編集", "profile", "go_profile_top"))
     head("資料・議事録", "議事録や資料を、ファイルまたは文章の貼り付けで取り込みます。録画は不要です。" if not demo else
          "議事録はWord・Excel・PDF・テキストのファイル、または文章の貼り付けで取り込めます。録画は不要です。", "資料")
-    guide = None if demo else situation.brief(p, "sources")
+    # 登録前は取り込みに集中できるよう、上部に共通の案内を出さない（詳しい案内は画面の下）
+    from ...logic import guidance as gd
+
+    guide = None if demo else gd.assess(p, "sources", st.session_state.get("resumed", False))
     if not demo:
-        _source_import(p)
+        done = _after_register(p)  # 登録した直後は、結果と次の操作を出し、追加のフォームは閉じる
+        # 閉じている間もフォームは描画して見えなくするだけにする。描画しないと、入力途中の文章や選んだファイルが消えるため
+        with st.container(key="src_form_hidden" if done else "src_form"):
+            _source_import(p)
     _source_list(p)
     if guide:
         situation.details(p, "sources", guide, skip={"setup", "profile", "sources"})
@@ -53,7 +59,10 @@ def _source_import(p: dict) -> None:
     ファイルと貼り付けの入力欄は常に同じ名前で置くため、種類や取り込み方法を切り替えても入力は消えない。
     """
     with edit_block("src"), st.container(border=True, key="src_box"):
-        _after_register(p)  # 登録した直後は、取り込み欄の一番上（初期表示の範囲）に結果と次の操作を出す
+        # フォームを閉じている間に消えた選択を戻す（続けて同じ種類の資料を追加しやすくする）
+        for k in ("src_mode", "src_kind"):
+            if k not in st.session_state and st.session_state.get(f"{k}_keep"):
+                st.session_state[k] = st.session_state[f"{k}_keep"]
         mode = st.radio("取り込むもの", list(MODES), horizontal=True, key="src_mode")
         if MODES[mode]:
             kind = MODES[mode]
@@ -85,7 +94,7 @@ def _source_import(p: dict) -> None:
                 if done:  # 1件以上の登録に成功したときだけ、次の操作を案内する
                     st.session_state["src_up_round"] = n + 1
                     touch(p)
-                    _registered(p, f"{done}件読み込みました（種類：{kind}）")
+                    _registered(p, kind, done)
         with tabs[1]:
             m = st.session_state.get("paste_round", 0)
             title = st.text_input("貼り付ける文章の名称", key=f"paste_t_{m}")
@@ -98,28 +107,36 @@ def _source_import(p: dict) -> None:
                     registry.ingest_paste(p, title, text, kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
                     st.session_state["paste_round"] = m + 1
                     touch(p)
-                    _registered(p, f"登録しました（種類：{kind}）")
+                    _registered(p, kind, 1)
 
 
-def _registered(p: dict, message: str) -> None:
-    """登録の成功を記録して再描画する。表示は、別の画面へ移るか「続けて資料を追加する」を押すまで残す。"""
-    st.session_state["src_done"] = {"project": p["id"], "message": message}
+def _registered(p: dict, kind: str, count: int) -> None:
+    """登録の成功を記録して再描画する。件数と種類は実際の登録結果を使う。
+
+    表示は、別の画面へ移るか「続けて資料を追加する」を押すまで残す。
+    """
+    st.session_state["src_mode_keep"] = st.session_state.get("src_mode")
+    st.session_state["src_kind_keep"] = st.session_state.get("src_kind")
+    st.session_state["src_done"] = {"project": p["id"], "message": f"{kind}{count}件を登録しました", "scroll": True}
     st.rerun()
 
 
-def _after_register(p: dict) -> None:
-    """登録した直後の案内：成功メッセージと、案件の状態に合う次の操作。準備画面を経由せずに続けられる。"""
+def _after_register(p: dict) -> bool:
+    """登録した直後の表示：成功メッセージと次の主ボタン。追加のフォームは閉じ、「続けて資料を追加する」で開く。"""
     from .prepare import next_block
 
     done = st.session_state.get("src_done")
     if not done or done["project"] != p["id"]:
-        return
-    with st.container(key="src_done_box"):
+        return False
+    with st.container(border=True, key="src_done_box"):
         st.success(done["message"])
         next_block(p, "src_next", "次の操作")
-        if st.button("続けて資料を追加する", key="src_more", type="tertiary"):
+        if st.button("続けて資料を追加する", key="src_more"):
             st.session_state.pop("src_done", None)
             st.rerun()
+    if done.pop("scroll", False):  # 登録ボタンの位置から下へ隠れないよう、結果の位置へ1回だけ移動する
+        st.iframe(f"<script>/*{pj.now_iso()}*/const t=()=>window.parent.document.querySelector('.st-key-src_done_box')?.scrollIntoView({{block:'center'}});t();setTimeout(t,300)</script>", height=1)
+    return True
 
 
 def _source_list(p: dict) -> None:
@@ -303,27 +320,75 @@ def minutes_import(p: dict, meeting: str | None, key: str) -> None:
 
 
 def records(p: dict) -> None:
-    """会議の記録の整理を1画面で行う。取込み→AIの整理→候補の確認。"""
-    head("会議の記録を整理", "議事録や録画の取込みから、AIの整理、候補の確認まで、この画面で進めます。録画はなくても進められます。", "記録を取り込む")
-    st.subheader("1. 議事録・録画を取り込む")
-    with edit_block("records"):
-        meeting = meeting_select(p, "records_mtg")
-        minutes_import(p, meeting, "records")
-        with st.expander("録画から文字起こしする（録画がある場合）"):
-            _transcribe_ui(p, meeting)
-    names = [s["name"] for s in p["sources"] if s.get("kind") == "議事録" and not s.get("superseded_by")] + [r["name"] for r in p["recordings"]]
-    st.caption("登録済みの記録：" + "、".join(names) if names else "登録済みの記録はまだありません。")
-    st.subheader("2. AIで整理する")
-    if names:
-        ai_panel(p, "extract", expanded=bool(unanalyzed_minutes(p)))
-    else:
-        st.caption("議事録を取り込むと、ここからAIで要望や未決事項を整理できます。")
-    st.subheader("3. 候補を確認する")
+    """会議の記録の整理を1画面で行う。状態に合わせて、主な操作を先頭に置く。
+
+    - 未整理の記録あり：件数と対象名 → AIで整理（対象を確認してから実行）→ 候補 → 追加の取り込み（閉じた状態）
+    - 整理済みのみ：候補の確認 → 追加の取り込み（閉じた状態）
+    - 記録なし：取り込みを最初に出す
+    """
+    from ...logic import guidance as gd
+    from .. import situation
+
+    demo = p.get("is_demo")
+    head("会議の記録を整理", "議事録や録画をAIで整理し、要望・決定事項・未決事項の候補を確認します。録画はなくても進められます。", "記録を取り込む")
+    latest = [s for s in p["sources"] if s.get("kind") == "議事録" and not s.get("superseded_by")]
+    names = [s["name"] for s in latest] + [r["name"] for r in p["recordings"]]
+    waiting = set(gd.unanalyzed_minutes(p))
+    pending = gd.requirement_candidates(p)
     tasks = tuple(sorted({r["task"] for r in p["ai_runs"]} - {"prep"}))
-    if tasks or p.get("is_demo"):
-        board(p, None if p.get("is_demo") else tasks, "records_cand", meeting)
+    if demo:
+        _records_demo(p, names, tasks)
+        return
+    if waiting:
+        wait_src = [s["id"] for s in latest if s["name"] in waiting]
+        wait_rec = [r["id"] for r in p["recordings"] if r["name"] in waiting]
+        st.html(_status(f"未整理の議事録 {len(waiting)}件", "、".join(sorted(waiting))))
+        with st.container(border=True, key="records_run"):
+            ai_panel_extract(p, wait_src, wait_rec)
+    elif names:
+        st.html(_status("未整理の議事録 0件", f"整理済みの記録：{'、'.join(names)}" + (f"／確認待ちの候補 {len(pending)}件" if pending else "")))
     else:
-        st.caption("AIで整理すると、候補がここに表示されます。候補のままでは要件や合意になりません。")
+        st.html(_status("会議の記録はまだありません", "議事録のファイルを選ぶか、文章を貼り付けて登録してください。録画がなくても進められます。"))
+    meeting = None
+    if names:
+        if tasks:
+            st.subheader("AIが整理した候補")
+            board(p, tasks, "records_cand", None)
+        if not waiting:
+            with st.expander("AIでもう一度整理する（対象を選んで実行）"):
+                ai_panel_extract(p, [], [])
+        with edit_block("records"), st.expander("議事録・録画を追加する"):
+            meeting = meeting_select(p, "records_mtg")
+            minutes_import(p, meeting, "records")
+            st.markdown("**録画から文字起こしする（録画がある場合）**")
+            _transcribe_ui(p, meeting)
+    else:
+        with edit_block("records"), st.container(border=True):
+            meeting = meeting_select(p, "records_mtg")
+            minutes_import(p, meeting, "records")
+            with st.expander("録画から文字起こしする（録画がある場合）"):
+                _transcribe_ui(p, meeting)
+    if st.button("ほかの作業：次回の質問を準備する", key="records_prep", type="tertiary"):
+        from .. import state
+        state.goto("prep")
+    situation.details(p, "records", gd.assess(p, "records", st.session_state.get("resumed", False)), skip={"setup", "records", "prep"})
+
+
+def _status(title: str, detail: str) -> str:
+    return f'<div class="dr-now"><b>{esc(title)}</b><span>{esc(detail)}</span></div>'
+
+
+def ai_panel_extract(p: dict, src_ids: list[str], rec_ids: list[str]) -> None:
+    from ..ai_panel import extract_runner
+
+    extract_runner(p, src_ids, rec_ids)
+
+
+def _records_demo(p: dict, names: list[str], tasks: tuple) -> None:
+    """デモ：記録と候補を閲覧する（AIは実行しない）。"""
+    st.caption("登録済みの記録：" + "、".join(names) if names else "登録済みの記録はまだありません。")
+    ai_panel(p, "extract")
+    board(p, None, "records_cand", None)
 
 
 def recordings(p: dict) -> None:

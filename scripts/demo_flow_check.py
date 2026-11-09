@@ -110,12 +110,15 @@ with sync_playwright() as pw:
     click(g, "前へ：案件の背景")
     click(g, "見どころへ：3案の比較と採用理由")
     t = g.inner_text("body")
-    check("ステップ 5/8" in t and "この案件の論点" in t and g.locator(".dr-ph li.on").inner_text().endswith("比較と判断"), "2 見どころへ直接進み、現在地（比較と判断・ステップ5）と論点が出る")
+    check("ステップ 5/8" in t and "この案件の論点" in t and g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 比較と判断", "2 見どころへ直接進み、現在地（比較と判断・ステップ5）と論点が出る")
 
     # 3. 判断の画面
-    vd = g.locator(".dr-vd").inner_text()
-    order = [vd.index(x) for x in ("1. 採用した案", "2. 採用理由", "3. この判断の根拠")]
-    check(order == sorted(order) and "本人確認済みの記録" in vd and "判断に使っていない発言（話者未確認）" in vd and "関係者による判断" in vd, "3 採用案・理由・根拠が順に、種類を分けて表示される")
+    top_vd = g.locator(".dr-vd").first.inner_text()
+    order = [top_vd.index(x) for x in ("再申請を採用", "元の記録が残り", "関係者による判断", "根拠：本人の確認メール")]
+    main(g).get_by_text("判断の根拠と経緯を見る").click()  # 引用の全文と話者の確認は開閉式
+    wait(g, 900)
+    vd = " ".join(g.locator(".dr-vd").all_inner_texts())
+    check(order == sorted(order) and "本人確認済みの記録" in vd and "判断に使っていない発言（話者未確認）" in vd, "3 採用案・理由・根拠の要約が順に出て、詳細で根拠の種類を分けて表示")
     check(g.locator(".dr-t-cmp .dr-t-win").inner_text().startswith("再申請") and not overflow(g), "3 3案の比較で採用行が分かり、表がはみ出さない")
     g.screenshot(path=OUT / "3_d1_decision.png", full_page=True)
     click(g, "この判断に使った確認メールを見る", 3000)
@@ -134,14 +137,14 @@ with sync_playwright() as pw:
     click(g, "次へ：追加要望の影響を見る")
     click(g, "次へ：判断後の仕様を見る")
     cs = g.locator(".dr-cs")
-    table = g.locator(".dr-t").first
-    check(in_view(g.locator(".dr-cs-grid")) and cs.bounding_box()["y"] < table.bounding_box()["y"] and "引き続き守る制約" in cs.inner_text() and "下書きの作成まで" in cs.inner_text(),
+    detail = main(g).locator("[data-testid=stExpander]").filter(has_text="判断の詳細を見る")
+    check(in_view(g.locator(".dr-cs-grid")) and cs.bounding_box()["y"] < detail.bounding_box()["y"] and "引き続き守る制約" in cs.inner_text() and "下書きの作成まで" in cs.inner_text(),
           "4 変更前・変更後・守る制約が、比較表より先に初期表示で見える")
     g.screenshot(path=OUT / "4_d1_after.png")
     check(not cut_labels(g) and not overflow(g), "7 判断後の仕様：ボタンの文字が切れず、表がはみ出さない")
 
     # 6. 終了画面
-    click(g, "次へ：体験の終了と資料を見る", 3500)
+    click(g, "次へ：要件定義書を見る", 3500)
     t = g.inner_text("body")
     check("デモ体験はここで終了です" in t and "案件に残る未確認の項目" in t and "4件" in g.locator(".dr-end-n").inner_text(), "6 体験の終了と、残る未確認項目4件を別々に表示")
     check(in_view(btn(g, "ほかのデモを見る")) and in_view(btn(g, "この案件の機能画面を詳しく見る")), "6 次の選択肢が、スクロールせずに見える")

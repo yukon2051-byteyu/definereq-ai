@@ -138,7 +138,7 @@ with sync_playwright() as pw:
     g = c.new_page()
     create(g, "研修申込の管理（架空・次にすること）")
     t = body(g)
-    check("次にすること" in t and next_button(g).first.inner_text() == "資料・議事録を取り込む →", "4 何もない案件：資料の取り込みを主ボタンで案内")
+    check(main(g).locator(".dr-next").count() == 0 and main(g).get_by_role("button", name="資料・議事録を取り込む").count() == 1, "4 何もない案件：2枚のカードが開始操作（次にすることは出さない）")
     click(g, "背景・目的・関係者を入力")
     g.get_by_label("背景", exact=True).first.fill("申込をメールで受けている")
     g.get_by_label("背景", exact=True).first.press("Tab")
@@ -162,7 +162,7 @@ with sync_playwright() as pw:
     g.screenshot(path=OUT / "1_setup_next.png")
     click(g, "会議の記録を整理する →", 3000)
     check(title(g) == "会議の記録を整理" and "第1回打ち合わせ議事録" in body(g), "1 1クリックで既存の整理画面が開く（取り込んだ議事録が並ぶ）")
-    check(main(g).get_by_role("button", name="← 案件の準備に戻る").count() == 1 and main(g).get_by_role("button", name="議事録をAIで整理する").count() == 0, "どの画面でも上部に戻る操作。AIは画面を開いただけでは実行しない")
+    check(main(g).get_by_role("button", name="← 案件の準備に戻る").count() == 1 and "件の候補を作成しました" not in body(g), "どの画面でも上部に戻る操作。AIは画面を開いただけでは実行しない")
     click(g, "← 案件の準備に戻る")
     click(g, "背景・目的・関係者を編集")
     keep = g.get_by_label("背景", exact=True).first.input_value() == "申込をメールで受けている"

@@ -64,15 +64,67 @@ def ai_panel(p: dict, task_key: str, extra: str = "", recordings: bool = False, 
             st.info(f"同じ入力の結果 {same[-1]['id']} があります。再実行せずに候補を利用できます。")
             again = st.checkbox("費用がかかることを理解して、もう一度実行する", key=f"ai_again_{task_key}")
         if st.button("この内容でAIを実行", disabled=not (rd.ai and code and again), key=f"ai_go_{task_key}", type="primary"):
-            with st.spinner("AIが候補を作成しています。通常1〜2分かかります。"):
-                try:
-                    res = ai.run_task(p, task_key, code, rd.ledger, source_ids=chosen, recording_ids=rec_ids, extra=extra)
-                except (AIError, BudgetExceeded, LedgerUnavailable) as e:
-                    st.error(str(e))
-                    return
-            touch(p)
-            skipped = res["run"].get("skipped_duplicates") or 0
-            ok_rerun(f"{len(res['candidates'])}件の候補を作成しました（約{res['cost_jpy']:,.1f}円）" + (f"。重複{skipped}件は追加していません" if skipped else ""))
+            _run(p, task_key, code, rd, chosen, rec_ids, extra)
+
+
+def _run(p: dict, task_key: str, code: str, rd, chosen: list[str], rec_ids: list[str], extra: str = "") -> None:
+    """AIを実行して候補を登録する。人がボタンを押したときだけ呼ぶ。"""
+    with st.spinner("AIが候補を作成しています。通常1〜2分かかります。"):
+        try:
+            res = ai.run_task(p, task_key, code, rd.ledger, source_ids=chosen, recording_ids=rec_ids, extra=extra)
+        except (AIError, BudgetExceeded, LedgerUnavailable) as e:
+            st.error(str(e))
+            return
+    touch(p)
+    skipped = res["run"].get("skipped_duplicates") or 0
+    ok_rerun(f"{len(res['candidates'])}件の候補を作成しました（約{res['cost_jpy']:,.1f}円）" + (f"。重複{skipped}件は追加していません" if skipped else ""))
+
+
+def extract_runner(p: dict, src_ids: list[str], rec_ids: list[str]) -> None:
+    """会議の記録を整理する画面の実行欄。対象の選択と実行ボタンを先に出し、送信内容の詳細は開閉式にする。
+
+    src_ids / rec_ids：初期状態で選ぶ記録（AIで未整理のもの）。未整理の記録が増えたら選択を作り直す。
+    実行は、利用者が対象を確認してボタンを押したときだけ行う。
+    """
+    task = ai.TASKS["extract"]
+    sources = [s for s in p["sources"] if not s.get("superseded_by")]
+    basis = (tuple(src_ids), tuple(rec_ids))
+    # 新しく登録した議事録を初期の選択に入れる。別の画面から戻ったとき（選択欄の値が消えたとき）も作り直す
+    if st.session_state.get("ai_extract_basis") != basis or "ai_src_extract" not in st.session_state:
+        st.session_state["ai_extract_basis"] = basis
+        st.session_state["ai_src_extract"] = list(src_ids)
+        st.session_state["ai_rec_extract"] = list(rec_ids)
+    names = {s["id"]: f"{s['name']}（{s['kind']}）" for s in sources}
+    chosen = st.multiselect("整理する議事録・資料", list(names), format_func=names.get, key="ai_src_extract")
+    picked: list[str] = []
+    if p["recordings"]:
+        recs = {r["id"]: f"{r['name']}（文字起こし）" for r in p["recordings"]}
+        picked = st.multiselect("整理する録画・字幕", list(recs), format_func=recs.get, key="ai_rec_extract")
+    context = ai.build_context(p, task, chosen, picked, "")
+    est = ai.estimate(context)
+    code = current_code()
+    rd = gate.readiness(code if code else None)
+    too_long = len(context) > config.MAX_AI_INPUT_CHARS
+    st.caption(f"送信先：Anthropic（{config.ai_model()}）／送信量：{len(context):,}文字／費用見込み：最大 約{est:,.0f}円。押すまでAIは実行しません。")
+    if too_long:
+        st.warning(f"入力が長すぎます（上限 {config.MAX_AI_INPUT_CHARS:,} 文字）。対象を減らしてください。")
+    for reason in rd.reasons:
+        if "文字起こし" not in reason:  # 議事録の整理と関係のない説明（文字起こしの設定）は出さない
+            st.caption(reason)
+    same = [r for r in p["ai_runs"] if r["task"] == "extract" and r["input_fingerprint"] == ai.input_fingerprint(context)]
+    again = True
+    if same:
+        st.info(f"同じ対象の結果 {same[-1]['id']} があります。再実行せずに下の候補を利用できます。")
+        again = st.checkbox("費用がかかることを理解して、もう一度実行する", key="ai_again_extract")
+    ready = rd.ai and bool(code) and again and not too_long and bool(chosen or picked)
+    if st.button("選択した議事録をAIで整理する", disabled=not ready, key="ai_go_extract", type="primary"):
+        _run(p, "extract", code, rd, chosen, picked)
+    with st.expander("送信する内容の詳細（案件の情報・送信しないもの）"):
+        refs = ai.reference_items(p)
+        for group, values in refs.items():
+            if values:
+                st.caption(f"{group}：" + "／".join(f"{k}（{v['確かさ']}）：{v['内容']}" if isinstance(v, dict) else f"{k}：{'、'.join(v) if isinstance(v, list) else v}" for k, v in values.items()))
+        st.caption("案件の情報と、選んだ記録だけを送信します。選んでいない資料、対象外の単位、内部メモは送信しません。")
 
 
 def ai_runs_list(p: dict, task_key: str) -> None:

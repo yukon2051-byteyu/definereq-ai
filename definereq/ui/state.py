@@ -87,6 +87,7 @@ def open_demo(demo_id: str, tour: bool = True, stage: int | None = None) -> None
 
 def goto(page: str) -> None:
     st.session_state.pop("src_done", None)  # 資料の登録直後の案内は、別の画面へ移ったら閉じる
+    st.session_state.pop("pf_saved", None)  # 背景の保存直後の案内も同じ
     st.session_state["page"] = page
     st.rerun()
 

@@ -403,11 +403,12 @@ def test_first_and_later_banner():
     assert "デモ体験中｜経費申請アプリの刷新" in first and "デモ用の役割" in first and "現場と経理の要望を取りまとめる" in first
     # 冒頭は 現場の要望 ⇔ 経理の制約 → 今回の論点。紙・Excelの説明はその下（開閉式）
     assert first.index("現場の要望") < first.index("経理の制約") < first.index("今回の論点") < first.index("元の記録を残しながら、どう訂正するか？") < first.index("現在の業務")
-    assert button(at, "tour_next_top").label == "次へ：会議前の確認点を見る" and button(at, "tour_shortcut").label == "見どころへ：3案の比較と採用理由"
+    assert button(at, "tour_next").label == "次へ：会議前の確認点を見る" and button(at, "tour_shortcut").label == "見どころへ：3案の比較と採用理由"
+    assert sum(1 for b in at.button if b.label.startswith("次へ：")) == 1  # 冒頭の「次へ」は1つだけ
     assert any(e.label.startswith("案件の詳しい背景") for e in at.expander)
     at = button(at, "tour_next").click().run()
     later = "".join(h.proto.body for h in at.get("html"))
-    assert "現場と経理の要望を取りまとめる" not in later and "ステップ 2/8" in later and '<li class="on"><b>1</b>背景と準備</li>' in later and "経費申請アプリの刷新｜第1回会議の前" in later and "アプリの支援" in later
+    assert "現場と経理の要望を取りまとめる" not in later and "ステップ 2/8 · 背景と準備" in later and "経費申請アプリの刷新｜第1回会議の前" in later and "アプリの支援" in later
     assert any(e.label == "案件の背景を確認" for e in at.expander)
 
 
@@ -493,7 +494,7 @@ def test_profile_shows_brief_guidance_and_details_below(blank):
     """背景の画面：見出しの下に短い1行、詳しい説明と作業の段階は入力欄より下に折りたたむ。"""
     at = project_app(blank, "profile")
     html = "".join(h.proto.body for h in at.get("html"))
-    assert 'class="dr-brief"' in html and "デモ体験中" not in html
+    assert 'class="dr-brief"' not in html and "デモ体験中" not in html  # 編集中は上部に別工程の案内を出さない
     labels = [e.label for e in at.expander]
     assert "次にすることの詳しい説明" in labels and any(x.startswith("作業の段階を選び直す") for x in labels)
 
@@ -547,7 +548,7 @@ def test_shortcut_goes_to_decision_with_issue_line():
     at = button(button(app(), "tour_d1").click().run(), "tour_shortcut").click().run()
     assert at.session_state["tour_index"] == 4 and not at.exception
     h = html_of(at)
-    assert "この案件の論点" in h and "ステップ 5/8" in h and '<li class="on"><b>2</b>比較と判断</li>' in h
+    assert "この案件の論点" in h and "ステップ 5/8 · 比較と判断" in h
     assert button(at, "tour_next").label == "次へ：追加要望の影響を見る"
 
 
@@ -555,10 +556,13 @@ def test_decision_shows_choice_reason_basis_then_table():
     at = button(button(app(), "tour_d1").click().run(), "tour_shortcut").click().run()
     h = html_of(at)
     h = h[h.index('class="dr-vd"'):]  # 判断の部品の中で順番を確かめる
-    order = ["1. 採用した案", "再申請を採用", "2. 採用理由", "元の記録が残り監査で説明できること", "3. この判断の根拠", "本人確認済みの記録",
-             "判断に使っていない発言（話者未確認）", "4. 3案の比較"]
+    # 採用案と理由1文 → 根拠の短い要約 → 3案の比較。引用の全文と話者未確認の発言は、その後の開閉式の詳細
+    order = ["再申請を採用", "元の記録が残り監査で説明できること", "関係者による判断", "根拠：本人の確認メール", "3案の比較", "判断に使っていない発言（話者未確認）"]
     assert [h.index(x) for x in order] == sorted(h.index(x) for x in order)
-    assert "関係者による判断" in h and "発言（話者確認済み）" in h and "（採用）" in h
+    assert "発言（話者確認済み）" in h and 'class="dr-t-win"' in h
+    labels = [b.label for b in at.button]
+    assert labels.index("次へ：追加要望の影響を見る") < labels.index("この判断に使った確認メールを見る") and labels.count("次へ：追加要望の影響を見る") == 1
+    assert any(e.label.startswith("判断の根拠と経緯を見る") for e in at.expander)
     assert button(at, "tour_evidence").label == "この判断に使った確認メールを見る" and button(at, "tour_detail").label == "決定・合意の一覧を見る"
 
 
@@ -586,8 +590,12 @@ def test_after_spec_summary_comes_before_table():
         at = button(at, "tour_next").click().run()
     h = html_of(at)
     h = h[h.index('class="dr-cs"'):]
-    order = ["変更前（v1）", "変更後（v2）", "引き続き守る制約", "承認済みの申請は直接変更しない", "下書きの作成まで", "追加要望", "過去の判断との衝突", "採用した対応", "<table"]
+    order = ["変更前（v1）", "変更後（v2）", "下書きの作成まで", "引き続き守る制約", "承認済みの申請は直接変更しない", "採用理由", "追加要望", "過去の判断との衝突", "採用した対応", "<table"]
     assert [h.index(x) for x in order] == sorted(h.index(x) for x in order)
+    assert [b.label for b in at.button if b.label.startswith("次へ：")] == ["次へ：要件定義書を見る"]
+    assert any(e.label.startswith("判断の詳細を見る") for e in at.expander)
+    at = button(at, "tour_next").click().run()
+    assert at.session_state["tour_index"] == 7 and any(b.label == "要件定義書の内容を見る" for b in at.button)
 
 
 def test_finale_separates_end_and_open_items_and_puts_next_first():

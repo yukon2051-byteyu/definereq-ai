@@ -156,9 +156,11 @@ def render(p: dict) -> None:
         demo_bar(p)
     elif not p.get("is_demo") and key not in ("setup", "profile", "sources") and not (key == "overview" and gd.phase(p) == "empty"):
         # 自分の案件の作業画面は、同じ位置に「戻る」（案件の準備へ）と「次に進む」（状況案内の主ボタン）を置く。
-        # 背景と資料の画面は入力を先に見せるため、戻る操作と案内を各画面の見出し付近に置く
+        # 背景と資料の画面は入力を先に見せるため、戻る操作を各画面の見出し付近に置く。
+        # 記録の整理の画面は、未整理の件数と実行ボタンを先頭に出すため、長い状況案内を画面の下にまとめる
         back_to_setup(key)
-        situation.project_panel(p, key)  # 案件の準備の画面は、それ自体が進み先を示す
+        if key != "records":
+            situation.project_panel(p, key)  # 案件の準備の画面は、それ自体が進み先を示す
     stage_control(p)
     if key == "demo_map":
         trace.demo_map(p)
