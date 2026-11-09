@@ -120,7 +120,8 @@ def _sections() -> None:
             domains = st.multiselect("対象分野（複合は複数選択）", list(DOMAINS), format_func=DOMAINS.get, default=["app"], key="new_dom")
             if not valid:
                 st.caption("作成するには、上の「AIパスワード」を入力し、Enterキーで確定してください。")
-            if st.button("案件を作成", disabled=not (valid and switch_ok), key="create_project"):
+            # 押せるときはオレンジ、押せないときは色を抜いた点線の枠（パスワードが確定すると色が変わる）
+            if st.button("案件を作成", type="primary", disabled=not (valid and switch_ok), key="create_project"):
                 created = guard(pj.new_project, name, domains)
                 if created:
                     st.session_state["ai_code"] = code.strip()  # AI実行の画面で使う（入力欄はここだけ）
@@ -170,6 +171,6 @@ def _resume(code: str, enabled: bool) -> None:
         st.caption(f"以前の形式（版{loaded['migrated_from']}）のファイルです。現在の形式に変換して読み込みます。")
     for note in jsonio.missing_files(loaded):
         st.caption(note)
-    if st.button("この案件を再開する", disabled=not enabled, key="resume_project"):
+    if st.button("この案件を再開する", type="primary", disabled=not enabled, key="resume_project"):
         st.session_state["ai_code"] = code.strip()
         state.open_project(loaded, loaded=True)

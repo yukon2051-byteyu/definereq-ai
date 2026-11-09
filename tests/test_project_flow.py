@@ -1230,8 +1230,11 @@ def test_primary_follows_the_state(p):
 
 
 def test_home_primary_is_only_demo_start():
+    """トップで押せるオレンジはデモ開始のボタン。「案件を作成」はパスワードが確定するまで押せない（点線の枠）。"""
     at = AppTest.from_file(APP, default_timeout=60).run()
-    assert sorted(primaries(at)) == sorted(["経費申請のデモを見る", "売上集計・クラウド移行のデモを見る", "ネットワーク更新のデモを見る"])
+    enabled = [b.label for b in at.main.button if b.proto.type == "primary" and not b.disabled]
+    assert sorted(enabled) == sorted(["経費申請のデモを見る", "売上集計・クラウド移行のデモを見る", "ネットワーク更新のデモを見る"])
+    assert next(b for b in at.main.button if b.key == "create_project").proto.type == "primary" and next(b for b in at.main.button if b.key == "create_project").disabled
     assert 'class="dr-btn dr-btn-p" href="#dr-demo">案内付きでデモを見る' in html(at)
 
 
