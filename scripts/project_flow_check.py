@@ -94,25 +94,31 @@ with sync_playwright() as pw:
     wait(g)
 
     # 1. 背景・目的・関係者
-    g.get_by_role("button", name="背景・困りごとを入力する").click()
+    g.get_by_role("button", name="背景・目的・関係者を入力").click()
     wait(g)
-    g.get_by_label("現在、何に困っていますか").fill("メールで申し込み、Excelで定員と出欠を管理している")
-    g.get_by_role("button", name="案件内に反映").first.click()
+    g.get_by_label("課題").fill("メールで申し込み、Excelで定員と出欠を管理している")
+    g.get_by_label("課題").press("Tab")
+    wait(g, 800)
+    g.get_by_role("button", name="保存", exact=True).click()
     wait(g, 2300)
     check("案件に反映しました" in body(g), "1 保存成功を画面に表示")
-    nav(g, "案件ホーム", "背景・目的・関係者")
     t = body(g)
-    check("不明な項目は空欄のまま進めます" in t and "入力が終わったら" in t and "これから会議をする" in t and "すでに議事録・資料がある" in t, "1 保存単位の説明と、進み先の選択肢")
+    check("不明な項目は空欄のまま進めます" in t and "案件の準備に戻る" in t, "1 保存単位の説明と、戻る操作")
     g.get_by_label("氏名・役割").first.fill("架空の研修責任者")
+    g.get_by_label("氏名・役割").first.press("Tab")
+    wait(g, 800)
     g.get_by_role("button", name="関係者を追加").click()
     wait(g, 2500)
     shot(g, "01_profile")
 
     # 2. フォームの末尾から進む（未反映の入力も保存される）
     g.get_by_label("目的", exact=True).fill("申込から受講履歴までを一つのアプリで管理する")
-    g.get_by_role("button", name="反映して議事録を取り込む").click()
+    g.get_by_label("目的", exact=True).press("Tab")
+    wait(g, 800)
+    g.get_by_role("button", name="保存して資料・議事録を取り込む").click()
     wait(g, 2800)
-    check("会議の記録を整理" in body(g) and "1. 議事録・録画を取り込む" in body(g), "2 フォーム末尾から記録の整理へ進める")
+    check("資料・議事録" in g.locator(".dr-title").first.inner_text(), "2 保存して資料・議事録へ進める")
+    nav(g, "記録を取り込む")
 
     # 3. 説明を閉じても次の操作が残る
     g.get_by_role("button", name="詳しい説明を閉じる").click()

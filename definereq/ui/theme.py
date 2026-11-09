@@ -190,6 +190,12 @@ __PALETTE_CSS__
 .dr-doc-b{font-size:14px;line-height:1.6;color:#2F3036;margin-top:4px}
 .st-key-doc_spec{background:#FBF3E8;border-left:4px solid #D9330F}
 .dr-cand{padding:2px 0}
+.dr-setup-h{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:17px;color:var(--ink)}
+.dr-setup-h b{font-weight:900}
+.dr-setup-t{font-size:14.5px;line-height:1.65;color:#2F3036;margin-top:4px}
+.dr-anchor{scroll-margin-top:70px;height:0}
+/* トップで選んだ入口（新規作成か再開か）の欄を強調する。URLの#で判定するため、パスワード確定後も続く */
+.st-key-home_new [data-testid="stColumn"]:has(#dr-new-create:target),.st-key-home_new [data-testid="stColumn"]:has(#dr-resume:target){outline:2px solid #D9330F;outline-offset:6px;border-radius:4px;background:#FFF8F3}
 .dr-ai-note{border-left:3px solid #2A5DB0;background:#F7F9FC;padding:6px 12px;margin:4px 0}
 .dr-ai-t{font-size:14.5px;font-weight:700;line-height:1.6;color:var(--ink)}
 button:focus-visible,a:focus-visible{outline:2px solid #2A5DB0;outline-offset:2px}

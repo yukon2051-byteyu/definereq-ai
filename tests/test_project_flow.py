@@ -621,10 +621,10 @@ def test_deciding_stage_with_requirements_points_to_them(p):
     assert gd.assess(p, "overview")["main"].id == "stage_refine"
 
 
-def test_profile_page_end_has_next_steps(p):
+def test_profile_page_has_back_and_go(p):
     at = open_app(p, "profile")
-    at = key(at, "pf_next_rec").click().run()
-    assert at.session_state["page"] == "records"
+    labels = [b.label for b in at.button]
+    assert "保存" in labels and "保存して資料・議事録を取り込む" in labels and "案件の準備に戻る" in labels
 
 
 # ---- JSON ----
@@ -660,18 +660,120 @@ def key(at, k):
     return next(b for b in at.button if b.key == k)
 
 
-def test_new_project_shows_start_screen_without_zero_stats(p):
-    at = open_app(p)
+def test_new_project_shows_setup_without_zero_stats(p):
+    at = open_app(p, "setup")
     text = html(at)
-    assert "の準備を始めましょう" in text and 'class="dr-stat"' not in text and "基準版なし" not in text
-    assert not at.exception
-    at = key(at, "start_input").click().run()
-    assert any(t.label == "現在、何に困っていますか" for t in at.text_area)
+    assert "案件の準備" in text and "どちらからでも始められます" in text and 'class="dr-stat"' not in text and "基準版なし" not in text
+    assert key(at, "setup_profile").label == "背景・目的・関係者を入力" and key(at, "setup_sources").label == "資料・議事録を取り込む"
+    assert "未入力" in text and "未取り込み" in text and not at.exception
+
+
+def test_empty_overview_shows_setup(p):
+    assert "どちらからでも始められます" in html(open_app(p, "overview"))
+
+
+def test_setup_keeps_both_items_after_progress(p):
+    p["profile"]["problem"].update(value="申込をメールで受けている")
+    registry.ingest_paste(p, "議事録", "本文", kind="議事録")
+    registry.ingest_paste(p, "資料", "本文2", kind="要望")
+    at = open_app(p, "setup")
+    text = html(at)
+    assert "入力済み" in text and "取り込み済み 2件" in text
+    assert key(at, "setup_profile").label == "背景・目的・関係者を編集" and key(at, "setup_sources").label == "資料・議事録を取り込む"
 
 
 def test_start_from_records(p):
-    at = key(open_app(p), "start_records").click().run()
-    assert at.session_state["page"] == "records"
+    at = key(open_app(p, "setup"), "setup_sources").click().run()
+    assert at.session_state["page"] == "sources"
+    at = key(at, "go_profile_top").click().run()
+    assert at.session_state["page"] == "profile"
+    at = key(at, "go_setup_top").click().run()
+    assert at.session_state["page"] == "setup"
+
+
+def bg_key(p, name):
+    return f"draft_{p['id']}_{name}"
+
+
+def test_draft_survives_navigation_and_shows_unsaved(p):
+    at = open_app(p, "profile")
+    next(t for t in at.text_area if t.key == bg_key(p, "v_background")).set_value("Excelで集計している").run()
+    at = key(at, "go_setup_bottom").click().run()
+    assert at.session_state["page"] == "setup" and "未保存の変更あり" in html(at)
+    at.session_state["page"] = "requirements"  # 左メニューでほかの画面へ移る
+    at.run()
+    at.session_state["page"] = "profile"
+    at.run()
+    assert next(t for t in at.text_area if t.key == bg_key(p, "v_background")).value == "Excelで集計している"
+    assert at.session_state["project"]["profile"]["background"]["value"] is None  # 保存までは案件を変えない
+
+
+def test_save_and_save_go(p):
+    at = open_app(p, "profile")
+    next(t for t in at.text_area if t.key == bg_key(p, "v_background")).set_value("背景の文").run()
+    at = key(at, "pf_save").click().run()
+    q = at.session_state["project"]
+    assert q["profile"]["background"]["value"] == "背景の文" and at.session_state["page"] == "profile"
+    assert any("案件に反映しました" in s.value for s in at.success)
+    next(t for t in at.text_area if t.key == bg_key(p, "v_purpose")).set_value("目的の文").run()
+    at = key(at, "pf_save_go").click().run()
+    assert at.session_state["page"] == "sources" and at.session_state["project"]["profile"]["purpose"]["value"] == "目的の文"
+    at.session_state["page"] = "setup"
+    at.run()
+    assert "入力済み" in html(at) and "未保存の変更あり" not in html(at)
+
+
+def test_drafts_are_kept_per_project():
+    from definereq.ui import drafts
+
+    a, b = pj.new_project("案件A", ["app"]), pj.new_project("案件B", ["app"])
+    at = open_app(a, "profile")
+    next(t for t in at.text_area if t.key == bg_key(a, "v_background")).set_value("Aの下書き").run()
+    at.session_state["project"] = b
+    at.run()
+    assert next(t for t in at.text_area if t.key == bg_key(b, "v_background")).value == ""
+    assert "Aの下書き" not in str(at.session_state["drafts"].get(b["id"], {}))
+
+
+def test_stakeholder_draft_survives_navigation(p):
+    at = open_app(p, "profile")
+    next(t for t in at.text_input if t.key == bg_key(p, "stk_name")).set_value("架空の責任者").run()
+    at.session_state["page"] = "setup"
+    at.run()
+    assert "未保存の変更あり" in html(at)
+    at.session_state["page"] = "profile"
+    at.run()
+    assert next(t for t in at.text_input if t.key == bg_key(p, "stk_name")).value == "架空の責任者"
+    at = key(at, "pf_add_stk").click().run()
+    assert at.session_state["project"]["stakeholders"][0]["name"] == "架空の責任者"
+    assert next(t for t in at.text_input if t.key == bg_key(p, "stk_name")).value == ""
+
+
+def test_imported_records_survive_round_trip_and_status(p):
+    registry.ingest_paste(p, "議事録", "講師が出欠を登録する。", kind="議事録")
+    p["profile"]["purpose"].update(value="目的")
+    q = jsonio.loads(jsonio.dumps(p))
+    at = open_app(q, "setup")
+    assert "取り込み済み 1件" in html(at) and "入力済み" in html(at)
+    assert q["sources"][0]["units"][0]["text"].startswith("講師が出欠")
+
+
+def test_new_project_opens_setup_and_loaded_opens_overview():
+    import inspect
+
+    from definereq.ui import state
+
+    src = inspect.getsource(state.open_project)
+    assert '"overview" if loaded else "setup"' in src
+
+
+def test_home_has_separate_entrances():
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    text = html(at)
+    assert 'href="#dr-new-create"' in text and 'href="#dr-resume"' in text and 'id="dr-new"' in text
+    assert 'id="dr-new-create"' in text and 'id="dr-resume"' in text
+    caps = [c.value for c in at.caption]
+    assert any("作成するには" in c for c in caps) and any("再開するには" in c for c in caps)
 
 
 def test_carryover_hidden_on_first_use(p):

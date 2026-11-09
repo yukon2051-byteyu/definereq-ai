@@ -55,7 +55,7 @@ with sync_playwright() as pw:
     g.get_by_role("button", name="会議の準備", exact=True).first.click()
     wait(g)
     g.get_by_label("現時点の理解").fill(INITIAL)
-    g.get_by_role("button", name="案件内に反映").first.click()
+    g.get_by_role("button", name="保存", exact=True).first.click()
     wait(g, 2500)
     g.get_by_role("tab", name="質問").click()
     wait(g, 800)

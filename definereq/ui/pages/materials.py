@@ -26,6 +26,11 @@ from ..components import chips, edit_block, head, meeting_select, ok_rerun, play
 
 
 def sources(p: dict) -> None:
+    from . import prepare
+    from .. import drafts
+
+    pstate = drafts.profile_state(p)
+    prepare.nav_row(("背景・目的・関係者を入力" if pstate == "未入力" else "背景・目的・関係者を編集", "profile", "go_profile_top"), ("案件の準備に戻る", "setup", "go_setup_src"))
     head("資料・議事録", "議事録はWord・Excel・PDF・テキストのファイル、または文章の貼り付けで取り込めます。録画は不要です。利用の許可がある資料だけを登録してください。構成資料に認証情報が含まれていないことを確認してください。", "資料")
     with edit_block("src"), st.expander("議事録・資料を追加する", expanded=not p["sources"] or st.session_state.get("src_kind") == "議事録"):
         st.caption("議事録を取り込むときは、資料の種類を「議事録」にしてください。AIで整理する対象になります。")

@@ -29,6 +29,16 @@ def render() -> None:
     with st.container(key="home"):
         _sections()
     _scroll_to(st.session_state.pop("scroll_to", None))
+    _keep_place()
+
+
+def _keep_place() -> None:
+    """パスワードを確定した直後、選んでいた入口（新規作成か再開か）へ戻す。"""
+    valid = gate.check_code(st.session_state.get("home_code", ""))
+    if valid and not st.session_state.get("home_was_valid"):
+        st.iframe("<script>const h=window.parent.location.hash;const t=()=>{if(h==='#dr-new-create'||h==='#dr-resume'){window.parent.document.getElementById(h.slice(1))?.scrollIntoView({block:'start'})}};"
+                  "t();setTimeout(t,300);setTimeout(t,900)</script>", height=1)
+    st.session_state["home_was_valid"] = valid
 
 
 def _scroll_to(section: str | None) -> None:
@@ -45,7 +55,7 @@ def _sections() -> None:
 <div class="dr-jp">AI要件定義・変更経緯管理システム</div>
 <p class="dr-sub">{esc(LEAD)}</p>
 <div class="dr-label">業務アプリ ／ インフラ ／ ネットワーク ／ 複合 に対応</div>
-<div class="dr-cta"><a class="dr-btn dr-btn-p" href="#dr-demo">案内付きでデモを見る</a><a class="dr-btn dr-btn-s" href="#dr-new">新しい案件を始める</a><a class="dr-btn dr-btn-s" href="#dr-new">保存した案件から再開</a></div>
+<div class="dr-cta"><a class="dr-btn dr-btn-p" href="#dr-demo">案内付きでデモを見る</a><a class="dr-btn dr-btn-s" href="#dr-new-create">新しい案件を始める</a><a class="dr-btn dr-btn-s" href="#dr-resume">保存した案件から再開</a></div>
 <div class="dr-note">デモは登録不要・無料／AI結果は準備済みのサンプルです</div>
 </div></div>""")
 
@@ -78,16 +88,22 @@ def _sections() -> None:
         st.caption("案件の作成と再開にはAIパスワードが必要です。入力後にEnterキーを押してください。入力した案件はアプリ利用中のみ保持されるため、続きを行うときはJSONで保存してください。")
         left, right = st.columns(2)
         with left:
+            st.html('<div id="dr-new-create" class="dr-anchor"></div>')
             st.markdown("**新しい案件を始める**")
             name = st.text_input("案件名", placeholder="例：勤怠システムの更新", key="new_name")
             domains = st.multiselect("対象分野（複合は複数選択）", list(DOMAINS), format_func=DOMAINS.get, default=["app"], key="new_dom")
+            if not valid:
+                st.caption("作成するには、上の「AIパスワード」を入力し、Enterキーで確定してください。")
             if st.button("案件を作成", type="primary", disabled=not (valid and switch_ok), key="create_project"):
                 created = guard(pj.new_project, name, domains)
                 if created:
                     st.session_state["ai_code"] = code.strip()  # AI実行の画面で使う（入力欄はここだけ）
                     state.open_project(created)
         with right:
+            st.html('<div id="dr-resume" class="dr-anchor"></div>')
             st.markdown("**保存した案件から再開する**")
+            if not valid:
+                st.caption("再開するには、上の「AIパスワード」を入力し、Enterキーで確定してください。ファイルの選択は先にできます。")
             st.caption("前回保存した案件JSONを読み込むと、要件・未決事項・判断・変更履歴を引き継いで、次の会議の準備や整理を続けられます。")
             _resume(code, valid and switch_ok)
 

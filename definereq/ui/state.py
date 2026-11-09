@@ -17,7 +17,7 @@ def current() -> dict | None:
 
 def _clear_widgets() -> None:
     keep = {"project", "page", "demo_copies", "tour_index", "tour_on", "media_paths", "ai_code", "flash", "last_view", "save_fp", "save_time", "show_home", "work_project",
-            "demo_done", "artifact_files", "guidance_hidden", "scroll_nonce", "resumed", "scroll_to", "guide_ai_busy"}
+            "demo_done", "artifact_files", "guidance_hidden", "scroll_nonce", "drafts", "home_was_valid", "resumed", "scroll_to", "guide_ai_busy"}
     for k in list(st.session_state.keys()):
         if k not in keep:
             del st.session_state[k]
@@ -36,7 +36,7 @@ def mark_saved(p: dict) -> None:
 def open_project(p: dict, loaded: bool = False) -> None:
     _clear_widgets()
     st.session_state["project"] = p
-    st.session_state["page"] = "overview"
+    st.session_state["page"] = "overview" if loaded else "setup"  # 新しい案件は案件の準備から始める
     st.session_state["tour_on"] = False
     st.session_state["show_home"] = False
     st.session_state["save_time"] = None

@@ -67,7 +67,7 @@ def add_request(p, text="承認の現状を確認したい"):
 # ---- プログラムの判定 ----
 def test_empty_project_gets_start_advice(blank):
     r = gd.assess(blank, "overview")
-    assert r["main"].id == "start" and r["main"].page == "profile" and "未入力" in r["main"].reason
+    assert r["main"].id == "start" and r["main"].page == "setup" and "未入力" in r["main"].reason
     assert not r["stage_question"]
 
 

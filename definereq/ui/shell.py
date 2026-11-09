@@ -14,7 +14,7 @@ from .pages import decide, materials, organize, prepare, trace
 
 # 上位は作業単位の5つ。機能は削除せず、選んだ作業の下に並べる
 GROUPS = [
-    ("案件ホーム", [("overview", "現在の状況", prepare.overview), ("profile", "背景・目的・関係者", prepare.profile)]),
+    ("案件ホーム", [("setup", "案件の準備", prepare.setup), ("overview", "現在の状況", prepare.overview), ("profile", "背景・目的・関係者", prepare.profile)]),
     ("会議の準備", [("prep", "質問・議題", prepare.prep), ("meetings", "会議", prepare.meetings)]),
     ("記録を取り込む", [("records", "会議の記録を整理", materials.records), ("sources", "資料・議事録", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
     ("要件を整理・判断", [("candidates", "AI候補の確認", organize.candidates), ("requirements", "要件", organize.requirements), ("refine", "具体化・受入条件", organize.refine), ("decisions", "決定・合意", decide.decisions),
@@ -28,7 +28,7 @@ PAGES = {key: (label, fn) for _, items in GROUPS for key, label, fn in items}
 ADVANCED = {"refine", "nfr", "scope", "scenarios", "issues", "conflicts", "risks", "baseline", "usage"}
 
 # 各画面の次の行動（移動先）
-NEXT = {"records": ("候補を確認して要件を整理します", "requirements"), "overview": ("残件のもとになる要件を確認します", "requirements"), "profile": ("会議の質問を準備します", "prep"), "meetings": ("次の会議の質問を準備します", "prep"), "prep": ("会議の資料を登録します", "sources"),
+NEXT = {"setup": ("背景・目的・関係者を入力します", "profile"), "records": ("候補を確認して要件を整理します", "requirements"), "overview": ("残件のもとになる要件を確認します", "requirements"), "profile": ("会議の質問を準備します", "prep"), "meetings": ("次の会議の質問を準備します", "prep"), "prep": ("会議の資料を登録します", "sources"),
         "sources": ("録画と発言を確認します", "recordings"), "recordings": ("資料と発言から候補を整理します", "candidates"), "candidates": ("採用した内容を要件で確認します", "requirements"),
         "requirements": ("曖昧な要件を具体化します", "refine"), "refine": ("非機能を確認します", "nfr"), "nfr": ("今回の範囲を決めます", "scope"),
         "scope": ("通常と例外の流れを確認します", "scenarios"), "scenarios": ("意見の違いを整理します", "issues"), "issues": ("判断を記録します", "decisions"),
@@ -148,8 +148,8 @@ def render(p: dict) -> None:
     context_bar(p, label)
     if p.get("demo"):
         demo_bar(p)
-    elif not p.get("is_demo") and not (key == "overview" and gd.phase(p) == "empty"):
-        situation.project_panel(p, key)  # 初回は開始画面が案内を兼ねる
+    elif not p.get("is_demo") and key != "setup" and not (key == "overview" and gd.phase(p) == "empty"):
+        situation.project_panel(p, key)  # 案件の準備の画面は、それ自体が進み先を示す
     stage_control(p)
     if key == "demo_map":
         trace.demo_map(p)

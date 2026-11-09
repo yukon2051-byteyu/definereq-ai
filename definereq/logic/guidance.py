@@ -89,7 +89,8 @@ def _start(p: dict) -> list[Advice]:
         return []
     return [Advice("start", "案件を作成した直後", "案件名と対象分野だけが登録されています。",
                    "背景・目的・要望の概要を入力するか、手元の資料を登録してください。",
-                   "案件情報が未入力で、資料も登録されていないため。", "profile", "案件情報を入力する", 10, {"overview", "profile", "sources"})]
+                   "案件情報が未入力で、資料も登録されていないため。", "setup", "案件の準備を開く", 10, {"setup", "overview", "profile", "sources"},
+                   short="背景の入力と資料の取り込みは、どちらからでも始められます。")]
 
 
 def unanalyzed_minutes(p: dict) -> list[str]:

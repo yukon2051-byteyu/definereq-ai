@@ -248,7 +248,7 @@ def test_hero_has_short_lead_and_anchor_links():
     source = (ROOT / "definereq" / "ui" / "home.py").read_text(encoding="utf-8")
     assert len(home.LEAD) < 80
     assert 'href="#dr-demo"' in source and 'id="dr-demo"' in source
-    assert 'href="#dr-new"' in source and 'id="dr-new"' in source
+    assert 'href="#dr-new-create"' in source and 'href="#dr-resume"' in source and 'id="dr-new"' in source
 
 
 def _luminance(color):
