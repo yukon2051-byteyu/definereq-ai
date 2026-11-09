@@ -624,7 +624,109 @@ def test_deciding_stage_with_requirements_points_to_them(p):
 def test_profile_page_has_back_and_go(p):
     at = open_app(p, "profile")
     labels = [b.label for b in at.button]
-    assert "保存" in labels and "保存して資料・議事録を取り込む" in labels and "案件の準備に戻る" in labels
+    assert "案件情報を保存" in labels and "保存して資料・議事録を取り込む" in labels and "← 案件の準備に戻る" in labels and "資料・議事録へ" in labels
+    assert "案件の準備を開く" not in labels and labels.count("← 案件の準備に戻る") == 1  # 準備へ戻る操作は見出し付近の1か所だけ
+    assert any("この欄の入力を案件に反映します" in c.value for c in at.caption)
+
+
+def test_profile_shows_heading_and_inputs_before_guidance(p):
+    """見出し→短い案内→入力欄の順。詳しい案内・作業の段階・AIの補足は入力欄より下に置く。"""
+    at = open_app(p, "profile")
+    text = html(at)
+    assert "dr-brief" in text and 'class="dr-sit dr-sit-work"' not in text  # 大きな案内の枠は出さない
+    order = [e for e in at.main if getattr(e, "type", "") in ("text_area", "expander")]
+    first_input = next(i for i, e in enumerate(order) if e.type == "text_area")
+    labels = [getattr(e, "label", "") for e in order]
+    stage = next(i for i, x in enumerate(labels) if str(x).startswith("作業の段階を選び直す"))
+    assert first_input < stage
+    assert any(str(x).startswith("対象分野と特徴を変更する") for x in labels)  # 分野の変更は補助の操作として折りたたむ
+
+
+def test_sources_shows_import_first(p):
+    at = open_app(p, "sources")
+    assert "dr-brief" in html(at) and 'class="dr-sit dr-sit-work"' not in html(at)
+    labels = [b.label for b in at.button]
+    assert labels.count("← 案件の準備に戻る") == 1 and "背景・目的・関係者を入力" in labels
+    assert next(r for r in at.radio if r.key == "src_mode").value == "議事録を取り込む"
+    assert "登録する種類<b>議事録</b>" in html(at)
+
+
+def paste(at, text, title="議事録"):
+    next(t for t in at.text_input if t.key.startswith("paste_t_")).set_value(title)
+    next(t for t in at.text_area if t.key.startswith("paste_b_")).set_value(text)
+    return key(at, "paste_go").click().run()
+
+
+def test_minutes_mode_registers_minutes_for_ai(p):
+    at = paste(open_app(p, "sources"), "講師が出欠を登録する。", "初回の議事録")
+    q = at.session_state["project"]
+    assert q["sources"][0]["kind"] == "議事録" and gd.unanalyzed_minutes(q) == ["初回の議事録"]
+    assert any("種類：議事録" in s.value for s in at.success)
+    assert next(t for t in at.text_area if t.key.startswith("paste_b_")).value == ""  # 二重登録を防ぐため空にする
+
+
+def test_other_mode_registers_chosen_kind_and_keeps_text(p):
+    at = open_app(p, "sources")
+    next(t for t in at.text_area if t.key.startswith("paste_b_")).set_value("申込の手順")
+    at = next(r for r in at.radio if r.key == "src_mode").set_value("その他の資料を取り込む").run()
+    assert next(t for t in at.text_area if t.key.startswith("paste_b_")).value == "申込の手順"  # 種類を切り替えても入力は残る
+    at = next(s for s in at.selectbox if s.key == "src_kind").set_value("手順").run()
+    assert "登録する種類<b>手順</b>" in html(at) and "議事録" not in next(s for s in at.selectbox if s.key == "src_kind").options
+    at = next(r for r in at.radio if r.key == "src_mode").set_value("議事録を取り込む").run()
+    at = next(r for r in at.radio if r.key == "src_mode").set_value("その他の資料を取り込む").run()
+    at = next(s for s in at.selectbox if s.key == "src_kind").set_value("手順").run()
+    at = key(at, "paste_go").click().run()
+    q = at.session_state["project"]
+    assert q["sources"][0]["kind"] == "手順" and gd.unanalyzed_minutes(q) == []
+
+
+def test_empty_paste_shows_reason(p):
+    at = key(open_app(p, "sources"), "paste_go").click().run()
+    assert not at.session_state["project"]["sources"] and any("貼り付ける文章を入力" in e.value for e in at.error)
+
+
+def test_profile_save_message_is_near_and_does_not_add_people(p):
+    at = open_app(p, "profile")
+    next(t for t in at.text_area if t.key == bg_key(p, "v_background")).set_value("背景").run()
+    next(t for t in at.text_input if t.key == bg_key(p, "stk_name")).set_value("未追加の人").run()
+    at = key(at, "pf_save").click().run()
+    q = at.session_state["project"]
+    assert q["profile"]["background"]["value"] == "背景" and q["stakeholders"] == []
+    msgs = [s.value for s in at.success]
+    assert any(m.startswith("案件情報を保存しました") for m in msgs) and not any("関係者" in m for m in msgs)
+    assert next(t for t in at.text_input if t.key == bg_key(p, "stk_name")).value == "未追加の人"
+
+
+def test_stakeholder_and_term_need_their_own_add(p):
+    at = open_app(p, "profile")
+    at = key(at, "pf_add_stk").click().run()
+    assert any("氏名・役割" in e.value for e in at.error)
+    next(t for t in at.text_input if t.key == bg_key(p, "term_term")).set_value("受講枠").run()
+    at = key(at, "pf_add_term").click().run()
+    assert at.session_state["project"]["glossary"][0]["term"] == "受講枠" and any("用語「受講枠」を追加しました" in s.value for s in at.success)
+    caps = [c.value for c in at.caption]
+    assert any("「関係者を追加」を押すと、入力した1件" in c for c in caps) and any("「用語を追加」を押すと、入力した1件" in c for c in caps)
+
+
+def test_save_failure_keeps_input_and_returns_reason(p):
+    from definereq.ui.pages import prepare
+
+    class Broken(dict):
+        def update(self, *a, **k):
+            raise RuntimeError("壊れた")
+
+    p["profile"] = Broken(p["profile"])
+    new = {k: {"value": "x", "certainty": "未確認"} for k in pj.PROFILE_FIELDS}
+    assert prepare._save_profile(p, new)  # 理由を返し、例外で画面を止めない
+
+
+def test_setup_resume_note_once_and_quiet(p):
+    at = open_app(p, "setup")
+    text = html(at)
+    assert text.count("元のWord・PDFファイルは含まれません") == 1 and "再開用ファイルは、ブラウザーを閉じた後に案件を復元する" in text
+    side = [c.value for c in at.sidebar.caption]
+    assert not any("元のWord" in c for c in side)
+    assert [b.key for b in at.get("download_button")].count("save_setup") == 1
 
 
 # ---- JSON ----
@@ -698,7 +800,7 @@ def bg_key(p, name):
 def test_draft_survives_navigation_and_shows_unsaved(p):
     at = open_app(p, "profile")
     next(t for t in at.text_area if t.key == bg_key(p, "v_background")).set_value("Excelで集計している").run()
-    at = key(at, "go_setup_bottom").click().run()
+    at = key(at, "go_setup_top").click().run()
     assert at.session_state["page"] == "setup" and "未保存の変更あり" in html(at)
     at.session_state["page"] = "requirements"  # 左メニューでほかの画面へ移る
     at.run()
@@ -714,10 +816,11 @@ def test_save_and_save_go(p):
     at = key(at, "pf_save").click().run()
     q = at.session_state["project"]
     assert q["profile"]["background"]["value"] == "背景の文" and at.session_state["page"] == "profile"
-    assert any("案件に反映しました" in s.value for s in at.success)
+    assert any(s.value.startswith("案件情報を保存しました") for s in at.success)
     next(t for t in at.text_area if t.key == bg_key(p, "v_purpose")).set_value("目的の文").run()
     at = key(at, "pf_save_go").click().run()
     assert at.session_state["page"] == "sources" and at.session_state["project"]["profile"]["purpose"]["value"] == "目的の文"
+    assert any("案件情報を保存しました" in s.value for s in at.success)  # 移動先で保存したことが分かる
     at.session_state["page"] = "setup"
     at.run()
     assert "入力済み" in html(at) and "未保存の変更あり" not in html(at)

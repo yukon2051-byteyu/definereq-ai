@@ -469,7 +469,7 @@ def project_app(p, page="overview", **state):
 
 
 def test_project_panel_can_close_and_reopen_and_has_no_demo_words(blank):
-    at = project_app(blank, "profile")
+    at = project_app(blank, "prep")  # 背景・資料の画面は見出しの下に短い1行だけを出すため、ほかの作業画面で確認する
     html = "".join(h.proto.body for h in at.get("html"))
     assert "案件を作成した直後" in html and "デモ体験中" not in html and "この操作をおすすめする理由" in html
     assert button(at, "guide_hide").label == "詳しい説明を閉じる"
@@ -478,6 +478,15 @@ def test_project_panel_can_close_and_reopen_and_has_no_demo_words(blank):
     assert "この操作をおすすめする理由" not in folded and "案件を作成した直後" in folded and not at.exception
     at = button(at, "guide_show").click().run()
     assert "この操作をおすすめする理由" in "".join(h.proto.body for h in at.get("html"))
+
+
+def test_profile_shows_brief_guidance_and_details_below(blank):
+    """背景の画面：見出しの下に短い1行、詳しい説明と作業の段階は入力欄より下に折りたたむ。"""
+    at = project_app(blank, "profile")
+    html = "".join(h.proto.body for h in at.get("html"))
+    assert 'class="dr-brief"' in html and "デモ体験中" not in html
+    labels = [e.label for e in at.expander]
+    assert "次にすることの詳しい説明" in labels and any(x.startswith("作業の段階を選び直す") for x in labels)
 
 
 def test_next_action_stays_after_closing_detail_on_other_pages(blank):

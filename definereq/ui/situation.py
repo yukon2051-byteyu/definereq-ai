@@ -162,6 +162,44 @@ def _stage_question(p: dict) -> None:
         st.rerun()
 
 
+def brief(p: dict, page: str) -> dict:
+    """入力が中心の画面では、見出しの下に短い1行だけを出す。詳しい説明は details() で画面の下にまとめる。"""
+    result = gd.assess(p, page, st.session_state.get("resumed", False))
+    main = result["main"]
+    text = _short(main) if main else "確認した範囲では、対応が必要な項目は検出されていません。"
+    st.html(f'<div class="dr-brief"><b>次にすること</b>{esc(text)}</div>')
+    return result
+
+
+def details(p: dict, page: str, result: dict, skip: set[str]) -> None:
+    """案内の詳しい説明・作業の段階・AIの補足。初期状態はすべて折りたたむ。
+
+    skip：この画面の上部の移動ボタンと同じ移動先。同じ操作を重複して出さない。
+    """
+    main = result["main"]
+    st.divider()
+    st.caption("案内と補助の操作")
+    with st.expander("次にすることの詳しい説明"):
+        if main:
+            for label, text in (("現在の状況", main.situation), ("今、確認するとよいこと", main.todo), ("この操作をおすすめする理由", main.reason)):
+                st.markdown(f"**{label}**")
+                st.write(text)
+            if main.items:
+                st.caption("該当する項目：" + "／".join(main.items))
+            if not _here(main, page) and main.page not in skip:
+                _go(main, page, "guide_go")
+        else:
+            st.write("確認した範囲では、対応が必要な項目は検出されていません。登録されていない論点は検出できません。")
+        others = [a for a in result["extra"] + result["rest"] if a.page not in skip]
+        for n, a in enumerate(others):
+            st.markdown(f"**ほかに確認すること：{a.title}**")
+            st.write(a.situation)
+            _go(a, page, f"guide_go_{n}")
+    _stage_question(p)
+    if main:
+        _ai_block(p, main)
+
+
 def project_panel(p: dict, page: str) -> None:
     """現在の状況と次にすること。主な内容は1件。説明を閉じても、状況の短い文と次の操作は残す。
 

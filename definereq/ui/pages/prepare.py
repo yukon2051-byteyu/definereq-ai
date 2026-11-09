@@ -14,7 +14,7 @@ from ...schema import CERTAINTY, DOMAINS, QUESTION_STATES
 from .. import state
 from ..ai_panel import ai_panel, ai_runs_list
 from ..candidates import board
-from .. import drafts
+from .. import drafts, situation
 from ..components import chip, definition, edit_block, esc, guard, head, ok_rerun, save_controls, select_item, touch
 
 
@@ -45,12 +45,37 @@ def setup(p: dict) -> None:
             if st.button(label, key=key, width="stretch"):
                 state.goto(page)
     st.caption("2つの項目がそろう前でも、左のメニューから会議の準備や要件の整理に進めます。")
-    if not p.get("is_demo"):
-        with st.container(border=True):
-            st.markdown("**続きを別の日に行う場合**")
-            st.caption("画面の「保存」は、このブラウザーで開いている案件に反映する操作です。ブラウザーを閉じた後も続けるには、再開用ファイルをダウンロードして保管してください。"
-                       "ファイルには、背景・関係者・取り込んだ資料の本文・議事録・判断などが含まれます。元のファイル（WordやPDFそのもの）は含まれません。")
-            save_controls(p, "save_setup")
+    if not p.get("is_demo"):  # 続きの作業に備える補助の操作。2枚のカードより控えめに置く
+        with st.container(key="setup_resume"):
+            st.html('<div class="dr-resume-t"><b>続きの作業に備える</b>' + esc(RESUME_NOTE) + "</div>")
+            save_controls(p, "save_setup", note=False)
+
+
+# 再開用ファイルの説明。jsonio.dumps は案件データ（取り込んだ資料の本文を含む）を書き出し、元のファイルと保存前の下書きは含まない
+RESUME_NOTE = ("別の日に続ける場合は、再開用ファイルをダウンロードしてください。元のWord・PDFファイルは含まれません。"
+               "各画面の「保存」は、いま開いている案件への反映です。再開用ファイルは、ブラウザーを閉じた後に案件を復元するためのものです（保存していない下書きは含まれません）。")
+
+
+def top_nav(back_key: str, cross: tuple[str, str, str]) -> None:
+    """本文の最上部の移動。左メニューを閉じていても、準備の画面と、背景・資料の間を移動できる。"""
+    with st.container(key="dr_topnav", horizontal=True, horizontal_alignment="distribute"):
+        if st.button("← 案件の準備に戻る", key=back_key, type="tertiary"):
+            state.goto("setup")
+        label, page, key = cross
+        if st.button(label, key=key, type="secondary"):
+            state.goto(page)
+
+
+def note_slot(name: str) -> None:
+    """操作の結果を、その操作の近くに表示する。表示は次の再描画で消える。"""
+    msg = st.session_state.pop(f"msg_{name}", None)
+    if msg:
+        (st.error if msg[0] == "error" else st.success)(msg[1])
+
+
+def done(name: str, text: str, kind: str = "ok") -> None:
+    st.session_state[f"msg_{name}"] = (kind, text)
+    st.rerun()
 
 
 def _todo_list(p: dict) -> None:
@@ -121,30 +146,28 @@ def _backlog(p: dict, bl: dict, phase: str) -> None:
 
 
 def profile(p: dict) -> None:
-    nav_row(("案件の準備に戻る", "setup", "go_setup_top"), ("資料・議事録へ", "sources", "go_sources_top"))
-    head("背景・目的・関係者", "確認済み・本人申告・仮説・未確認を区別して記録します。要件定義書の背景と目的はここを参照します。担当者や期限をAIが設定することはありません。", "案件ホーム")
-    _reflect_panel(p)
-    st.subheader("対象分野")
-    if p.get("is_demo"):
-        st.write("、".join(DOMAINS[d] for d in p["domains"]))
-    with edit_block("dom"):
-        domains = st.multiselect("分野（複合は複数選択）", list(DOMAINS), default=p["domains"], format_func=DOMAINS.get, key="pf_domains")
-        traits_all = config.checkpoints()["traits"]
-        suggested = checks.suggest_traits(p)
-        traits = st.multiselect("業務・システムの特徴（深掘りする観点）", list(traits_all), default=p.get("traits", []), format_func=lambda k: traits_all[k]["label"], key="pf_traits")
-        missing = [traits_all[k]["label"] for k in suggested if k not in p.get("traits", [])]
-        if missing:
-            st.caption("本文から提案された特徴（採否は人が決めます）：" + "、".join(missing))
-        if st.button("分野と特徴を案件内に反映") and domains:
-            p["domains"], p["traits"] = domains, traits
-            touch(p)
-            ok_rerun("保存しました")
-
-    st.subheader("案件の情報")
-    st.caption("分かる範囲だけで構いません。不明な項目は空欄のまま進めます。入力途中の内容は、ほかの画面へ移っても残ります。下の「保存」で案件に反映します。")
-    if p.get("is_demo"):
+    demo = p.get("is_demo")
+    if not demo:
+        top_nav("go_setup_top", ("資料・議事録へ", "sources", "go_sources_top"))
+    head("背景・目的・関係者", "案件の背景・目的・課題を記録します。分からない項目は空欄のまま進められます。" if not demo else
+         "確認済み・本人申告・仮説・未確認を区別して記録します。要件定義書の背景と目的はここを参照します。", "案件ホーム")
+    guide = None if demo else situation.brief(p, "profile")
+    if demo:
         definition([(label, p["profile"][key]["value"]) for key, label in PROFILE_FIELDS.items()])
-    with edit_block("profile"):
+    _profile_form(p)
+    _reflect_panel(p)
+    _stakeholders(p)
+    _glossary(p)
+    _domains(p)
+    if guide:
+        situation.details(p, "profile", guide, skip={"setup", "sources", "profile"})
+
+
+def _profile_form(p: dict) -> None:
+    """背景・目的などの欄。入力途中の内容は下書きとして残り、ボタンを押したときだけ案件に反映する。"""
+    with edit_block("profile"), st.container(border=True, key="pf_form"):
+        st.markdown("**案件情報**")
+        st.caption("入力途中の内容は、ほかの画面へ移っても残ります。「確かさ」は、確認済み・本人申告・仮説・未確認から選びます。")
         new = {}
         for key, label in PROFILE_FIELDS.items():
             cur = p["profile"][key]
@@ -152,51 +175,113 @@ def profile(p: dict) -> None:
             value = drafts.widget(p["id"], f"v_{key}", c1.text_area, label, cur["value"] or "", height=68)
             cert = drafts.widget(p["id"], f"c_{key}", c2.selectbox, "確かさ", cur["certainty"], options=CERTAINTY)
             new[key] = {"value": (value or "").strip() or None, "certainty": cert}
-        if drafts.profile_pending(p):
-            st.warning("保存していない変更があります。「保存」を押すと案件に反映します。")
-        b1, b2, b3 = st.columns(3)
-        save_now = b1.button("保存", type="primary", key="pf_save", width="stretch")
+        # ボタンより上には、入力中に表示が変わる部品を置かない。
+        # 入力欄の確定（フォーカスが外れたとき）で上の表示が増えると、押している最中にボタンが下へずれ、クリックが成立しないため
+        st.caption("背景・目的・課題など、この欄の入力を案件に反映します。関係者と用語は、それぞれの「追加」で反映します。")
+        b1, b2 = st.columns(2)
+        save_now = b1.button("案件情報を保存", type="primary", key="pf_save", width="stretch")
         save_go = b2.button("保存して資料・議事録を取り込む", key="pf_save_go", width="stretch")
-        back = b3.button("案件の準備に戻る", key="go_setup_bottom", width="stretch")
         if save_now or save_go:
-            for key, value in new.items():  # 出所の記録は残す
-                value["origin"] = p["profile"][key].get("origin")
-            p["profile"].update(new)
-            drafts.clear(p["id"], [f"{x}_{key}" for key in PROFILE_FIELDS for x in ("v", "c")])
-            touch(p)
-            if save_go:  # 保存が終わってから移動する
-                st.session_state["page"] = "sources"
-            ok_rerun("案件に反映しました")
-        if back:  # 入力途中の内容は下書きに残る
-            state.goto("setup")
+            error = _save_profile(p, new)
+            if error:  # 入力内容は下書きに残したまま、理由をボタンの近くに出す
+                st.error(f"案件情報を保存できませんでした。{error} 入力内容はそのまま残っています。")
+            elif save_go:  # 保存を確認してから移動する
+                st.session_state["flash"] = "案件情報を保存しました"
+                state.goto("sources")
+            else:
+                done("pf", f"案件情報を保存しました（{pj.now_iso()[11:16]}）。")
+        note_slot("pf")
+        if drafts.profile_fields_pending(p):
+            st.caption("保存していない変更があります。")
 
+
+def _save_profile(p: dict, new: dict) -> str | None:
+    """案件情報を反映し、反映できたことを確かめる。問題があれば理由を返す。"""
+    try:
+        for key, value in new.items():  # 出所の記録は残す
+            value["origin"] = p["profile"][key].get("origin")
+        p["profile"].update(new)
+        if any(p["profile"][k]["value"] != v["value"] for k, v in new.items()):
+            return "反映後の内容を確認できませんでした。"
+    except Exception:  # 想定外の失敗でも、入力を失わないようにする
+        return "時間をおいて、もう一度押してください。"
+    drafts.clear(p["id"], [f"{x}_{key}" for key in PROFILE_FIELDS for x in ("v", "c")])
+    touch(p)
+    return None
+
+
+def _stakeholders(p: dict) -> None:
     st.subheader("関係者")
     df = pd.DataFrame([{"ID": s["id"], "氏名・役割": s["name"], "所属": s["org"], "立場": s["position"], "判断・確認できる範囲": s["authority"],
                         "確かさ": s["certainty"], "備考": s.get("note")} for s in p["stakeholders"]],
                       columns=["ID", "氏名・役割", "所属", "立場", "判断・確認できる範囲", "確かさ", "備考"])
-    st.dataframe(df, hide_index=True, width="stretch")
+    if p["stakeholders"]:
+        st.dataframe(df, hide_index=True, width="stretch")
+    elif not p.get("is_demo"):
+        st.caption("登録された関係者はまだいません。")
     with edit_block("stk"):
         cols = st.columns(4)
         fields = {n: drafts.widget(p["id"], f"stk_{n}", col.text_input, label, "") for col, (n, label) in zip(cols, (("name", "氏名・役割"), ("org", "所属"), ("pos", "立場"), ("auth", "判断・確認できる範囲")))}
         cert = drafts.widget(p["id"], "stk_cert", st.selectbox, "確かさ（関係者）", "未確認", options=CERTAINTY)
-        if st.button("関係者を追加", key="pf_add_stk") and fields["name"].strip():
-            pj.add(p, "stakeholders", {"name": fields["name"].strip(), "org": fields["org"] or None, "position": fields["pos"] or None, "authority": fields["auth"] or None, "certainty": cert, "note": None})
-            drafts.clear(p["id"], ["stk_name", "stk_org", "stk_pos", "stk_auth", "stk_cert"])
-            touch(p)
-            ok_rerun("関係者を追加しました")
+        st.caption("「関係者を追加」を押すと、入力した1件が案件に反映されます。")
+        if st.button("関係者を追加", key="pf_add_stk"):
+            name = (fields["name"] or "").strip()
+            if not name:
+                st.error("「氏名・役割」を入力してください。")
+            else:
+                pj.add(p, "stakeholders", {"name": name, "org": fields["org"] or None, "position": fields["pos"] or None, "authority": fields["auth"] or None, "certainty": cert, "note": None})
+                drafts.clear(p["id"], ["stk_name", "stk_org", "stk_pos", "stk_auth", "stk_cert"])
+                touch(p)
+                done("stk", f"関係者「{name}」を追加しました。")
+        note_slot("stk")
 
+
+def _glossary(p: dict) -> None:
     st.subheader("用語集")
-    st.dataframe(pd.DataFrame([{"用語": g["term"], "意味": g["meaning"]} for g in p["glossary"]], columns=["用語", "意味"]), hide_index=True, width="stretch")
+    if p["glossary"]:
+        st.dataframe(pd.DataFrame([{"用語": g["term"], "意味": g["meaning"]} for g in p["glossary"]], columns=["用語", "意味"]), hide_index=True, width="stretch")
+    elif not p.get("is_demo"):
+        st.caption("登録された用語はまだありません。")
     with edit_block("term"):
         c1, c2 = st.columns([1, 3])
         term = drafts.widget(p["id"], "term_term", c1.text_input, "用語", "")
         meaning = drafts.widget(p["id"], "term_meaning", c2.text_input, "意味", "")
-        if st.button("用語を追加", key="pf_add_term") and term.strip():
-            pj.add(p, "glossary", {"term": term.strip(), "meaning": meaning})
-            drafts.clear(p["id"], ["term_term", "term_meaning"])
-            touch(p)
-            ok_rerun("用語を追加しました")
-    st.caption("「保存」は背景・目的の欄を案件に反映します。関係者と用語は「追加」で1件ずつ反映します。")
+        st.caption("「用語を追加」を押すと、入力した1件が案件に反映されます。")
+        if st.button("用語を追加", key="pf_add_term"):
+            word = (term or "").strip()
+            if not word:
+                st.error("「用語」を入力してください。")
+            else:
+                pj.add(p, "glossary", {"term": word, "meaning": meaning})
+                drafts.clear(p["id"], ["term_term", "term_meaning"])
+                touch(p)
+                done("term", f"用語「{word}」を追加しました。")
+        note_slot("term")
+
+
+def _domains(p: dict) -> None:
+    """案件作成時に選んだ対象分野と、深掘りする観点。補助的な設定のため、初期状態は折りたたむ。"""
+    names = "、".join(DOMAINS[d] for d in p["domains"])
+    if p.get("is_demo"):
+        st.subheader("対象分野")
+        st.write(names)
+        return
+    with edit_block("dom"), st.expander(f"対象分野と特徴を変更する（現在の分野：{names}）"):
+        domains = st.multiselect("分野（複合は複数選択）", list(DOMAINS), default=p["domains"], format_func=DOMAINS.get, key="pf_domains")
+        traits_all = config.checkpoints()["traits"]
+        suggested = checks.suggest_traits(p)
+        traits = st.multiselect("業務・システムの特徴（深掘りする観点）", list(traits_all), default=p.get("traits", []), format_func=lambda k: traits_all[k]["label"], key="pf_traits")
+        missing = [traits_all[k]["label"] for k in suggested if k not in p.get("traits", [])]
+        if missing:
+            st.caption("本文から提案された特徴（採否は人が決めます）：" + "、".join(missing))
+        if st.button("分野と特徴を案件内に反映", key="pf_dom_save"):
+            if not domains:
+                st.error("分野を1つ以上選んでください。")
+            else:
+                p["domains"], p["traits"] = domains, traits
+                touch(p)
+                done("dom", "分野と特徴を反映しました。")
+        note_slot("dom")
 
 
 def prep(p: dict) -> None:

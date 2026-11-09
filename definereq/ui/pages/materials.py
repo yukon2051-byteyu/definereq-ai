@@ -22,44 +22,89 @@ from ...usage.ledger import BudgetExceeded, LedgerUnavailable, Limits
 from ...logic.guidance import unanalyzed_minutes
 from ..ai_panel import ai_panel, current_code
 from ..candidates import board
-from ..components import chips, edit_block, head, meeting_select, ok_rerun, play_at, select_item, touch
+from ..components import chips, edit_block, esc, head, meeting_select, ok_rerun, play_at, select_item, touch
+
+
+MODES = {"議事録を取り込む": "議事録", "その他の資料を取り込む": None}
+OTHER_KINDS = [k for k in SOURCE_KINDS if k != "議事録"]
 
 
 def sources(p: dict) -> None:
     from . import prepare
-    from .. import drafts
+    from .. import drafts, situation
 
-    pstate = drafts.profile_state(p)
-    prepare.nav_row(("背景・目的・関係者を入力" if pstate == "未入力" else "背景・目的・関係者を編集", "profile", "go_profile_top"), ("案件の準備に戻る", "setup", "go_setup_src"))
-    head("資料・議事録", "議事録はWord・Excel・PDF・テキストのファイル、または文章の貼り付けで取り込めます。録画は不要です。利用の許可がある資料だけを登録してください。構成資料に認証情報が含まれていないことを確認してください。", "資料")
-    with edit_block("src"), st.expander("議事録・資料を追加する", expanded=not p["sources"] or st.session_state.get("src_kind") == "議事録"):
-        st.caption("議事録を取り込むときは、資料の種類を「議事録」にしてください。AIで整理する対象になります。")
-        c1, c2 = st.columns(2)
-        kind = c1.selectbox("資料の種類", SOURCE_KINDS, key="src_kind")
-        vis = c2.selectbox("公開範囲", VISIBILITY, key="src_vis")
-        date = st.text_input("資料の日付（不明なら空欄）", key="src_date")
-        meeting = meeting_select(p, "src_mtg")
-        files = st.file_uploader("ファイル（PDF / Word / Excel / PowerPoint / テキスト / SRT / VTT）", accept_multiple_files=True,
-                                 type=["pdf", "docx", "xlsx", "pptx", "txt", "srt", "vtt"], key="src_up")
-        if st.button("読み込む", type="primary", disabled=not files):
-            done = 0
-            for f in files:
-                try:
-                    registry.ingest_bytes(p, f.name, f.getvalue(), kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
-                    done += 1
-                except IngestError as e:
-                    st.error(f"{safe_filename(f.name)}：{e}")
-            if done:
-                touch(p)
-                ok_rerun(f"{done}件読み込みました")
-        st.divider()
-        title = st.text_input("貼り付ける文章の名称", key="paste_t")
-        text = st.text_area("文章を貼り付ける", key="paste_b")
-        if st.button("貼り付けた文章を案件内に登録") and text.strip():
-            registry.ingest_paste(p, title, text, kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
-            touch(p)
-            ok_rerun("登録しました")
+    demo = p.get("is_demo")
+    if not demo:
+        pstate = drafts.profile_state(p)
+        prepare.top_nav("go_setup_src", ("背景・目的・関係者を入力" if pstate == "未入力" else "背景・目的・関係者を編集", "profile", "go_profile_top"))
+    head("資料・議事録", "議事録や資料を、ファイルまたは文章の貼り付けで取り込みます。録画は不要です。" if not demo else
+         "議事録はWord・Excel・PDF・テキストのファイル、または文章の貼り付けで取り込めます。録画は不要です。", "資料")
+    guide = None if demo else situation.brief(p, "sources")
+    if not demo:
+        _source_import(p)
+    _source_list(p)
+    if guide:
+        situation.details(p, "sources", guide, skip={"setup", "profile", "sources"})
 
+
+def _source_import(p: dict) -> None:
+    """取り込みの入口。先に「議事録」か「その他の資料」かを選び、選んだ種類で登録する。
+
+    ファイルと貼り付けの入力欄は常に同じ名前で置くため、種類や取り込み方法を切り替えても入力は消えない。
+    """
+    with edit_block("src"), st.container(border=True, key="src_box"):
+        mode = st.radio("取り込むもの", list(MODES), horizontal=True, key="src_mode")
+        if MODES[mode]:
+            kind = MODES[mode]
+            st.caption("議事録として登録します。「会議の記録を整理」で、AIで整理する会議の記録として扱われます。")
+        else:
+            kind = st.selectbox("資料の種類", OTHER_KINDS, key="src_kind")
+            st.caption("議事録以外の資料として登録します。AIで候補を作るときに、送信する資料として選べます。")
+        with st.expander("補足項目（公開範囲・資料の日付・関連付ける会議）　未設定でも登録できます"):
+            c1, c2 = st.columns(2)
+            vis = c1.selectbox("公開範囲", VISIBILITY, key="src_vis")
+            date = c2.text_input("資料の日付（不明なら空欄）", key="src_date")
+            meeting = meeting_select(p, "src_mtg")
+        tabs = st.tabs(["ファイルから取り込む", "文章を貼り付けて取り込む"])
+        st.caption("利用の許可がある資料だけを登録してください。構成資料に認証情報が含まれていないことを確認してください。")
+        kind_note = f'<div class="dr-kind">登録する種類<b>{esc(kind)}</b></div>'
+        with tabs[0]:
+            n = st.session_state.get("src_up_round", 0)  # 登録が終わったら選択を空にする（同じファイルの二重登録を防ぐ）
+            files = st.file_uploader("ファイル（PDF / Word / Excel / PowerPoint / テキスト / SRT / VTT）", accept_multiple_files=True,
+                                     type=["pdf", "docx", "xlsx", "pptx", "txt", "srt", "vtt"], key=f"src_up_{n}")
+            st.html(kind_note)
+            if st.button("読み込む", type="primary", disabled=not files, key="src_read"):
+                done = 0
+                for f in files:
+                    try:
+                        registry.ingest_bytes(p, f.name, f.getvalue(), kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
+                        done += 1
+                    except IngestError as e:
+                        st.error(f"{safe_filename(f.name)}：{e}")
+                if done:
+                    st.session_state["src_up_round"] = n + 1
+                    touch(p)
+                    ok_rerun(f"{done}件読み込みました（種類：{kind}）")
+        with tabs[1]:
+            m = st.session_state.get("paste_round", 0)
+            title = st.text_input("貼り付ける文章の名称", key=f"paste_t_{m}")
+            text = st.text_area("文章を貼り付ける", key=f"paste_b_{m}")
+            st.html(kind_note)
+            if st.button("貼り付けた文章を案件内に登録", key="paste_go"):
+                if not (text or "").strip():
+                    st.error("貼り付ける文章を入力してください。")
+                else:
+                    registry.ingest_paste(p, title, text, kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
+                    st.session_state["paste_round"] = m + 1
+                    touch(p)
+                    ok_rerun(f"登録しました（種類：{kind}）")
+
+
+def _source_list(p: dict) -> None:
+    st.subheader("取り込んだ資料")
+    if not p["sources"]:
+        st.caption("取り込んだ資料はまだありません。")
+        return
     rows = [{"ID": s["id"], "名称": s["name"], "版": f"v{s['version']}", "種類": s["kind"], "日付": s.get("occurred_at") or "未設定", "公開範囲": s["visibility"],
              "会議": continuity.label(p, s.get("meeting_id")), "単位数": len(s["units"]), "警告": len(s["warnings"]), "状態": "旧版" if s.get("superseded_by") else "最新"} for s in p["sources"]]
     st.dataframe(pd.DataFrame(rows, columns=["ID", "名称", "版", "種類", "日付", "公開範囲", "会議", "単位数", "警告", "状態"]), hide_index=True, width="stretch")

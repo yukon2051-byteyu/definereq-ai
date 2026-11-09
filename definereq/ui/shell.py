@@ -148,7 +148,8 @@ def render(p: dict) -> None:
     context_bar(p, label)
     if p.get("demo"):
         demo_bar(p)
-    elif not p.get("is_demo") and key != "setup" and not (key == "overview" and gd.phase(p) == "empty"):
+    elif not p.get("is_demo") and key not in ("setup", "profile", "sources") and not (key == "overview" and gd.phase(p) == "empty"):
+        # 背景と資料の画面は入力を先に見せるため、案内は各画面の見出しの下に短く出す
         situation.project_panel(p, key)  # 案件の準備の画面は、それ自体が進み先を示す
     stage_control(p)
     if key == "demo_map":

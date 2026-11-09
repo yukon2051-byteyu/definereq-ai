@@ -194,6 +194,15 @@ __PALETTE_CSS__
 .dr-setup-h b{font-weight:900}
 .dr-setup-t{font-size:14.5px;line-height:1.65;color:#2F3036;margin-top:4px}
 .dr-anchor{scroll-margin-top:70px;height:0}
+/* 背景・資料の画面：見出しの下の短い案内、登録する種類、準備画面の補助の操作 */
+.dr-brief{font-size:13.5px;line-height:1.6;color:#2F3036;border-left:3px solid #2A5DB0;padding:2px 0 2px 10px;margin:2px 0 4px}
+.dr-brief b{color:#1F4A8F;margin-right:10px}
+.dr-kind{font-size:13.5px;color:#45474D}
+.dr-kind b{display:inline-block;margin-left:8px;padding:1px 10px;border-radius:999px;background:#E8EFFA;color:#1F4A8F;font-weight:800}
+.st-key-dr_topnav{gap:8px}
+.st-key-setup_resume{padding:4px 2px 0;border-top:1px solid var(--line)}
+.dr-resume-t{font-size:13px;line-height:1.65;color:var(--muted)}
+.dr-resume-t b{display:block;color:#45474D;font-size:13.5px;margin-bottom:2px}
 /* トップで選んだ入口（新規作成か再開か）の欄を強調する。URLの#で判定するため、パスワード確定後も続く */
 .st-key-home_new [data-testid="stColumn"]:has(#dr-new-create:target),.st-key-home_new [data-testid="stColumn"]:has(#dr-resume:target){outline:2px solid #D9330F;outline-offset:6px;border-radius:4px;background:#FFF8F3}
 .dr-ai-note{border-left:3px solid #2A5DB0;background:#F7F9FC;padding:6px 12px;margin:4px 0}

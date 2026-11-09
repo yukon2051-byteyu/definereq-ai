@@ -113,20 +113,23 @@ def tri_text(label: str, value, key: str, area: bool = False):
     return widget(f"{label}の内容", value="" if value in (None, NA) else str(value), key=f"{key}_t") or None
 
 
-def save_controls(p: dict, key: str) -> None:
-    """案件の保存。ダウンロードの作成日時と、作成後の変更の有無を示す。"""
+def save_controls(p: dict, key: str, note: bool = True) -> None:
+    """再開用ファイルのダウンロード。作成日時と、作成後の変更の有無を短く示す。
+
+    note=False：近くに説明がある場所では、まだ作成していないときの注意を繰り返さない。
+    """
     from ..export import jsonio
     from . import state
 
     st.download_button("再開用ファイルをダウンロード", jsonio.dumps(p), file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json",
-                       key=key, width="stretch", on_click=state.mark_saved, args=(p,))
+                       key=key, width="stretch" if note else "content", on_click=state.mark_saved, args=(p,))
     made = st.session_state.get("save_time")
     if not state.is_dirty(p):
         st.caption(f"{made[11:16]} に最新の内容でファイルを作成しました。" if made else "読み込んだファイルから変更はありません。")
     elif made:
         st.caption(f"{made[11:16]} にファイルを作成した後、案件に変更があります。")
-    else:
-        st.caption("案件はブラウザーを閉じると消えます。続きを行うときは、このファイルを手元に保管してください。")
+    elif note:
+        st.caption("案件はブラウザーを閉じると消えます。閉じる前にダウンロードしてください。")
 
 
 def definition(rows: list[tuple[str, object]]) -> None:

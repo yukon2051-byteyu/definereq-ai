@@ -36,8 +36,8 @@ def clear(project_id: str, names: list[str]) -> None:
         st.session_state.pop(f"draft_{project_id}_{name}", None)
 
 
-def profile_pending(p: dict) -> bool:
-    """背景・目的の下書きに、保存していない変更があるか。"""
+def profile_fields_pending(p: dict) -> bool:
+    """案件情報（背景・目的など）の欄に、保存していない変更があるか。"""
     draft = st.session_state.get("drafts", {}).get(p["id"], {})
     for key in PROFILE_FIELDS:
         cur = p["profile"][key]
@@ -45,7 +45,13 @@ def profile_pending(p: dict) -> bool:
             return True
         if f"c_{key}" in draft and draft[f"c_{key}"] != cur["certainty"]:
             return True
-    return any((draft.get(n) or "").strip() for n in ("stk_name", "term_term"))
+    return False
+
+
+def profile_pending(p: dict) -> bool:
+    """背景・目的、または追加前の関係者・用語に、保存していない入力があるか。"""
+    draft = st.session_state.get("drafts", {}).get(p["id"], {})
+    return profile_fields_pending(p) or any((draft.get(n) or "").strip() for n in ("stk_name", "term_term"))
 
 
 def profile_state(p: dict) -> str:
