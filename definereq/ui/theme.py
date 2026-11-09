@@ -43,7 +43,7 @@ def palette_css() -> str:
 CSS = """
 <style>
 __PALETTE_CSS__
-:root{--ink:#161618;--muted:#5A5C63;--line:#E2E3E7;--panel:#F5F5F7;--g1:var(--c-orange);--g2:var(--c-coral);--g3:var(--c-magenta)}
+:root{--btn-main:#F97832;--btn-main-hover:#F95C0E;--btn-main-active:#E8520A;--btn-main-ink:#171717;--ink:#161618;--muted:#5A5C63;--line:#E2E3E7;--panel:#F5F5F7;--g1:var(--c-orange);--g2:var(--c-coral);--g3:var(--c-magenta)}
 .dr-chips{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px}
 .dr-chip{display:inline-block;padding:2px 9px;border-radius:3px;font-size:12px;font-weight:700;line-height:1.7;white-space:nowrap}
 .dr-head{margin:0 0 14px;padding-left:14px;border-left:6px solid;border-image:linear-gradient(180deg,var(--g1),var(--g2),var(--g3)) 1}
@@ -140,8 +140,8 @@ __PALETTE_CSS__
 .dr-label{font-size:13px;font-weight:700;color:var(--muted);margin-top:8px}
 .dr-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
 .dr-btn{display:inline-block;padding:11px 22px;border-radius:4px;font-size:15px;font-weight:700;text-decoration:none;line-height:1.3}
-.dr-btn-p,.dr-btn-p:visited{background:#F95C0E;color:#171717;border:1px solid #F95C0E}
-.dr-btn-p:hover{background:#FF7433;color:#171717;border-color:#FF7433}
+.dr-btn-p,.dr-btn-p:visited{background:var(--btn-main);color:var(--btn-main-ink);border:1px solid var(--btn-main)}
+.dr-btn-p:hover{background:var(--btn-main-hover);color:var(--btn-main-ink);border-color:var(--btn-main-hover)}
 .dr-btn:focus-visible{outline:3px solid #171717;outline-offset:2px}
 .dr-btn-s,.dr-btn-s:visited{background:#fff;color:var(--ink);border:1px solid #CFCDC6}
 .dr-btn-s:hover{border-color:#D9330F;color:#B8290A}
@@ -342,12 +342,12 @@ button:focus-visible,a:focus-visible{outline:2px solid #2A5DB0;outline-offset:2p
 .st-key-home [data-testid="stColumn"] p,.st-key-home_new p{margin-bottom:0}
 .st-key-home [data-testid="stColumn"] [data-testid="stMarkdownContainer"],.st-key-home [data-testid="stColumn"] [data-testid="stCaptionContainer"],.st-key-home_new [data-testid="stMarkdownContainer"],.st-key-home_new [data-testid="stCaptionContainer"]{margin-bottom:0}
 .st-key-home_new{gap:10px}
-/* 主ボタン：その場で進める操作。ヒーローの斜線と同じオレンジに濃い文字（コントラスト比 約5.4:1）。
+/* 主ボタン：その場で進める操作。やや柔らかいオレンジに濃い文字（コントラスト比 通常 約6.6:1、ホバー 約5.4:1）。色は :root の --btn-main で管理。
    テーマの赤（注意・エラー・選択の表示）は変えず、本文の主ボタンだけに適用する */
-[data-testid="stMain"] button[kind="primary"],[data-testid="stMain"] button[kind="primaryFormSubmit"]{background:#F95C0E;border:1px solid #F95C0E;color:#171717}
+[data-testid="stMain"] button[kind="primary"],[data-testid="stMain"] button[kind="primaryFormSubmit"]{background:var(--btn-main);border:1px solid var(--btn-main);color:var(--btn-main-ink)}
 [data-testid="stMain"] button[kind="primary"] p,[data-testid="stMain"] button[kind="primaryFormSubmit"] p{color:#171717;font-weight:700}
-[data-testid="stMain"] button[kind="primary"]:hover,[data-testid="stMain"] button[kind="primaryFormSubmit"]:hover{background:#FF7433;border-color:#FF7433;color:#171717}
-[data-testid="stMain"] button[kind="primary"]:active,[data-testid="stMain"] button[kind="primaryFormSubmit"]:active{background:#E8520A;border-color:#E8520A}
+[data-testid="stMain"] button[kind="primary"]:hover,[data-testid="stMain"] button[kind="primaryFormSubmit"]:hover{background:var(--btn-main-hover);border-color:var(--btn-main-hover);color:var(--btn-main-ink)}
+[data-testid="stMain"] button[kind="primary"]:active,[data-testid="stMain"] button[kind="primaryFormSubmit"]:active{background:var(--btn-main-active);border-color:var(--btn-main-active)}
 [data-testid="stMain"] button:focus-visible{outline:3px solid #171717 !important;outline-offset:2px;box-shadow:none}
 /* 押せない主ボタン：色を抜き、点線の枠で押せるボタンと区別する */
 [data-testid="stMain"] button[kind="primary"]:disabled,[data-testid="stMain"] button[kind="primaryFormSubmit"]:disabled{background:#F2EEE8;border:1px dashed #C9C1B6;color:#7A756E;cursor:not-allowed}
