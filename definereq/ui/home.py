@@ -33,6 +33,26 @@ def render() -> None:
         _sections()
     _scroll_to(st.session_state.pop("scroll_to", None))
     _keep_place()
+    _sync_autofill()
+
+
+# ブラウザが保存済みのパスワードを自動入力すると、欄には値が見えても、アプリには入力の操作が届かない
+# （「案件を作成」が押せないままになる）。欄に値があり、利用者がその欄を操作していないときだけ、入力と確定を補う。
+# 値を読み書きするのは、利用者のブラウザの中だけ（サーバーには通常の入力と同じ経路で送られる）。
+_AUTOFILL = """<script>
+const d=window.parent.document;let last=null;
+const sync=()=>{const i=d.querySelector('.st-key-home_code input');if(!i||!i.value||i===d.activeElement||i.value===last)return;
+ last=i.value;const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;const v=i.value;
+ set.call(i,'');i.dispatchEvent(new Event('input',{bubbles:true}));set.call(i,v);i.dispatchEvent(new Event('input',{bubbles:true}));
+ i.dispatchEvent(new FocusEvent('focusout',{bubbles:true}));i.dispatchEvent(new FocusEvent('blur'));};
+let n=0;const timer=setInterval(()=>{sync();if(++n>240)clearInterval(timer)},500);
+</script>"""
+
+
+def _sync_autofill() -> None:
+    """自動入力されたAIパスワードを、アプリが受け取れるようにする（確定済みなら何もしない）。"""
+    if not gate.check_code(st.session_state.get("home_code", "")):
+        st.iframe(_AUTOFILL, height=1)
 
 
 def _keep_place() -> None:
