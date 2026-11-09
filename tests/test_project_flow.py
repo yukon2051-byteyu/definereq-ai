@@ -627,7 +627,7 @@ def test_deciding_stage_with_requirements_points_to_them(p):
 def test_profile_page_has_back_and_go(p):
     at = open_app(p, "profile")
     labels = [b.label for b in at.button]
-    assert "案件情報を保存" in labels and "保存して資料・議事録を取り込む" in labels and "← 案件の準備に戻る" in labels and "資料・議事録へ" in labels
+    assert "案件情報を保存" in labels and "保存して資料・議事録へ進む" in labels and "← 案件の準備に戻る" in labels and "資料・議事録へ" in labels
     assert "案件の準備を開く" not in labels and labels.count("← 案件の準備に戻る") == 1  # 準備へ戻る操作は見出し付近の1か所だけ
     assert any("この欄の入力を案件に反映します" in c.value for c in at.caption)
 
@@ -1053,13 +1053,13 @@ def test_empty_setup_uses_cards_as_start(p):
 
 def test_profile_after_save_points_to_next(p):
     at = open_app(p, "profile")
-    assert key(at, "pf_save_go").label == "保存して資料・議事録を取り込む"
+    assert key(at, "pf_save_go").label == "保存して資料・議事録へ進む"
     next(t for t in at.text_area if t.key == bg_key(p, "v_background")).set_value("背景").run()
     at = key(at, "pf_save").click().run()
     assert key(at, "pf_next_go").label == "次へ：資料・議事録を取り込む →"
     registry.ingest_paste(at.session_state["project"], "議事録", "本文", kind="議事録")
     at.run()
-    assert key(at, "pf_save_go").label == "保存して会議の記録を整理する" and key(at, "pf_next_go").label == "次へ：会議の記録を整理する →"
+    assert key(at, "pf_save_go").label == "保存して会議の記録を整理へ進む" and key(at, "pf_next_go").label == "次へ：会議の記録を整理する →"
     at = key(at, "pf_next_go").click().run()
     assert at.session_state["page"] == "records"
 
@@ -1172,15 +1172,14 @@ def test_every_project_page_has_next_or_back_in_body(p):
 def test_every_demo_detail_page_returns_to_step():
     """デモのステップから、サイドバーの全工程・全機能を開いても、本文に元のステップへ戻る操作がある。"""
     at = AppTest.from_file(APP, default_timeout=60).run()
-    at = next(b for b in at.button if b.key == "tour_d1").click().run()
-    at = next(b for b in at.button if b.key == "tour_shortcut").click().run()
+    at = next(b for b in at.button if b.key == "tour_d1_hl").click().run()
     opened = set()
     for n in range(5):
         at = next(b for b in at.sidebar.button if b.key == f"nav_group_{n}").click().run()
         for b in [b for b in at.sidebar.button if b.key.startswith("nav_") and b.key[4:] in PAGES_KEYS()]:
             at = next(x for x in at.sidebar.button if x.key == b.key).click().run()
             assert not at.exception and at.session_state["tour_on"] is False, b.key
-            assert next(x for x in at.button if x.key == "tour_back").label == "← 5. 訂正方法の比較に戻る", b.key
+            assert next(x for x in at.button if x.key == "tour_back").label == "← ステップ5「判断」に戻る", b.key
             opened.add(b.key[4:])
     assert len(opened) >= 15  # 詳細メニュー以外の機能をすべて開いた
     at = next(x for x in at.button if x.key == "tour_back").click().run()
@@ -1196,7 +1195,7 @@ def PAGES_KEYS():
 # ---- 主ボタン（オレンジ）は、その状態で進める操作を1つだけ ----
 def primaries(at):
     """本文の主ボタン（サイドバーの選択表示を除く）。タブで切り替わる登録ボタンは、表示中のタブの1つとして数える。"""
-    labels = [b.label for b in at.button if b.proto.type == "primary" and not (b.key or "").startswith("nav_")]
+    labels = [b.label for b in at.main.button if b.proto.type == "primary"]  # サイドバーの選択表示は数えない
     labels += [b.label for b in at.get("download_button") if b.proto.type == "primary"]
     if {"読み込む", "貼り付けた文章を案件内に登録"} <= set(labels):
         labels.remove("貼り付けた文章を案件内に登録")
@@ -1244,3 +1243,40 @@ def test_demo_steps_have_one_primary():
         found = primaries(at)
         assert len(found) == 1, (n, found)
     assert found == ["要件定義書の内容を見る"]  # 終了画面は成果物の確認を主操作にする
+
+
+def test_project_requirements_states_and_links(p):
+    at = open_app(p, "requirements")
+    assert "要件はまだ登録されていません" in "".join(i.value for i in at.info) and f"{p['name']}の要件一覧" in html(at)
+    reviewed(p)
+    assert key(open_app(p, "requirements"), "guide_go").label == "AI候補を確認する →"
+    for c in p["candidates"]:
+        if c["state"] == "候補":
+            c["state"] = "却下"
+    at = open_app(p, "overview")
+    if key(at, "guide_go").label == "確認待ちの要件を見る →":
+        at = key(at, "guide_go").click().run()
+        assert at.session_state["page"] == "requirements" and "合意待ちの要件" in html(at)
+    at = open_app(p, "profile")
+    assert key(at, "pf_save_go").label.startswith("保存して") and key(at, "pf_save_go").label.endswith("へ進む")
+
+
+def test_project_action_links_to_related_requirement(p):
+    reviewed(p)
+    r = p["requirements"][0]
+    pj.add(p, "actions", {"content": "照合の手順を現場に確認する", "owner": None, "due": None, "related": [r["id"]], "state": "未着手"})
+    at = open_app(p, "overview")
+    link = next(b for b in at.button if b.key and b.key.startswith("todo_req_"))
+    at = link.click().run()
+    assert at.session_state["page"] == "requirements" and at.session_state["rq_sel"] == r["id"] and "照合の手順を現場に確認する" in html(at)
+    at = key(at, "req_back").click().run()
+    assert at.session_state["page"] == "overview"
+
+
+def test_resumed_project_next_matches_state(p):
+    reviewed(p)
+    q = jsonio.loads(jsonio.dumps({**p, "last_page": "overview"}))
+    at = AppTest.from_file(APP, default_timeout=60)
+    at.session_state["project"], at.session_state["page"], at.session_state["resumed"] = q, q.pop("last_page"), True
+    at.run()
+    assert key(at, "guide_go").label == "AI候補を確認する →" and "行き先：要件の確認・判断 › AI候補の確認" in "".join(c.value for c in at.caption)

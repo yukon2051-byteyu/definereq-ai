@@ -122,7 +122,7 @@ with sync_playwright() as pw:
     fill(g, "課題", "メールで申し込み、Excelで定員を管理している")
     click(g, "案件情報を保存")
     check("案件情報を保存しました" in body(g) and title(g) == "背景・目的・関係者", "1 保存すると、その場で反映を表示")
-    click(g, "保存して資料・議事録を取り込む")
+    click(g, "保存して資料・議事録へ進む")
     check(title(g) == "資料・議事録", "1 保存して資料・議事録へ移動")
     g.get_by_role("tab", name="文章を貼り付けて取り込む").click()
     wait(g, 600)

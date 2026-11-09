@@ -97,7 +97,7 @@ def test_demo_card_has_single_entry_and_tour_can_be_closed():
     at = click(at, "経費申請のデモを見る")
     at = by_key(at, "nav_group_3").click().run()  # 案内中にサイドバーから機能を開く
     assert at.session_state["tour_on"] is False and not at.exception and at.session_state["page"] == "candidates"
-    assert by_key(at, "tour_back").label == "← 1. 案件の背景に戻る"
+    assert by_key(at, "tour_back").label == "← ステップ1「案件の背景」に戻る"
     assert at.session_state["project"]["is_demo"]
 
 
@@ -107,9 +107,10 @@ def test_demo_is_read_only_on_every_page():
     for page in PAGES:
         at = run(project=builder.build("d1", 4), page=page)
         assert not at.exception, page
-        allowed = {"nav", "tour", "go", "ex", "next", "share", "play"}
+        from definereq.ui.readonly import VIEW_BUTTON  # 閲覧として許可する操作は、閲覧専用の制御と同じ一覧を使う
+
         for b in at.button:
-            assert b.disabled or (b.key or "").split("_")[0] in allowed, (page, b.label, b.key)
+            assert b.disabled or VIEW_BUTTON.match(b.key or ""), (page, b.label, b.key)
         assert all(t.disabled for t in at.text_area), page
         assert not at.get("file_uploader"), page
         assert all(t.disabled for t in at.text_input if t.key not in ("why_q", "rq_q")), page

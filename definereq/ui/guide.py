@@ -240,7 +240,7 @@ def _finale(p: dict, ctx: guide.Ctx, steps: list[dict], i: int, intro: dict) -> 
     block(right, "残っていること", [todo_line(t) for t in s["todo"]], "登録された内容から検出された残件はありません。", "todo")
 
     c3, c4, _ = st.columns([2, 1, 2])
-    if c3.button(f"前へ：{steps[i - 1]['short']}", key="tour_prev", type="tertiary"):
+    if c3.button(f"前へ：{steps[i - 1]['process']}", key="tour_prev", type="tertiary"):
         jump(steps, i - 1)
     if c4.button("TOPへ戻る", key="tour_home", type="tertiary"):
         state.go_home()
@@ -304,7 +304,7 @@ def render(p: dict) -> None:
             _verdict(block, step, steps, i)
         elif block["type"] == "change_sum":
             _change_sum(block)
-            _next_inline(steps, i, "次へ：要件定義書を見る" if steps[i + 1].get("finale") else None)
+            _next_inline(steps, i)
             with st.expander("判断の詳細を見る（追加要望と過去の判断の衝突、比較表、根拠、仕様の履歴）"):
                 _change_flow(block)
                 for m, rest in enumerate(blocks[n + 1:]):
@@ -333,17 +333,17 @@ def _phases(demo_id: str, steps: list[dict], i: int) -> None:
 
     前へ・次へは本文の要点の下に置く。サイドバーは工程と機能のメニュー（自分の案件と同じ）。
     """
-    _, name = guide.phase_of(demo_id, i)
-    target, label = guide.SHORTCUTS[demo_id]
     with st.container(key="tour_loc", horizontal=True, vertical_alignment="center"):
-        st.html(f'<div class="dr-loc">ステップ {i + 1}/{len(steps)} · {esc(name)}</div>')
+        st.html(f'<div class="dr-loc">ステップ {i + 1}/{len(steps)} · {esc(steps[i]["process"])}</div>')
         with st.popover("ステップ一覧"):
             for n, step in enumerate(steps):
                 _, phase = guide.phase_of(demo_id, n)
-                if st.button(f"{n + 1}. {step['process']}（{phase}）", key=f"tour_go_{n}", type="secondary" if n == i else "tertiary", disabled=n == i):
+                if st.button(f"{n + 1}. {step['process']}", key=f"tour_go_{n}", type="secondary" if n == i else "tertiary", disabled=n == i):
                     jump(steps, n)
-        if i not in (0, target) and not steps[i].get("finale") and st.button(label, key="tour_shortcut_any", type="tertiary"):
-            jump(steps, target)
+        if st.session_state.get("tour_via_shortcut") == i and st.button("案件の背景から見る", key="tour_from_start", type="tertiary"):
+            jump(steps, 0)
+    if st.session_state.get("tour_via_shortcut") == i:  # 一覧の近道で途中から開いたときだけ、その場面までの前提を1文で示す
+        st.html(f'<p class="dr-premise">{esc(guide.PREMISES[demo_id])}</p>')
 
 
 def step_page(p: dict) -> str:
@@ -354,7 +354,7 @@ def step_page(p: dict) -> str:
 
 def _next_inline(steps: list[dict], i: int, label: str | None = None) -> None:
     """本文の要点のすぐ下に置く「次へ」。詳細を開いたり最後まで読んだりしなくても押せる。"""
-    if st.button(label or f"次へ：{steps[i + 1]['short']}を見る", key="tour_next", type="primary"):
+    if st.button(label or next_label(steps, i), key="tour_next", type="primary"):
         jump(steps, i + 1)
 
 
@@ -416,12 +416,10 @@ def _focus(demo_id: str, i: int) -> str:
 
 def _start(steps: list[dict], i: int, demo_id: str) -> None:
     """最初の画面の進み方。順に見る人と、見どころから入りたい人の両方に対応する。"""
-    target, label = guide.SHORTCUTS[demo_id]
+    # 冒頭は順番に進む操作を1つ。見どころへの近道はトップのデモ一覧に置く
     with st.container(key="tour_start", horizontal=True):
-        if st.button(f"次へ：{steps[i + 1]['short']}を見る", key="tour_next", type="primary"):
+        if st.button(next_label(steps, i), key="tour_next", type="primary"):
             jump(steps, i + 1)
-        if st.button(label, key="tour_shortcut"):
-            jump(steps, target)
 
 
 def open_detail(page: str, **preset) -> None:
@@ -436,22 +434,29 @@ def back_label(p: dict) -> str:
     """詳細画面から戻るボタンの名前。実際の戻り先の画面を示す。"""
     steps = guide.load(p["demo"]["id"])
     i = min(st.session_state.get("tour_index", 0), len(steps) - 1)
-    return f"← {i + 1}. {steps[i]['short']}に戻る"
+    return f"← ステップ{i + 1}「{steps[i]['process']}」に戻る"
 
 
 def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx, show_next: bool = True) -> None:
     """画面下の移動。「次へ」を本文の途中に置いた画面では、ここに同じボタンを重ねて出さない。"""
     c1, c2, c3 = st.columns([2, 2, 3])
-    if i > 0 and c1.button(f"前へ：{steps[i - 1]['short']}", key="tour_prev", width="stretch"):
+    if i > 0 and c1.button(f"前へ：{steps[i - 1]['process']}", key="tour_prev", width="stretch"):
         jump(steps, i - 1)
     if c2.button(step["detail"](ctx), key="tour_detail", type="tertiary", width="stretch"):
         open_detail(step["page"])
-    if show_next and c3.button(f"次へ：{steps[i + 1]['short']}を見る", key="tour_next", type="primary", width="stretch"):
+    if show_next and c3.button(next_label(steps, i), key="tour_next", type="primary", width="stretch"):
         jump(steps, i + 1)
+
+
+def next_label(steps: list[dict], i: int) -> str:
+    """「次へ」のボタン名。行き先のステップの正式名（サイドバーと本文の現在地と同じ名前）を使う。"""
+    return f"次へ：{steps[i + 1]['process']}"
 
 
 def jump(steps: list[dict], i: int) -> None:
     st.session_state.pop("ev_focus", None)  # 根拠から開いた箇所の強調は、ステップへ戻ったら消す
+    if st.session_state.get("tour_via_shortcut") != i:
+        st.session_state.pop("tour_via_shortcut", None)  # 近道で開いたときだけの案内は、別のステップへ移ったら消す
     st.session_state["tour_index"] = i
     state.set_stage(steps[i]["stage"], steps[i]["page"])
 

@@ -62,6 +62,9 @@ def next_block(p: dict, key: str, lead: str = "次にすること") -> None:
         with st.container(horizontal=True, vertical_alignment="center"):
             if st.button(f"{nx['label']} →", key=f"{key}_go", type="primary"):
                 state.goto(nx["page"])
+            where = st.session_state.get("_page_names", {}).get(nx["page"])
+            if where:
+                st.caption(f"行き先：{where[0]} › {where[1]}")
             for n, (label, page) in enumerate(nx["alts"]):
                 if st.button(f"ほかの作業：{label}", key=f"{key}_alt_{n}", type="tertiary"):
                     state.goto(page)
@@ -89,6 +92,23 @@ def done(name: str, text: str, kind: str = "ok") -> None:
     st.rerun()
 
 
+def _related_links(p: dict, items: list[dict], cat: str) -> None:
+    """残件ごとに、関係する要件を開く操作。関係は登録済みのIDの参照だけで判定する。0件なら出さない（一覧は補助の操作から開く）。"""
+    seen = set()
+    for k, i in enumerate(items):
+        if i["target"] in seen:
+            continue
+        seen.add(i["target"])
+        ids = checks.related_requirements(p, i["target"])
+        if not ids:
+            continue
+        c1, c2 = st.columns([3, 2])
+        c1.caption(f"{i['target']}：{i['content']}")
+        label = "この残件に関係する要件を見る" + (f"（{len(ids)}件）" if len(ids) > 1 else "")
+        if c2.button(label, key=f"bl_req_{cat}_{k}", type="tertiary"):
+            state.open_requirements(ids, i["content"], "overview", cat)
+
+
 def _todo_list(p: dict) -> None:
     """人が担当・期限を付けて管理する宿題。アプリが勧める操作（上の案内）とは別のもの。"""
     st.subheader("確認・依頼すること")
@@ -100,6 +120,13 @@ def _todo_list(p: dict) -> None:
         st.dataframe(pd.DataFrame([{"ID": q["id"], "確認事項": q["text"], "確認相手": display(q.get("ask")), "状態": q["status"]} for q in confirm]), hide_index=True, width="stretch")
     if not acts and not confirm:
         st.caption("登録された依頼や確認事項はありません。")
+    for k, x in enumerate([*acts, *confirm]):  # 確認・依頼の結果が、どの要件の判断に役立つか
+        ids = checks.related_requirements(p, x["id"])
+        if ids:
+            c1, c2 = st.columns([3, 2])
+            c1.caption(f"{x['id']}：{x.get('content') or x.get('text')} → 関係する要件 {'、'.join(ids)}")
+            if c2.button("この残件に関係する要件を見る" + (f"（{len(ids)}件）" if len(ids) > 1 else ""), key=f"todo_req_{k}", type="tertiary"):
+                state.open_requirements(ids, x.get("content") or x.get("text"), "overview", None)
     with edit_block("action"), st.form("add_action", clear_on_submit=True):
         c1, c2, c3 = st.columns([3, 1, 1])
         text = c1.text_input("依頼・確認を追加", placeholder="例：人事担当に現行の勤怠表を依頼する")
@@ -141,10 +168,14 @@ def overview(p: dict) -> None:
 def _backlog(p: dict, bl: dict, phase: str) -> None:
     """残件の一覧。確認した結果として0件の場合は、完了と誤解されないように説明する。"""
     st.subheader("残件")
+    if p["requirements"] and st.button("この案件の要件一覧を見る", key="bl_all_reqs", type="tertiary"):  # 見返すための補助
+        state.goto("requirements")
+    opened = st.session_state.pop("backlog_open", None)  # 要件から戻ったときは、開いていた区分を開く
     for cat, items in bl["categories"].items():
         if not items:
             continue
-        with st.expander(f"{cat}　{len(items)}件"):
+        with st.expander(f"{cat}　{len(items)}件", expanded=cat == opened):
+            _related_links(p, items, cat)
             rows = [{"対象": i["target"], "内容": i["content"], "行動": i["action"], "確認相手": display(i.get("ask")),
                      "期限": display(i.get("due")), "状態": i["state"]} for i in items]
             st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
@@ -208,7 +239,8 @@ def _profile_form(p: dict) -> None:
         just_saved = bool(saved and saved["project"] == p["id"] and not drafts.profile_fields_pending(p))
         b1, b2 = st.columns(2)
         save_now = b1.button("案件情報を保存", type="secondary" if just_saved else "primary", key="pf_save", width="stretch")
-        save_go = b2.button(f"保存して{go_label}", key="pf_save_go", width="stretch")
+        where = st.session_state.get("_page_names", {}).get(go_page, ("", go_label))[1]
+        save_go = b2.button(f"保存して{where}へ進む", key="pf_save_go", width="stretch")  # 処理（保存）と行き先の両方を示す
         if save_now or save_go:
             error = _save_profile(p, new)
             if error:  # 入力内容は下書きに残したまま、理由をボタンの近くに出す

@@ -73,24 +73,42 @@ def demo_copy(demo_id: str, stage: int) -> dict:
     return copies[key]
 
 
-def open_demo(demo_id: str, tour: bool = True, stage: int | None = None) -> None:
+def open_demo(demo_id: str, tour: bool = True, stage: int | None = None, start: int = 0) -> None:
+    """デモを開く。start を指定すると、そのステップ（一覧の見どころへの近道）から開く。"""
     _clear_widgets()
     p = current()
     if p and not p.get("is_demo"):  # デモを見ても作業中の案件を失わない
         st.session_state["work_project"] = p
     st.session_state["show_home"] = False
-    stage = stage or (guide.load(demo_id)[0]["stage"] if tour else 4)
+    steps = guide.load(demo_id)
+    stage = stage or (steps[start]["stage"] if tour else 4)
     st.session_state["project"] = demo_copy(demo_id, stage)
     st.session_state["tour_on"] = tour
-    st.session_state["tour_index"] = 0
-    st.session_state["page"] = "overview"
+    st.session_state["tour_index"] = start
+    st.session_state["page"] = steps[start]["page"] if tour else "overview"
+    st.session_state.pop("ev_focus", None)
+    if start:  # 近道で開いたときだけ、前提と「案件の背景から見る」を出す
+        st.session_state["tour_via_shortcut"] = start
+    else:
+        st.session_state.pop("tour_via_shortcut", None)
     st.rerun()
 
 
-def goto(page: str) -> None:
+def open_requirements(ids: list[str], reason: str, from_page: str, cat: str | None = None) -> None:
+    """残件などから、関係する要件に絞って要件一覧を開く。絞り込みはこの移動のときだけ有効にする。"""
+    goto_keep = {"req_focus": {"ids": ids, "reason": reason, "from": from_page, "cat": cat}}
+    if len(ids) == 1:
+        goto_keep["rq_sel"] = ids[0]  # 1件なら、その要件の詳細を開く
+    goto("requirements", keep=goto_keep)
+
+
+def goto(page: str, keep: dict | None = None) -> None:
     st.session_state.pop("src_done", None)  # 資料の登録直後の案内は、別の画面へ移ったら閉じる
     st.session_state.pop("pf_saved", None)  # 背景の保存直後の案内も同じ
     st.session_state["resumed"] = False  # 再開の通知は、作業を始めたら閉じる
+    st.session_state.pop("req_focus", None)  # 残件から開いたときの絞り込みは、その移動のときだけ
+    for k, v in (keep or {}).items():
+        st.session_state[k] = v
     st.session_state["page"] = page
     st.rerun()
 

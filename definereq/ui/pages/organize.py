@@ -12,7 +12,7 @@ from .. import state
 from ...schema import AGREEMENT_STATES, CANDIDATE_KINDS, DOMAINS, MEASURE_KINDS, MEASURE_ORIGINS, MEASURE_STATUS, PRIORITIES, REQ_KINDS, SCOPE_CHOICES
 from ..ai_panel import ai_panel, ai_runs_list
 from ..candidates import board
-from ..components import main_type, STATUS_TONE, add_evidence_form, chip, chips, edit_block, evidence_block, flow, guard, head, meeting_select, ok_rerun, people, select_item, touch, tri_text
+from ..components import esc, main_type, STATUS_TONE, add_evidence_form, chip, chips, edit_block, evidence_block, flow, guard, head, meeting_select, ok_rerun, people, select_item, touch, tri_text
 
 
 def candidates(p: dict) -> None:
@@ -83,15 +83,55 @@ def _req_label(r: dict) -> str:
     return f"{r['id']} {r['title']}"
 
 
+# 要件一覧の説明（案件の分野に合わせる）
+REQ_LEAD = {"network": "新しいネットワークや運用が満たすべき条件と、合意の状況を確認できます。", "infra": "基盤と運用が満たすべき条件と、合意の状況を確認できます。",
+            "app": "業務アプリが満たすべき機能・条件と、合意の状況を確認できます。"}
+
+
+def _req_lead(p: dict) -> str:
+    if len(p["domains"]) > 1:
+        return "・".join(DOMAINS[d] for d in p["domains"]) + "で満たすべき条件と、合意の状況を確認できます。"
+    return REQ_LEAD.get(p["domains"][0], "この案件で満たすべき条件と、合意の状況を確認できます。")
+
+
+def _req_focus(p: dict) -> list[str] | None:
+    """残件などから開いたとき：どこから開いたか、関係する要件、確認待ちの内容を先に示す。"""
+    f = st.session_state.get("req_focus")
+    if not f:
+        return None
+    ids = [i for i in f["ids"] if pj.get(p, "requirements", i)]
+    names = "／".join(f"{i} {pj.get(p, 'requirements', i)['title']}（{pj.get(p, 'requirements', i)['status']}）" for i in ids)
+    st.html(f'<div class="dr-focus"><div class="dr-v-lab">「{esc(f["reason"])}」に関係する要件 {len(ids)}件</div><div class="dr-key-s">{esc(names)}</div>'
+            f'<div class="dr-meta">{esc(("残件の区分：" + f["cat"] + "。") if f.get("cat") else "")}この確認の結果は、上の要件の判断に使います。</div></div>')
+    with st.container(horizontal=True, key="req_focus_nav"):
+        back = f["from"]
+        if st.button(f"← {PAGE_NAMES.get(back, back)}に戻る", key="req_back"):
+            state.goto(back, keep={"backlog_open": f.get("cat")})
+        if st.button("この案件の要件一覧を見る（絞り込みを解除）", key="req_all", type="tertiary"):
+            state.goto("requirements")
+    return ids
+
+
+PAGE_NAMES = {"overview": "現在の状況", "setup": "案件の準備"}
+
+
 def requirements(p: dict) -> None:
-    head("要件", "段階的に入力できます。未設定と該当なしを区別します。合意済みの要件を変更すると、確認待ちに戻ります。", "整理")
+    from ...demos.builder import STAGES
+    from ..components import esc
+
+    head(f"{p['name']}の要件一覧", _req_lead(p), "整理")
+    if p.get("demo"):
+        st.caption(f"デモの段階：{STAGES[p['demo']['stage']]}の時点。閲覧専用のため、内容・根拠・版の履歴を確認できます（編集はできません）。")
+    focus = _req_focus(p)
+    if not p["requirements"] and not p.get("is_demo"):
+        st.info("要件はまだ登録されていません。議事録をAIで整理し、AI候補を確認して採用すると、ここに並びます。")
     rows = [{"ID": r["id"], "名称": r["title"], "版": r["version"], "分野": DOMAINS.get(r.get("domain"), "未設定"), "種類": display(r.get("kind")), "優先": display(r.get("priority")),
              "対象範囲": share.scope_label(r.get("scope")), "合意状態": r["status"], "受入条件": len(r.get("acceptance") or []), "根拠": len(r.get("evidence") or [])} for r in p["requirements"]]
     if rows:  # 要件がないときは絞り込みを出さない
         c1, c2 = st.columns(2)
         fs = c1.multiselect("合意状態", AGREEMENT_STATES, key="rq_fs")
         fq = c2.text_input("検索", key="rq_q")
-        rows = [r for r in rows if (not fs or r["合意状態"] in fs) and (not fq or fq in r["名称"] or fq in r["ID"])]
+        rows = [r for r in rows if (not fs or r["合意状態"] in fs) and (not fq or fq in r["名称"] or fq in r["ID"]) and (focus is None or r["ID"] in focus)]
         st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
     with edit_block("addreq"), st.expander("要件を追加する"):
         with st.form("add_req", clear_on_submit=True):
@@ -101,7 +141,7 @@ def requirements(p: dict) -> None:
                 r = pj.add(p, "requirements", pj.new_requirement(title=title.strip(), body=body.strip()))
                 touch(p)
                 ok_rerun(f"{r['id']} を追加しました")
-    r = select_item(p["requirements"], _req_label, "rq_sel", "要件はまだありません。")
+    r = select_item([x for x in p["requirements"] if focus is None or x["id"] in focus] or p["requirements"], _req_label, "rq_sel", "要件はまだありません。")
     if not r:
         return
     st.html('<div class="dr-chips">' + chip(f"合意状態：{r['status']}", STATUS_TONE.get(r["status"], "plain")) + chip(f"対象範囲：{share.scope_label(r.get('scope'))}", "plain") + chip(f"版：v{r['version']}", "plain") + "</div>")

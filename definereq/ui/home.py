@@ -6,6 +6,7 @@ import streamlit as st
 
 from .. import project as pj
 from ..demos import builder
+from ..demos import guide as demo_guide
 from ..export import jsonio
 from ..schema import DOMAINS
 from ..usage import gate
@@ -77,8 +78,11 @@ def _sections() -> None:
                     f'<div class="dr-take"><div class="dr-demo-l">このデモで分かること</div><b>{esc(d["takeaway"])}</b></div>'
                     f'<div class="dr-demo-l">案件の背景</div><div class="dr-demo-s">{esc(d["background"])}</div>')
             st.space("stretch")  # 文章の行数が違っても、ボタンと下端の線を揃える
-            if st.button(d["start"], key=f"tour_{d['id']}", type="primary", width="stretch"):
+            if st.button(d["start"], key=f"tour_{d['id']}", type="primary", width="stretch"):  # ステップ1から順番に見る
                 state.open_demo(d["id"], tour=True)
+            # 見どころへの近道（控えめなテキストリンク）。番号と名前はステップの定義から取る
+            if st.button(demo_guide.shortcut_label(d["id"]), key=f"tour_{d['id']}_hl", type="tertiary"):
+                state.open_demo(d["id"], tour=True, start=demo_guide.SHORTCUTS[d["id"]][0])
 
     st.html('<h2 id="dr-new" class="dr-sec">あなたの案件で試す</h2>')
     switch_ok = _current_work()

@@ -16,9 +16,9 @@ URL, OUT = sys.argv[1], Path(sys.argv[2])
 OUT.mkdir(parents=True, exist_ok=True)
 H = 900
 problems: list[str] = []
-DEMOS = [("d1", "経費申請アプリの刷新", "対立する要望から、判断と変更を追う", "経費申請のデモを見る", "見どころへ：3案の比較と採用理由", "3案を比べて、再申請を採用した"),
-         ("d2", "拠点売上集計の自動化とクラウド移行", "曖昧な要望を、測れる要件にする", "売上集計・クラウド移行のデモを見る", "見どころへ：「毎朝すぐ」を測れる条件にする", "「毎朝すぐ」「失いたくない」を測れる条件に分ける"),
-         ("d3", "拠点ネットワーク更新と遠隔保守", "録画の発言から、合意の根拠を確認する", "ネットワーク更新のデモを見る", "見どころへ：録画の発言と提案の扱い", "保守会社の発言は「提案」であり、決定ではない")]
+DEMOS = [("d1", "経費申請アプリの刷新", "対立する要望から、判断と変更を追う", "経費申請のデモを見る", "ステップ5「判断」から見る", "3案を比べて、再申請を採用した"),
+         ("d2", "拠点売上集計の自動化とクラウド移行", "曖昧な要望を、測れる要件にする", "売上集計・クラウド移行のデモを見る", "ステップ3「具体化」から見る", "「毎朝すぐ」「失いたくない」を測れる条件に分ける"),
+         ("d3", "拠点ネットワーク更新と遠隔保守", "録画の発言から、合意の根拠を確認する", "ネットワーク更新のデモを見る", "ステップ3「録画の発言」から見る", "保守会社の発言は「提案」であり、決定ではない")]
 
 
 def check(ok, message):
@@ -76,6 +76,14 @@ def top(g):
     wait(g)
 
 
+def shortcut(g, demo):
+    """一覧の近道（ステップ番号と正式名のリンク）から見どころを開く。"""
+    top(g)
+    main(g).get_by_role("button", name=demo[4], exact=True).click()
+    wait(g, 3500)
+    close_sidebar(g)
+
+
 def start(g, demo):
     top(g)
     click(g, demo[3], 3500)
@@ -102,15 +110,15 @@ with sync_playwright() as pw:
     text = g.inner_text("body")
     boxes = g.locator(".dr-q-box")
     first = boxes.count() == 2 and "現場の要望" in boxes.nth(0).inner_text() and "経理の制約" in boxes.nth(1).inner_text() and in_view(boxes.nth(0)) and         in_view(g.locator(".dr-q-focus")) and "元の記録を残しながら、どう訂正するか？" in g.locator(".dr-q-focus").inner_text()
-    check(first and text.index("現場の要望") < text.index("今回の論点") and in_view(btn(g, "次へ：会議前の確認点を見る")) and in_view(btn(g, "見どころへ：3案の比較と採用理由")),
+    check(first and text.index("現場の要望") < text.index("今回の論点") and in_view(btn(g, "次へ：会議前の準備")) and main(g).get_by_role("button").filter(has_text="見どころへ").count() == 0,
           "2 デモ1の初期表示で、現場の要望・経理の制約・今回の論点と、2つの進み方が見える")
     g.screenshot(path=OUT / "2_d1_first.png")
-    click(g, "次へ：会議前の確認点を見る")
+    click(g, "次へ：会議前の準備")
     check("ステップ 2/8" in g.inner_text("body") and "規程にない" in title(g), "2 順に進む操作で、ステップ2へ")
     click(g, "前へ：案件の背景")
-    click(g, "見どころへ：3案の比較と採用理由")
+    shortcut(g, DEMOS[0])
     t = g.inner_text("body")
-    check("ステップ 5/8" in t and "この案件の論点" in t and g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 比較と判断", "2 見どころへ直接進み、現在地（比較と判断・ステップ5）と論点が出る")
+    check("ステップ 5/8" in t and "この案件の論点" in t and g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 判断", "2 見どころへ直接進み、現在地（比較と判断・ステップ5）と論点が出る")
 
     # 3. 判断の画面
     top_vd = g.locator(".dr-vd").first.inner_text()
@@ -125,17 +133,17 @@ with sync_playwright() as pw:
     # 本文は表（キャンバス描画）のため、選ばれた記録の名前で確かめる。画面写真でも確認する
     g.screenshot(path=OUT / "3_mail.png")
     picked = g.locator("[data-testid=stSelectbox]").filter(has_text="表示する項目").evaluate("e=>e.textContent+' '+[...e.querySelectorAll('input')].map(i=>i.value+' '+(i.getAttribute('aria-label')||'')).join(' ')")
-    check("判断の確認メール" in picked and btn(g, "← 5. 訂正方法の比較に戻る").count() == 1, f"3 確認メールの記録が開き、戻り先が「← 5. 訂正方法の比較に戻る」（{picked.strip()[:40]}）")
-    click(g, "← 5. 訂正方法の比較に戻る", 3000)
+    check("判断の確認メール" in picked and btn(g, "← ステップ5「判断」に戻る").count() == 1, f"3 確認メールの記録が開き、戻り先が「← ステップ5「判断」に戻る」（{picked.strip()[:40]}）")
+    click(g, "← ステップ5「判断」に戻る", 3000)
     check("ステップ 5/8" in g.inner_text("body"), "3 確認メールから、ステップ5へ戻る")
     click(g, "決定・合意の一覧を見る", 3000)
     g.screenshot(path=OUT / "3_decisions.png")
-    check(g.locator(".dr-title").first.inner_text() == "決定・合意" and btn(g, "← 5. 訂正方法の比較に戻る").count() == 1, "3 決定・合意の一覧（案件全体の判断記録）が開き、戻り先を表示")
-    click(g, "← 5. 訂正方法の比較に戻る", 3000)
+    check(g.locator(".dr-title").first.inner_text() == "決定・合意" and btn(g, "← ステップ5「判断」に戻る").count() == 1, "3 決定・合意の一覧（案件全体の判断記録）が開き、戻り先を表示")
+    click(g, "← ステップ5「判断」に戻る", 3000)
 
     # 4. 判断後の仕様
-    click(g, "次へ：追加要望の影響を見る")
-    click(g, "次へ：判断後の仕様を見る")
+    click(g, "次へ：追加要望と影響")
+    click(g, "次へ：判断後の仕様")
     cs = g.locator(".dr-cs")
     detail = main(g).locator("[data-testid=stExpander]").filter(has_text="判断の詳細を見る")
     check(in_view(g.locator(".dr-cs-grid")) and cs.bounding_box()["y"] < detail.bounding_box()["y"] and "引き続き守る制約" in cs.inner_text() and "下書きの作成まで" in cs.inner_text(),
@@ -144,7 +152,7 @@ with sync_playwright() as pw:
     check(not cut_labels(g) and not overflow(g), "7 判断後の仕様：ボタンの文字が切れず、表がはみ出さない")
 
     # 6. 終了画面
-    click(g, "次へ：要件定義書を見る", 3500)
+    click(g, "次へ：要件定義書と成果物", 3500)
     t = g.inner_text("body")
     check("デモ体験はここで終了です" in t and "案件に残る未確認の項目" in t and "4件" in g.locator(".dr-end-n").inner_text(), "6 体験の終了と、残る未確認項目4件を別々に表示")
     check(in_view(btn(g, "ほかのデモを見る")) and in_view(btn(g, "この案件の機能画面を詳しく見る")), "6 次の選択肢が、スクロールせずに見える")
@@ -164,9 +172,9 @@ with sync_playwright() as pw:
 
     # 5. デモ2・3の近道と通常の順路
     for demo in DEMOS[1:]:
-        start(g, demo)
-        click(g, demo[4])
-        check(title(g) == demo[5] and "この案件の論点" in g.inner_text("body"), f"5 {demo[0]} の見どころ：{demo[5]}")
+        shortcut(g, demo)  # 一覧の近道から開く
+        check(title(g) == demo[5] and g.locator(".dr-premise").count() == 1 and main(g).get_by_role("button", name="案件の背景から見る").count() == 1,
+              f"5 {demo[0]} の見どころ：{demo[5]}（前提の1文と「案件の背景から見る」）")
         g.screenshot(path=OUT / f"5_{demo[0]}_shortcut.png")
         start(g, demo)  # 通常の順路は最初から
         steps = 0

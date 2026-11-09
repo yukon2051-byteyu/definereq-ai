@@ -115,7 +115,7 @@ with sync_playwright() as pw:
     g.get_by_label("目的", exact=True).fill("申込から受講履歴までを一つのアプリで管理する")
     g.get_by_label("目的", exact=True).press("Tab")
     wait(g, 800)
-    g.get_by_role("button", name="保存して資料・議事録を取り込む").click()
+    g.get_by_role("button", name="保存して資料・議事録へ進む").click()
     wait(g, 2800)
     check("資料・議事録" in g.locator(".dr-title").first.inner_text(), "2 保存して資料・議事録へ進める")
     nav(g, "案件の準備", "現在の状況")  # 状況案内は、記録の整理以外の作業画面の上部に出る

@@ -5,6 +5,7 @@ import streamlit as st
 
 from .. import project as pj
 from ..demos.builder import STAGES
+from ..demos import guide as demo_guide
 from ..logic import guidance as gd
 from ..schema import DOMAINS
 from . import guide, situation, state
@@ -58,6 +59,13 @@ def sidebar(p: dict) -> None:
         with st.container(key="nav_mode"):
             if p.get("demo"):
                 st.caption("デモ：閲覧専用・架空データ")
+                if tour:  # デモのステップ（本文の現在地と同じ名前）。選んだステップが強調される
+                    steps = demo_guide.load(p["demo"]["id"])
+                    now = min(st.session_state.get("tour_index", 0), len(steps) - 1)
+                    st.caption("デモのステップ")
+                    for n, s in enumerate(steps):
+                        if st.button(f"{n + 1}. {s['process']}", key=f"tour_side_{n}", type="primary" if n == now else "secondary", width="stretch"):
+                            guide.jump(steps, n)
                 if not tour and st.button("案内付きで最初から見る", key="nav_tour", width="stretch"):
                     state.open_demo(p["demo"]["id"], tour=True)
                 if st.button("機能対応表", key="nav_map", width="stretch"):
@@ -129,15 +137,17 @@ def scroll_top_on_change(p: dict, key: str) -> None:
 
 
 def next_step(key: str, p: dict) -> None:
-    """デモの機能画面の下に、次の画面への移動を出す。実案件は状況案内が現在の状態に合わせて案内する。"""
+    """デモの機能画面の下：主ボタンは「デモの続きに戻る」。関連する画面を見返す操作は補助にし、開く対象が分かる名前にする。"""
     if key not in NEXT or st.session_state.get("tour_on") or not p.get("is_demo"):
         return
     text, target = NEXT[key]
     st.divider()
-    c1, c2 = st.columns([3, 1])
-    c1.markdown(f"**次にすること**　{text}")
-    if c2.button(f"{PAGES[target][0]}へ", key=f"next_{key}", width="stretch"):
-        state.goto(target)
+    with st.container(horizontal=True, vertical_alignment="center", key="demo_next"):
+        if p.get("demo") and st.button(f"デモの続きに戻る（{guide.back_label(p)[2:-3]}）", key=f"demo_resume_{key}", type="primary"):
+            guide.back_to_guide(p)
+        label = "この案件の要件一覧を見る" if target == "requirements" else f"{PAGES[target][0]}を見る"
+        if st.button(label, key=f"next_{key}"):
+            state.goto(target)
 
 
 def back_to_setup(key: str) -> None:  # noqa: D401
@@ -167,7 +177,8 @@ def render(p: dict) -> None:
     label = "デモの機能対応表" if key == "demo_map" else PAGES.get(key, PAGES["overview"])[0]
     context_bar(p, label)
     st.session_state["_group"] = GROUP_OF.get(key)  # 見出しの上の工程名（サイドバーと同じ名前）
-    st.session_state["_demo"] = bool(p.get("is_demo"))  # デモの機能画面は、見出し付近に「デモデータ · 閲覧専用」
+    st.session_state["_demo"] = bool(p.get("is_demo"))
+    st.session_state["_page_names"] = {k: (GROUP_OF[k], v[0]) for k, v in PAGES.items()}  # ボタンの近くに行き先の正式名を出す  # デモの機能画面は、見出し付近に「デモデータ · 閲覧専用」
     mine = not p.get("is_demo")
     st.session_state["_main_elsewhere"] = False
     empty = key == "overview" and gd.phase(p) == "empty"

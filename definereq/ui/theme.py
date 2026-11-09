@@ -202,6 +202,7 @@ __PALETTE_CSS__
 .dr-take b{display:block;font-size:16.5px;font-weight:900;line-height:1.5;color:var(--ink)}
 .dr-demo-common{display:flex;flex-wrap:wrap;gap:6px 8px;margin:2px 0 10px}
 .dr-demo-common span{font-size:13px;font-weight:700;color:#45474D;background:#EFEFF2;border-radius:999px;padding:2px 12px}
+.dr-premise{margin:2px 0 4px;padding:6px 12px;border-left:3px solid #2A5DB0;background:#F7F9FC;font-size:14.5px;line-height:1.6;color:var(--ink)}
 /* デモの現在地（短い1行） */
 .dr-loc{font-size:14px;font-weight:700;color:#8F2408;margin:2px 0 4px}
 .dr-g-focus{margin:4px 0 0;font-size:16px;line-height:1.6;color:var(--ink)}

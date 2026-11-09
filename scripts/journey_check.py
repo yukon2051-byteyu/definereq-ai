@@ -171,7 +171,7 @@ with sync_playwright() as pw:
     done = now(g)
     check("確認待ち0件" in done and btn(g, "採用した要件を確認する →").count() == 1, f"4 確認待ち0件：{done}／主操作「採用した要件を確認する」")
     click(g, "採用した要件を確認する →", 3000)
-    check(title(g) == "要件" and btn(g, "ほかの作業：確認資料・要件定義書を作る").count() == 1, "2 要件の画面から、本文で資料の作成へ進める")
+    check(title(g).endswith("の要件一覧") and btn(g, "ほかの作業：確認資料・要件定義書を作る").count() == 1, "2 要件の画面から、本文で資料の作成へ進める")
     click(g, "ほかの作業：確認資料・要件定義書を作る", 3000)
     main(g).get_by_text("要件定義書", exact=True).first.click()
     wait(g, 2200)
@@ -223,13 +223,13 @@ with sync_playwright() as pw:
         if name == "d1":
             main(g).get_by_role("button", name="ステップ一覧").click()
             wait(g, 700)
-            g.get_by_role("button", name="5. 判断（比較と判断）", exact=True).click()  # ステップ一覧は本文の外に開く
+            g.locator("[data-testid=stPopoverBody]").get_by_role("button", name="5. 判断", exact=True).click()  # ステップ一覧は本文の外に開く
             wait(g, 3000)
-            check(g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 比較と判断", "3 本文のステップ一覧からステップ5へ")
+            check(g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 判断", "3 本文のステップ一覧からステップ5へ")
             click(g, "決定・合意の一覧を見る", 3000)
-            check(btn(g, "← 5. 訂正方法の比較に戻る").count() == 1, "3 詳細から元のステップへ戻る操作")
-            click(g, "← 5. 訂正方法の比較に戻る", 3000)
-            click(g, "← 5. 訂正方法の比較に戻る", 300) if btn(g, "← 5. 訂正方法の比較に戻る").count() else None
+            check(btn(g, "← ステップ5「判断」に戻る").count() == 1, "3 詳細から元のステップへ戻る操作")
+            click(g, "← ステップ5「判断」に戻る", 3000)
+            click(g, "← ステップ5「判断」に戻る", 300) if btn(g, "← ステップ5「判断」に戻る").count() else None
             top(g)
             g.get_by_role("button", name=start).click()
             wait(g, 3500)

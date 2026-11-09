@@ -119,18 +119,16 @@ def main() -> None:
         steps = demo_guide.load(demo_id)
         target, short = demo_guide.SHORTCUTS[demo_id]
         for n, s in enumerate(steps):
-            ops = []
-            if n:
-                ops.append(f"前へ：{steps[n - 1]['short']}")
+            ops = [f"前へ：{steps[n - 1]['process']}"] if n else []
             if s.get("finale"):
-                ops += ["ほかのデモを見る", "この案件の機能画面を詳しく見る", "要件定義書の内容を見る・Word／Excelのダウンロード"]
+                ops += ["要件定義書の内容を見る（主操作）", "ほかのデモを見る", "この案件の機能画面を詳しく見る", "Word／Excelのダウンロード"]
             else:
-                ops.append(("次へ：要件定義書を見る" if steps[n + 1].get("finale") and n == len(steps) - 2 else f"次へ：{steps[n + 1]['short']}を見る"))
+                ops.append(f"次へ：{steps[n + 1]['process']}（主操作）")
                 ops.append(f"詳細：{s['detail'](demo_guide.Ctx(__import__('definereq.demos.builder', fromlist=['build']).build(demo_id, s['stage'])))}")
-            if n == 0:
-                ops.append(short)
+            if n == target:
+                ops.append(f"トップの近道「{demo_guide.shortcut_label(demo_id)}」の行き先（前提の1文と「案件の背景から見る」を表示）")
             lines.append(f"| {demo_id} | {n + 1}. {s['process']} | {group_of.get(s['page'], '')} | {'／'.join(ops)} |")
-    lines += ["", "デモのステップからサイドバーで機能を開くと、本文の先頭に「← N. ステップ名に戻る」が出て、開いた元のステップへ戻ります（`tests/test_project_flow.py` の `test_every_demo_detail_page_returns_to_step`）。", ""]
+    lines += ["", "デモのステップからサイドバーで機能を開くと、本文の先頭に「← ステップN「ステップ名」に戻る」が出て、開いた元のステップへ戻ります（`tests/test_project_flow.py` の `test_every_demo_detail_page_returns_to_step`）。", ""]
     OUT.write_text("\n".join(lines), encoding="utf-8")
     print("作成", OUT)
 

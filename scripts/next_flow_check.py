@@ -143,7 +143,7 @@ with sync_playwright() as pw:
     g.get_by_label("背景", exact=True).first.fill("申込をメールで受けている")
     g.get_by_label("背景", exact=True).first.press("Tab")
     wait(g, 800)
-    click(g, "保存して資料・議事録を取り込む", 2800)
+    click(g, "保存して資料・議事録へ進む", 2800)
     paste(g, "第1回打ち合わせ議事録", "講師が出欠を登録する。定員は30名。")
     ok_box = g.locator(".st-key-src_done_box")
     success_y = ok_box.locator("[data-testid=stAlert]").bounding_box()["y"]

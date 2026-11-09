@@ -325,6 +325,31 @@ def backlog(p: dict) -> dict:
             "category_total": sum(len(v) for v in cats.values()), "unique_total": len(unique)}
 
 
+def related_requirements(p: dict, target: str) -> list[str]:
+    """残件や確認・依頼事項の対象（ID）から、関係する要件のIDを返す。
+
+    対象が要件ならそのID。ほかの記録なら、その記録に登録された要件IDの参照だけを使う（名前の似かたでは結び付けない）。
+    """
+    reqs = {r["id"] for r in p["requirements"] if r["status"] not in ("廃止", "却下")}
+    if target in reqs:
+        return [target]
+    for col in ("issues", "changes", "decisions", "actions", "questions", "risks", "conflicts", "scenarios"):
+        item = next((x for x in p.get(col, []) if x.get("id") == target), None)
+        if item is None:
+            continue
+        found: list[str] = []
+        for key in ("related_requirements", "related", "requirements", "targets", "affected", "a", "b"):
+            value = item.get(key)
+            for v in value if isinstance(value, list) else [value]:
+                if isinstance(v, str) and v in reqs and v not in found:
+                    found.append(v)
+        for imp in item.get("impacts") or []:  # 追加要望の影響の対象
+            if imp.get("target") in reqs and imp["target"] not in found:
+                found.append(imp["target"])
+        return found
+    return []
+
+
 BACKLOG_CATEGORIES = ["受入条件未設定", "意見未調整", "判断者・期限未設定", "計測値未確認",
                       "復旧・通信・責任分界未決", "変更調査待ち", "再確認待ち"]
 

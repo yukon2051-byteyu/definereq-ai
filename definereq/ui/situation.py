@@ -216,11 +216,19 @@ def headline(p: dict, page: str) -> None:
     if state_text:
         st.html(f'<div class="dr-now"><b>{esc(state_text[0])}</b><span>{esc(state_text[1])}</span></div>')
     st.session_state["_main_elsewhere"] = bool(target and target != page)
+    pending = [r["id"] for r in p["requirements"] if r["status"] in ("提案", "確認待ち")] if target == "requirements" else []
+    if pending:  # 合意待ちの要件を処理する段階では、その要件に絞って開く
+        label = "確認待ちの要件を見る"
     with st.container(horizontal=True, vertical_alignment="center", key="head_next"):
         if target and target != page:
             if st.button(f"{label} →", key="guide_go", type="primary"):
                 st.session_state["resumed"] = False
+                if pending:
+                    state.open_requirements(pending, "合意待ちの要件", page)
                 state.goto(target)
+            where = st.session_state.get("_page_names", {}).get(target)
+            if where:
+                st.caption(f"行き先：{where[0]} › {where[1]}")
         elif not resumed:
             st.caption("この画面で作業します。")
         for n, (alt, to) in enumerate(alts):

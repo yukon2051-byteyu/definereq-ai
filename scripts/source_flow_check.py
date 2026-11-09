@@ -178,7 +178,7 @@ with sync_playwright() as pw:
     g.keyboard.press("End")
     g.keyboard.type("。月末に集計している")  # 入力欄にフォーカスを置いたまま押す
     # 資料（議事録）を登録済みのため、保存と移動のボタンは案件の状態に合う次工程（会議の記録の整理）になる
-    slow_click(g, "保存して会議の記録を整理する")
+    slow_click(g, "保存して会議の記録を整理へ進む")
     t = body(g)
     check(title(g) == "会議の記録を整理" and "案件情報を保存しました" in t, "3 フォーカスを外さずに1回押すと、保存して次工程（記録の整理）が開き、保存したことを表示")
     click(g, "← 案件の準備に戻る")
@@ -190,7 +190,7 @@ with sync_playwright() as pw:
     box = g.get_by_label("目的", exact=True).first
     box.click()
     g.keyboard.type("申込の状況を一つの画面で見られるようにする")
-    slow_click(g, "保存して会議の記録を整理する")
+    slow_click(g, "保存して会議の記録を整理へ進む")
     check(title(g) == "会議の記録を整理", "3 保存済みの状態から編集しても、1回の操作で保存して移動する")
 
     # 4. 関係者・用語はそれぞれの追加で反映する

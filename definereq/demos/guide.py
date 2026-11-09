@@ -395,7 +395,7 @@ STORIES = {
 }
 
 
-FINAL = dict(process="体験の終了と資料", short="体験の終了と資料", stage=4, page="overview", title="体験の振り返りとサンプル資料", lead=None, finale=True,
+FINAL = dict(process="要件定義書と成果物", short="要件定義書と成果物", stage=4, page="overview", title="体験の振り返りとサンプル資料", lead=None, finale=True,
              main=lambda g: [], more=lambda g: [], open=lambda g: [], count=lambda g: None)
 
 
@@ -562,6 +562,18 @@ SHORTCUTS = {
     "d2": (2, "見どころへ：「毎朝すぐ」を測れる条件にする"),
     "d3": (2, "見どころへ：録画の発言と提案の扱い"),
 }
+# 一覧の近道で途中から開いたときに添える、その場面までの前提（1文）
+PREMISES = {
+    "d1": "承認済みの記録を残したまま金額を訂正するため、直接変更・再承認・再申請の3つの方法を比較しました。",
+    "d2": "経営企画の「毎朝すぐに見たい」「データを失いたくない」という要望を、第2回の打ち合わせで確認した数値の条件に分けました。",
+    "d3": "大阪拠点の回線更新の定例で、保守会社が遠隔保守を提案しました。録画の発言が提案か決定かを確認します。",
+}
+
+
+def shortcut_label(demo_id: str) -> str:
+    """一覧の近道のリンク名。番号と名前はステップの定義から取る（例：ステップ5「判断」から見る）。"""
+    n = SHORTCUTS[demo_id][0]
+    return f"ステップ{n + 1}「{load(demo_id)[n]['process']}」から見る"
 
 
 def phase_of(demo_id: str, index: int) -> tuple[int, str]:

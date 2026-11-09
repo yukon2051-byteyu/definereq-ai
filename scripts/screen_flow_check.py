@@ -168,17 +168,20 @@ with sync_playwright() as pw:
         close_sidebar(g)
         nexts = main(g).get_by_role("button").filter(has_text="次へ：")
         loc = g.locator(".dr-loc").inner_text()
-        check(nexts.count() == 1 and in_view(nexts.first) and main(g).get_by_role("button").filter(has_text="見どころへ：").count() == 1 and loc == "ステップ 1/8 · " + loc.split(" · ")[1],
+        check(nexts.count() == 1 and in_view(nexts.first) and main(g).get_by_role("button").filter(has_text="見どころへ：").count() == 0 and loc == "ステップ 1/8 · " + loc.split(" · ")[1],
               f"4 {name} 冒頭：「次へ」は1つ、見どころへの近道あり、現在地「{loc}」")
         if name == "d1":
-            click(g, "次へ：会議前の確認点を見る")
-            check(g.locator(".dr-loc").inner_text() == "ステップ 2/8 · 背景と準備", "4 d1 順に進むと現在地が更新される")
+            click(g, "次へ：会議前の準備")
+            check(g.locator(".dr-loc").inner_text() == "ステップ 2/8 · 会議前の準備", "4 d1 順に進むと現在地が更新される")
             click(g, "前へ：案件の背景")
-            click(g, "見どころへ：3案の比較と採用理由", 3000)
-            check(g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 比較と判断", "4 d1 見どころから入っても現在地が一致（ステップ 5/8 · 比較と判断）")
+            main(g).get_by_role("button", name="ステップ一覧").click()
+            wait(g, 700)
+            g.locator("[data-testid=stPopoverBody]").get_by_role("button", name="5. 判断", exact=True).click()
+            wait(g, 3000)
+            check(g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 判断", "4 d1 見どころから入っても現在地が一致（ステップ 5/8 · 判断）")
             win = g.locator(".dr-vd-win")
             table = g.locator(".dr-t-cmp")
-            nxt = btn(g, "次へ：追加要望の影響を見る")
+            nxt = btn(g, "次へ：追加要望と影響")
             check(in_view(win) and "再申請を採用" in win.inner_text() and table.bounding_box()["y"] < H and in_view(nxt),
                   f"5 判断：採用案と理由、3案の比較（上端 {table.bounding_box()['y']:.0f}px）、次へ が根拠を開かずに初期表示に入る")
             check(g.locator(".dr-t-cmp .dr-t-win").inner_text().startswith("再申請") and "採用" in g.locator(".dr-t-cmp .dr-t-win .dr-chip").inner_text() and "根拠：本人の確認メール" in win.inner_text(),
@@ -189,30 +192,30 @@ with sync_playwright() as pw:
             check(main(g).get_by_text("判断に使っていない発言（話者未確認）").is_visible(), "5 詳細を開くと、話者未確認の発言を判断に使っていないことが分かる")
             click(g, "この判断に使った確認メールを見る", 3000)
             picked = g.locator("[data-testid=stSelectbox]").filter(has_text="表示する項目").evaluate("e=>[...e.querySelectorAll('input')].map(i=>i.value).join(' ')+e.textContent")
-            check("判断の確認メール" in picked and btn(g, "← 5. 訂正方法の比較に戻る").count() == 1, "5 確認メールが開き、戻り先を表示")
-            click(g, "← 5. 訂正方法の比較に戻る", 3000)
+            check("判断の確認メール" in picked and btn(g, "← ステップ5「判断」に戻る").count() == 1, "5 確認メールが開き、戻り先を表示")
+            click(g, "← ステップ5「判断」に戻る", 3000)
             click(g, "決定・合意の一覧を見る", 3000)
             check(g.locator(".dr-title").first.inner_text() == "決定・合意", "5 決定・合意の一覧が開く")
-            click(g, "← 5. 訂正方法の比較に戻る", 3000)
-            check(g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 比較と判断", "5 元のステップへ戻る")
-            click(g, "次へ：追加要望の影響を見る")
-            click(g, "次へ：判断後の仕様を見る", 3000)
+            click(g, "← ステップ5「判断」に戻る", 3000)
+            check(g.locator(".dr-loc").inner_text() == "ステップ 5/8 · 判断", "5 元のステップへ戻る")
+            click(g, "次へ：追加要望と影響")
+            click(g, "次へ：判断後の仕様", 3000)
             grid = g.locator(".dr-cs-grid")
-            nxt = btn(g, "次へ：要件定義書を見る")
+            nxt = btn(g, "次へ：要件定義書と成果物")
             details = main(g).locator("[data-testid=stExpander]").filter(has_text="判断の詳細を見る")
             check(in_view(grid) and in_view(nxt) and nxt.bounding_box()["y"] < details.bounding_box()["y"] and "下書きの作成まで" in grid.inner_text() and "直接変更しない" in grid.inner_text(),
-                  "6 変更後の仕様：3枚のカード（下書きまで・直接変更しない）と「次へ：要件定義書を見る」が詳細より先に見える")
+                  "6 変更後の仕様：3枚のカード（下書きまで・直接変更しない）と「次へ：要件定義書と成果物」が詳細より先に見える")
             check(main(g).get_by_role("button").filter(has_text="次へ：").count() == 1, "6 「次へ」は1つ")
             g.screenshot(path=OUT / "4_デモ1の変更後の仕様.png")
-            click(g, "次へ：要件定義書を見る", 3500)
+            click(g, "次へ：要件定義書と成果物", 3500)
             check(in_view(btn(g, "要件定義書の内容を見る")) and "デモ体験はここで終了です" in body(g), "6 成果物の画面へ進み、要件定義書のカードがすぐ見える")
         else:
             nxt = main(g).get_by_role("button").filter(has_text="次へ：").first
             for _ in range(6):  # 判断後の仕様まで進む
                 main(g).get_by_role("button").filter(has_text="次へ：").last.click()
                 wait(g, 2600)
-            check(btn(g, "次へ：要件定義書を見る").count() == 1 and in_view(g.locator(".dr-cs-grid")) and main(g).get_by_role("button").filter(has_text="次へ：").count() == 1,
-                  f"6 {name} 判断後の仕様：3枚のカードと「次へ：要件定義書を見る」（次へは1つ）")
+            check(btn(g, "次へ：要件定義書と成果物").count() == 1 and in_view(g.locator(".dr-cs-grid")) and main(g).get_by_role("button").filter(has_text="次へ：").count() == 1,
+                  f"6 {name} 判断後の仕様：3枚のカードと「次へ：要件定義書と成果物」（次へは1つ）")
             g.screenshot(path=OUT / f"5_{name}の変更後の仕様.png")
     b.close()
 
