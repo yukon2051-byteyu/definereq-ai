@@ -118,7 +118,7 @@ with sync_playwright() as pw:
     g.get_by_role("button", name="保存して資料・議事録を取り込む").click()
     wait(g, 2800)
     check("資料・議事録" in g.locator(".dr-title").first.inner_text(), "2 保存して資料・議事録へ進める")
-    nav(g, "記録を取り込む")
+    nav(g, "案件ホーム", "現在の状況")  # 状況案内は、記録の整理以外の作業画面の上部に出る
 
     # 3. 説明を閉じても次の操作が残る
     g.get_by_role("button", name="詳しい説明を閉じる").click()
@@ -126,7 +126,7 @@ with sync_playwright() as pw:
     t = body(g)
     check("この操作をおすすめする理由" not in t and "詳しい説明を表示" in t and "現在の状況と次にすること" in t, f"3 説明を閉じても現在地が残る（{sit(g)[:44]}）")
     check(g.get_by_role("button", name="会議を準備する").count() > 0, "3 次の操作が残る")
-    nav(g, "案件ホーム")
+    nav(g, "要件を整理・判断")
     check(g.get_by_role("button", name="会議を準備する").count() > 0 and "詳しい説明を表示" in body(g), "3 別の画面でも次の操作が残る")
     g.get_by_role("button", name="詳しい説明を表示").click()
     wait(g, 1800)
@@ -142,13 +142,15 @@ with sync_playwright() as pw:
     wait(g)
     g.get_by_role("button", name="貼り付けた文章を議事録として登録").click()
     wait(g, 3000)
-    check("議事録を登録しました" in sit(g) and "AIで候補を作る：会議後の整理" in body(g), f"4 同じ画面でAIの整理へ進める（{sit(g)[:36]}）")
-    check(g.get_by_role("button", name="次回の質問を準備する").count() == 1, "4 次回の準備は副操作")
+    now = " ".join(g.locator(".dr-now").first.inner_text().split())
+    check("未整理の議事録 1件" in now and "初回打ち合わせ議事録" in now and g.get_by_role("button", name="選択した議事録をAIで整理する").count() == 1,
+          f"4 同じ画面で、未整理の議事録を選んだ状態からAIの整理へ進める（{now}）")
+    check(g.get_by_role("button", name="ほかの作業：次回の質問を準備する").count() == 1, "4 次回の準備は副操作")
     shot(g, "03_minutes")
-    g.get_by_role("button", name="この内容でAIを実行").click()
+    g.get_by_role("button", name="選択した議事録をAIで整理する").click()
     g.get_by_text("件の候補を作成しました").first.wait_for(timeout=60000)
     wait(g, 2500)
-    check(g.get_by_role("button", name="要件候補として採用").count() > 0, f"4 候補の確認へ進む（{sit(g)[:36]}）")
+    check(g.get_by_role("button", name="要件候補として採用").count() > 0 and "未整理の議事録 0件" in g.locator(".dr-now").first.inner_text(), "4 候補の確認へ進む")
     shot(g, "04_candidates")
 
     # 5. 分割
