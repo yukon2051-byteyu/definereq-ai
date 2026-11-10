@@ -190,11 +190,11 @@ with sync_playwright() as pw:
             g.get_by_text("判断の根拠と経緯を見る").click()
             wait(g, 900)
             check(main(g).get_by_text("判断に使っていない発言（話者未確認）").is_visible(), "5 詳細を開くと、話者未確認の発言を判断に使っていないことが分かる")
-            click(g, "この判断に使った確認メールを見る", 3000)
+            click(g, "機能画面でこの判断に使った確認メールを見る", 3000)
             picked = g.locator("[data-testid=stSelectbox]").filter(has_text="表示する項目").evaluate("e=>[...e.querySelectorAll('input')].map(i=>i.value).join(' ')+e.textContent")
             check("判断の確認メール" in picked and btn(g, "← デモステップ 5/8『判断』に戻る").count() == 1, "5 確認メールが開き、戻り先を表示")
             click(g, "← デモステップ 5/8『判断』に戻る", 3000)
-            click(g, "この案件の決定・合意を確認する", 3000)
+            click(g, "機能画面で決定・合意を見る", 3000)
             check(g.locator(".dr-title").first.inner_text() == "決定・合意", "5 決定・合意の一覧が開く")
             click(g, "← デモステップ 5/8『判断』に戻る", 3000)
             check(g.locator(".dr-loc").inner_text() == "デモステップ 5/8 · 判断", "5 元のステップへ戻る")
@@ -208,7 +208,7 @@ with sync_playwright() as pw:
             check(main(g).get_by_role("button").filter(has_text="次へ：").count() == 1, "6 「次へ」は1つ")
             g.screenshot(path=OUT / "4_デモ1の変更後の仕様.png")
             click(g, "次へ：要件定義書と成果物", 3500)
-            check(in_view(btn(g, "要件定義書の内容を見る")) and "デモ体験はここで終了です" in body(g), "6 成果物の画面へ進み、要件定義書のカードがすぐ見える")
+            check(in_view(btn(g, "要件定義書の全文を見る")) and "この案件の要件定義書と成果物" in body(g), "6 成果物の画面へ進み、要件定義書のカードがすぐ見える")
         else:
             nxt = main(g).get_by_role("button").filter(has_text="次へ：").first
             for _ in range(6):  # 判断後の仕様まで進む

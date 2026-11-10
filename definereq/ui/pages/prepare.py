@@ -567,7 +567,10 @@ def meetings(p: dict) -> None:
                 st.session_state["rq_mtg"] = added["id"]  # 下の一覧でも、登録した会議を選んだ状態にする
                 st.rerun()
     done = st.session_state.get("mtg_done")
-    if done and done["project"] == p["id"] and pj.get(p, "meetings", done["id"]):  # 登録した会議の近くに次の操作
+    if done and st.session_state.get("rq_mtg") not in (None, done["id"]):  # 一覧で別の会議を選び直したら、登録直後の欄は閉じる
+        st.session_state.pop("mtg_done", None)
+        done = None
+    if done and done["project"] == p["id"] and pj.get(p, "meetings", done["id"]):  # 登録した会議の近くに次の操作（この1組だけ）
         with st.container(border=True, key="mtg_done_box"):
             st.success(f"会議「{continuity.label(p, done['id'])}」を登録しました。")
             _meeting_next(p, done["id"], "mtg_done", primary=True)
@@ -575,8 +578,9 @@ def meetings(p: dict) -> None:
         st.dataframe(pd.DataFrame([{"ID": m["id"], "会議名": m["name"], "開催日": m.get("held_on") or "記録なし", "資料": len(continuity.meeting_items(p, m["id"])["資料"]) + len(continuity.meeting_items(p, m["id"])["録画"]),
                                     "判断": len(continuity.meeting_items(p, m["id"])["判断"]), "変更履歴": len(continuity.meeting_items(p, m["id"])["変更履歴"])} for m in p["meetings"]]), hide_index=True, width="stretch")
     m = select_item(p["meetings"], lambda x: continuity.label(p, x["id"]), "rq_mtg", "会議はまだありません。")
-    if m and not p.get("is_demo"):  # 開催日だけで開催済みとは判定しない。開催前でも記録の入口を使える
-        _meeting_next(p, m["id"], "mtg_sel", primary=not (done and done["project"] == p["id"]))
+    just_added = bool(done and done["project"] == p["id"] and m and m["id"] == done["id"])
+    if m and not p.get("is_demo") and not just_added:  # 登録直後は上の完了欄の1組だけ。開催前でも記録の入口を使える
+        _meeting_next(p, m["id"], "mtg_sel", primary=True)
     elif not p["meetings"] and not p.get("is_demo"):
         if st.button("質問・議題に戻る", key="mtg_back_prep"):
             state.goto("prep")

@@ -129,14 +129,14 @@ with sync_playwright() as pw:
     check(order == sorted(order) and "本人確認済みの記録" in vd and "判断に使っていない発言（話者未確認）" in vd, "3 採用案・理由・根拠の要約が順に出て、詳細で根拠の種類を分けて表示")
     check(g.locator(".dr-t-cmp .dr-t-win").inner_text().startswith("再申請") and not overflow(g), "3 3案の比較で採用行が分かり、表がはみ出さない")
     g.screenshot(path=OUT / "3_d1_decision.png", full_page=True)
-    click(g, "この判断に使った確認メールを見る", 3000)
+    click(g, "機能画面でこの判断に使った確認メールを見る", 3000)
     # 本文は表（キャンバス描画）のため、選ばれた記録の名前で確かめる。画面写真でも確認する
     g.screenshot(path=OUT / "3_mail.png")
     picked = g.locator("[data-testid=stSelectbox]").filter(has_text="表示する項目").evaluate("e=>e.textContent+' '+[...e.querySelectorAll('input')].map(i=>i.value+' '+(i.getAttribute('aria-label')||'')).join(' ')")
     check("判断の確認メール" in picked and btn(g, "← デモステップ 5/8『判断』に戻る").count() == 1, f"3 確認メールの記録が開き、戻り先が「← デモステップ 5/8『判断』に戻る」（{picked.strip()[:40]}）")
     click(g, "← デモステップ 5/8『判断』に戻る", 3000)
     check("ステップ 5/8" in g.inner_text("body"), "3 確認メールから、ステップ5へ戻る")
-    click(g, "この案件の決定・合意を確認する", 3000)
+    click(g, "機能画面で決定・合意を見る", 3000)
     g.screenshot(path=OUT / "3_decisions.png")
     check(g.locator(".dr-title").first.inner_text() == "決定・合意" and btn(g, "← デモステップ 5/8『判断』に戻る").count() == 1, "3 決定・合意の一覧（案件全体の判断記録）が開き、戻り先を表示")
     click(g, "← デモステップ 5/8『判断』に戻る", 3000)
@@ -154,11 +154,11 @@ with sync_playwright() as pw:
     # 6. 終了画面
     click(g, "次へ：要件定義書と成果物", 3500)
     t = g.inner_text("body")
-    check("デモ体験はここで終了です" in t and "案件に残る未確認の項目" in t and "4件" in g.locator(".dr-end-n").inner_text(), "6 体験の終了と、残る未確認項目4件を別々に表示")
-    check(in_view(btn(g, "ほかのデモを見る")) and in_view(btn(g, "この案件の機能画面を詳しく見る")), "6 次の選択肢が、スクロールせずに見える")
+    check("この案件の要件定義書と成果物" in t and "案件に残る未確認の項目" in t and "4件" in g.locator(".dr-end-n").inner_text(), "6 体験の終了と、残る未確認項目4件を別々に表示")
+    check(in_view(btn(g, "ほかのデモを見る")) and in_view(btn(g, "機能画面でこの案件の現在の状況を見る")), "6 次の選択肢が、スクロールせずに見える")
     check("再申請方式を採用した理由と、未確認の項目がどう記録されたかを確認できます" in t, "6 要件定義書で見てほしい内容を1文で示す")
     g.screenshot(path=OUT / "6_d1_end.png")
-    click(g, "要件定義書の内容を見る", 3000)
+    click(g, "要件定義書の全文を見る", 3000)
     check("要件定義書の内容" in g.inner_text("body") and "この文書について" in g.inner_text("body"), "6 要件定義書のプレビューが開く")
     for label, kind in (("要件定義書をWordでダウンロード", "docx"), ("打ち合わせ確認資料をWordでダウンロード", "docx"), ("要件一覧をExcelでダウンロード", "xlsx")):
         with g.expect_download() as d:
@@ -185,7 +185,7 @@ with sync_playwright() as pw:
             steps += 1
             if cut_labels(g) or overflow(g):
                 check(False, f"7 {demo[0]} ステップ{steps}で文字切れ・はみ出し {cut_labels(g)}")
-        check(btn(g, "ほかのデモを見る").count() == 1 and "デモ体験はここで終了です" in g.inner_text("body"), f"5 {demo[0]} を通常の順路で終了画面まで進める（{steps}回）")
+        check(btn(g, "ほかのデモを見る").count() == 1 and "この案件の要件定義書と成果物" in g.inner_text("body"), f"5 {demo[0]} を通常の順路で終了画面まで進める（{steps}回）")
     # デモ1も通常の順路で最後まで
     start(g, DEMOS[0])
     n = 0

@@ -37,7 +37,7 @@ ROUTES = {
     "次の行動": Route("action", "確認・依頼事項に追加", "overview"),
     "要望": _REQUIREMENT, "要件": _REQUIREMENT, "制約": _REQUIREMENT,
     "リスク": _RISK, "リスク候補": _RISK,
-    "決定": Route("decision", "判断記録の下書きに追加", "decisions"),
+    "決定": Route("decision", "判断記録の下書きの内容を確認", "decisions"),  # 押すと確認欄が開くだけ（作成は確認欄の「判断記録の下書きを作成」）
     "意見の違い": Route("issue", "意見調整に追加", "issues"),
     "案件情報": Route("profile", "案件情報へ反映", "profile"),
 }

@@ -72,7 +72,7 @@ with sync_playwright() as pw:
         if entry == "本文の補助ボタン":
             g.evaluate("document.querySelector('[data-testid=stSidebarCollapseButton] button')?.click()")  # 左メニューを閉じて本文だけで
             wait(g, 900)
-            main(g).get_by_role("button", name="この案件のAI候補を確認する").click()
+            main(g).get_by_role("button", name="機能画面でAI候補を見る").click()
         else:
             opener = g.locator("[data-testid=stExpandSidebarButton]")  # 閉じていれば開く
             if opener.count() and opener.first.is_visible():

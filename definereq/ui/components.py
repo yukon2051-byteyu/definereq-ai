@@ -142,12 +142,23 @@ def save_controls(p: dict, key: str, note: bool = True) -> None:
     st.download_button("再開用ファイルをダウンロード", data, file_name=f"{pj.today()}_DefineReq_{p['id']}.json", mime="application/json",
                        key=key, width="stretch" if note else "content", on_click=state.mark_saved, args=(p,))
     made = st.session_state.get("save_time")
+    before = bool(st.session_state.get("save_fp"))  # 前回のファイル（ダウンロードしたもの、または読み込んだもの）がある
     if not state.is_dirty(p):
         st.caption(f"{made[11:16]} に最新の内容でファイルを作成しました。" if made else "読み込んだファイルから変更はありません。")
-    elif made:
-        st.caption(f"{made[11:16]} にファイルを作成した後、案件に変更があります。")
-    elif note:
+    elif before:  # 前回の出力（または読み込み）の後に、案件へ反映した変更がある
+        st.caption("前回のファイルには、最新の変更が入っていません。閉じる前に、もう一度ダウンロードしてください。")
+    elif note:  # まだ一度も出力していない
         st.caption("案件はブラウザーを閉じると消えます。閉じる前にダウンロードしてください。")
+    if _pending_input(p):  # 画面に入力中で、まだ案件に反映していない内容は、ファイルにも入らない
+        st.caption("画面で入力中の内容（保存・反映の前）は、ファイルに含まれません。先に各画面で保存・反映してください。")
+
+
+def _pending_input(p: dict) -> bool:
+    """背景・目的や質問・議題の欄に、案件へ反映していない入力があるか（下書きとしてブラウザーにだけある）。"""
+    from . import drafts
+    from .pages.prepare import prep_pending
+
+    return drafts.profile_fields_pending(p) or prep_pending(p)
 
 
 def definition(rows: list[tuple[str, object]]) -> None:

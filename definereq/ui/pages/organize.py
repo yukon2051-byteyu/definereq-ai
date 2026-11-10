@@ -59,7 +59,7 @@ def _candidates_top(p: dict) -> None:
             # 一覧の位置へ移動する（絞り込まない。確認待ちが先に並び、採用した候補にも「採用済み」が残る）
             st.session_state["cand_scroll"] = pj.now_iso()
             st.rerun()
-    elif s["adopted"]:
+    elif s["adopted"] and not st.session_state.get("cand_done"):  # 確定した直後は、結果の近くの操作（実際に作成したものを開く）を使う
         if st.button("採用した要件を確認する →", key="cand_go_reqs", type="primary"):
             state.goto("requirements")
     else:

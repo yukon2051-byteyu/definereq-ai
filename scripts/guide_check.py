@@ -103,11 +103,11 @@ with sync_playwright() as pw:
             g.wait_for_selector(".dr-end-h", timeout=30000)
             g.wait_for_timeout(2500)
             body = g.inner_text("body")
-            check(i == 7 and "デモ体験はここで終了です" in body and body.index("デモ体験はここで終了です") < body.index("作成されたサンプル資料"), f"{name} 最終画面")
+            check(i == 7 and "この案件の要件定義書と成果物" in body and body.index("この案件の要件定義書と成果物") < body.index("代表的な要件の例") < body.index("ほかの成果物"), f"{name} 最終画面（成果物の見出し → 代表例 → ほかの成果物）")
             g.screenshot(path=OUT / f"{name}_end_full.png", full_page=False)
             downloads(g, name)
             check(g.locator(".dr-end-h").count() == 1, f"{name} ダウンロード後も最終画面のまま")
-            g.get_by_role("button", name="要件定義書の内容を見る").first.click()
+            g.get_by_role("button", name="要件定義書の全文を見る").first.click()
             g.wait_for_timeout(2000)
             check("この文書について" in g.inner_text("body"), f"{name} 内容を見る")
             more = g.get_by_text(re.compile(r"^全\d+件を見る$"))
@@ -147,10 +147,10 @@ with sync_playwright() as pw:
     g.screenshot(path=OUT / "pc_play.png")
     # ガイドと機能画面の行き来
     title = g.locator(".dr-g-h").inner_text()
-    g.get_by_role("button", name="確認状態を見る").click()
+    g.get_by_role("button", name=re.compile(r"^機能画面で")).first.click()  # 機能画面を開く補助ボタン
     g.wait_for_timeout(3000)
     check("機能画面" in g.inner_text("body"), "詳細へ移動すると機能画面の説明が出る")
-    g.get_by_role("button", name=re.compile(r"^← デモステップ \d+/")).click()  # 開いた元のステップへ戻る
+    g.get_by_role("button").filter(has_text="← デモステップ").first.click()  # 開いた元のステップへ戻る
     g.wait_for_selector(".dr-g-h", timeout=60000)
     g.wait_for_timeout(2500)
     check(g.locator(".dr-g-h").inner_text() == title, "ガイドの元の画面へ戻る")

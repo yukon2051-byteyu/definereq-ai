@@ -106,7 +106,7 @@ with sync_playwright() as pw:
             click(g, "次へ：要件定義書と成果物", 1000)
             g.wait_for_selector(".dr-end-h", timeout=30000)
             wait(g, 2500)
-            one(g, "要件定義書の内容を見る", "デモ1 終了画面")
+            one(g, "要件定義書の全文を見る", "デモ1 終了画面")
             g.screenshot(path=OUT / "4_デモ1の終了画面.png")
 
     # 自分の案件

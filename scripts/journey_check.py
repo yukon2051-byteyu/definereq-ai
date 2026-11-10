@@ -159,12 +159,13 @@ with sync_playwright() as pw:
     click(g, "要件に採用する内容を確認", 2500)
     check(btn(g, "この内容で採用").count() == 1, "4 確認欄を開いてから「この内容で採用」で確定する（確認と確定を区別）")
     click(g, "この内容で採用", 3000)
+    g.screenshot(path=OUT / "4_採用直後.png")
     after = now(g)
     check(f"確認待ち{waiting - 1}件" in after and "要件に採用 1件" in after and main(g).get_by_text("採用済み").count() > 0, f"4 1件採用後：{after}、採用した候補に「採用済み」")
     check(btn(g, "この内容で採用").count() == 0, "4 確定後は確認欄が閉じ、同じ候補を再び採用できない")
     msg = main(g).get_by_text("要件を下書きとして登録しました", exact=False)
     nxt, open_req = btn(g, "次の未確認候補へ"), btn(g, "登録した要件を開く")
-    check(msg.count() == 1 and in_view(msg.first) and nxt.count() == 1 and open_req.count() == 1, "4 採用直後：結果の表示と「次の未確認候補へ」「登録した要件を開く」が見える")
+    check(msg.count() == 1 and in_view(msg.first) and nxt.count() == 1 and open_req.count() == 1, f"4 採用直後：結果の表示と「次の未確認候補へ」「登録した要件を開く」が見える（表示{msg.count()}・画面内{msg.count() and in_view(msg.first)}・次へ{nxt.count()}・開く{open_req.count()}）")
     g.screenshot(path=OUT / "2_1件採用後.png")
     click(g, "登録した要件を開く", 3000)
     check(title(g).endswith("の要件一覧") and "から登録した要件" in g.inner_text("body"), "4 「登録した要件を開く」で今回登録した要件だけを開く")
@@ -234,7 +235,7 @@ with sync_playwright() as pw:
             g.locator("[data-testid=stPopoverBody]").get_by_role("button", name="5. 判断", exact=True).click()  # ステップ一覧は本文の外に開く
             wait(g, 3000)
             check(g.locator(".dr-loc").inner_text() == "デモステップ 5/8 · 判断", "3 本文のステップ一覧からステップ5へ")
-            click(g, "この案件の決定・合意を確認する", 3000)
+            click(g, "機能画面で決定・合意を見る", 3000)
             check(btn(g, "← デモステップ 5/8『判断』に戻る").count() == 1, "3 詳細から元のステップへ戻る操作")
             click(g, "← デモステップ 5/8『判断』に戻る", 3000)
             click(g, "← デモステップ 5/8『判断』に戻る", 300) if btn(g, "← デモステップ 5/8『判断』に戻る").count() else None
@@ -246,7 +247,7 @@ with sync_playwright() as pw:
             main(g).get_by_role("button").filter(has_text="次へ：").first.click()
             wait(g, 2600)
             n += 1
-        check(btn(g, "ほかのデモを見る").count() == 1 and "デモ体験はここで終了です" in g.inner_text("body"), f"2 {name} を本文だけで終了画面まで（{n}回）")
+        check(btn(g, "ほかのデモを見る").count() == 1 and "この案件の要件定義書と成果物" in g.inner_text("body"), f"2 {name} を本文だけで終了画面まで（{n}回）")
     b.close()
 
 print("問題", len(problems))

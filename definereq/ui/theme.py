@@ -247,6 +247,9 @@ __PALETTE_CSS__
 .dr-cs-next{margin:6px 0 4px}
 /* 終了画面：体験の終了と、案件に残る項目を分ける */
 .dr-end-row{display:grid;grid-template-columns:3fr 2fr;gap:10px;margin-top:8px}
+.dr-rep{border:1px solid var(--line,#E2DED6);border-left:4px solid #1C7A4D;border-radius:0 4px 4px 0;background:#fff;padding:12px 16px;margin:8px 0}
+.dr-rep-t{font-size:17px;font-weight:800;line-height:1.5;margin:2px 0 4px}
+.dr-rep .dr-v-lab{margin-top:8px}
 .dr-end-box{background:#fff;border:1px solid #D7EBDD;border-radius:4px;padding:8px 12px}
 .dr-end-left{border-color:#EBD9BE;background:#FFFBF4}
 .dr-end-n{font-size:24px;font-weight:900;color:#8A4B00;line-height:1.3}

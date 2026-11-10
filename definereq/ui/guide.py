@@ -197,27 +197,32 @@ def _more(step: dict, ctx: guide.Ctx) -> None:
 
 
 def _finale(p: dict, ctx: guide.Ctx, steps: list[dict], i: int, intro: dict) -> None:
-    """最終画面：体験の終了 → 案件に残る項目 → 次の選択肢 → 資料 → 決定と残件。
+    """最終画面：成果物（要件定義書）を先に見せる。
 
-    体験の終了と、案件に残る未確認の項目は別の情報として並べる（体験が終わっても案件は完了していない）。
+    見出し → 代表的な要件1件（内容・状態・元の記録・判断と理由）→ 要件定義書の全文とWord → 体験の振り返りと残件
+    → ほかの成果物と機能画面への導線。「デモ完了」は見出しの上の補助表示にする。
     """
     s = ctx.summary()
     total = s["todo_total"]
     shown = 3  # 要約に出す件数
     _phases(p["demo"]["id"], steps, i)
+    st.html(f'<div class="dr-sit dr-end"><div class="dr-sit-tag">✓ デモ完了｜{esc(p["name"])}｜ステップ {i + 1}/{len(steps)}</div>'
+            '<h1 class="dr-g-h dr-end-h">この案件の要件定義書と成果物</h1>'
+            '<p>案内で見た判断が、要件定義書にどう残ったかを、代表的な要件1件で示します。</p></div>')
+    _representative(p, p["demo"]["id"])
+    artifacts.spec_actions(p)
     rest = (f'<div class="dr-end-box dr-end-left"><div class="dr-v-lab">案件に残る未確認の項目</div><div class="dr-end-n">{total}件</div>'
-            '<div class="dr-meta">要件定義の完了を示すものではありません。内容は下の「残っていること」で確認できます。</div></div>') if total else            ('<div class="dr-end-box"><div class="dr-v-lab">案件に残る未確認の項目</div><div class="dr-g-sub">登録された内容からは検出されていません。登録されていない論点は検出できません。</div></div>')
-    st.html(f'<div class="dr-sit dr-end"><div class="dr-sit-tag">{esc(p["name"])}｜ステップ {i + 1}/{len(steps)}</div><h1 class="dr-g-h dr-end-h">✓ デモ体験はここで終了です</h1>'
-            f'<div class="dr-end-row"><div class="dr-end-box"><div class="dr-v-lab">体験したこと</div><div class="dr-g-sub">{esc(intro["done"])}</div></div>{rest}</div></div>')
-    # 次の選択肢は、末尾までスクロールしなくても見える位置に置く
+            '<div class="dr-meta">要件定義の完了を示すものではありません。内容は下の「残っていること」で確認できます。</div></div>') if total else \
+           ('<div class="dr-end-box"><div class="dr-v-lab">案件に残る未確認の項目</div><div class="dr-g-sub">登録された内容からは検出されていません。登録されていない論点は検出できません。</div></div>')
+    st.html(f'<div class="dr-end-row"><div class="dr-end-box"><div class="dr-v-lab">体験したこと</div><div class="dr-g-sub">{esc(intro["done"])}</div></div>{rest}</div>')
+    st.html('<h2 class="dr-end-sec">ほかの成果物</h2>')
+    artifacts.cards(p, spec_note=intro.get("spec_note"), skip_spec=True)
     with st.container(key="tour_end_next", horizontal=True):
-        if st.button("ほかのデモを見る", key="tour_others"):  # 終了画面の主操作は「要件定義書の内容を見る」
+        if st.button("ほかのデモを見る", key="tour_others"):
             state.go_home("dr-demo")
-        if st.button("この案件の機能画面を詳しく見る", key="tour_end"):
+        if st.button("機能画面でこの案件の現在の状況を見る", key="tour_end"):
             open_detail("overview")
     recap = "".join(f"<li>{esc(x)}</li>" for x in intro["recap"])
-    st.html(f'<h2 class="dr-end-sec">作成されたサンプル資料を見る・ダウンロードする</h2>')
-    artifacts.cards(p, spec_note=intro.get("spec_note"))
 
     st.html(f'<h2 class="dr-end-sec">この体験で確認できたこと</h2><ul class="dr-g-list">{recap}</ul><h2 class="dr-end-sec">決まったことと残っていること</h2>')
     left, right = st.columns(2)
@@ -244,6 +249,29 @@ def _finale(p: dict, ctx: guide.Ctx, steps: list[dict], i: int, intro: dict) -> 
     c3.button(f"前へ：{steps[i - 1]['process']}", key="tour_prev", type="tertiary", on_click=jump, args=(steps, i - 1, False))
     if c4.button("TOPへ戻る", key="tour_home", type="tertiary"):
         state.go_home()
+
+
+def _representative(p: dict, demo_id: str) -> None:
+    """最終画面の代表例：要件の内容と状態、元の記録（議事録・発言）、決め手になった判断と理由。値は既存のデモデータを使う。"""
+    rid, did = guide.REPRESENTATIVE[demo_id]
+    r, d = pj.get(p, "requirements", rid), pj.get(p, "decisions", did)
+    if not r:
+        return
+    quotes = []
+    for e in (r.get("evidence") or [])[:2]:
+        src = pj.get(p, "recordings" if str(e.get("source_id", "")).startswith("REC") else "sources", e.get("source_id"))
+        if src and e.get("quote"):
+            quotes.append(f'<li>「{esc(e["quote"])}」<span class="dr-meta">（{esc(src["name"])}）</span></li>')
+    dec = ""
+    if d:
+        adopted = next((o["label"] for o in d["options"] if o["id"] == d.get("adopted")), "未定")
+        dec = (f'<div class="dr-v-lab">判断</div><div class="dr-g-sub">{esc(d["topic"])} → <b>{esc(adopted)}</b>（{esc(d["state"])}）</div>'
+               f'<div class="dr-v-lab">理由</div><div class="dr-g-sub">{esc(d.get("rationale") or "理由の記録がありません")}</div>')
+    src_html = f'<div class="dr-v-lab">元の記録</div><ul class="dr-g-list">{"".join(quotes)}</ul>' if quotes else ""
+    st.html(f'<div class="dr-rep"><div class="dr-v-lab">代表的な要件の例</div>'
+            f'<div class="dr-rep-t">{esc(r["id"])} {esc(r["title"])}</div>'
+            f'<div class="dr-chips">{chip(f"状態：{r["status"]}", STATUS_TONE.get(r["status"], "plain"))}{chip(f"版：v{r["version"]}", "plain")}</div>'
+            f'<div class="dr-g-sub">{esc(r.get("body") or "")}</div>{src_html}{dec}</div>')
 
 
 def _lead(step: dict, ctx: guide.Ctx) -> str:
@@ -292,12 +320,12 @@ def render(p: dict) -> None:
     for n, block in enumerate(blocks):
         if block["type"] == "speech":
             _speech(p, block, f"guide_{i}_{n}")
-            if st.button("録画・発言の画面でこの発言を見る", key=f"tour_ev_sp_{n}", type="tertiary"):
+            if st.button("機能画面（録画・発言）でこの発言を見る", key=f"tour_ev_sp_{n}", type="tertiary"):
                 open_detail("recordings", rec_sel=block["rec_id"], ev_focus={"source_id": block["rec_id"], "unit_id": block["seg_id"], "note": "デモのステップから開いた発言です。"})
         elif block["type"] == "story":
             _story(block)
             _start(steps, i, demo_id)  # 論点の直下に、順に見る操作と見どころへの近道を1組だけ出す
-            if st.button("登録された背景・目的・関係者を見る", key="tour_profile", type="tertiary"):
+            if st.button("機能画面で背景・目的・関係者を見る", key="tour_profile", type="tertiary"):
                 open_detail("profile")
             _story_more(block)
         elif block["type"] == "verdict":
@@ -322,7 +350,7 @@ def render(p: dict) -> None:
     _support(step)
     _open(step["open"](ctx))
     if i == first_after_meeting(steps):  # 会議後の最初の場面で、残った確認事項をこの時点のデータで見せる
-        if st.button("会議後に残った確認事項を見る", key="tour_todo_open", type="tertiary"):
+        if st.button("機能画面で会議後に残った確認事項を見る", key="tour_todo_open", type="tertiary"):
             open_detail("overview")
         st.caption(f"開くと「現在の状況」に、この場面と同じ時点（{data_time(step['stage'])}）の残件が表示されます。")
     _more(step, ctx)
@@ -389,7 +417,7 @@ def _used_materials(p: dict) -> None:
     names = [s["name"] for s in p["sources"] if not s.get("superseded_by")] + [r["name"] for r in p["recordings"]]
     with st.container(horizontal=True, vertical_alignment="center", key="tour_used"):
         st.caption("使用した資料：" + ("、".join(names) if names else "なし"))
-        if st.button("使用した資料・議事録を見る", key="tour_used_open", type="tertiary"):
+        if st.button("機能画面で使用した資料・議事録を見る", key="tour_used_open", type="tertiary"):
             open_detail("sources")
 
 
@@ -402,7 +430,7 @@ def _verdict(c: dict, step: dict, steps: list[dict], i: int) -> None:
         if mail and step.get("evidence_button") and st.button(step["evidence_button"], key="tour_evidence", type="tertiary"):
             open_evidence({"source_id": mail["source_id"], "unit_id": mail["unit_id"], "quote": mail["quote"], "page": "sources"}, "この判断の確認に使った記録です。")
         speech = next((b for b in c["basis"] if b["kind"] == "発言（話者確認済み）"), None)
-        if speech and st.button("議事録の該当発言を見る", key="tour_ev_speech", type="tertiary"):
+        if speech and st.button("機能画面で議事録の該当発言を見る", key="tour_ev_speech", type="tertiary"):
             open_evidence({"source_id": speech["source_id"], "unit_id": speech["unit_id"], "quote": speech["quote"], "page": "recordings"}, "この判断の根拠に使った発言（話者確認済み）です。")
     _options_table(c, "3案の比較" if len(c["rows"]) == 3 else "案の比較")
     _next_inline(steps, i)
@@ -455,11 +483,11 @@ def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx, show_next: bool 
 
 
 def detail_label(page_name: str) -> str:
-    """機能ページを開く補助ボタンの名前（例：この案件のAI候補を確認する）。画面名の「の確認」は重ねない。"""
+    """機能画面を開く補助ボタンの名前（例：機能画面でAI候補を見る）。「次へ」と区別できるよう、押す前に機能画面へ移ることを示す。"""
     noun = page_name[:-3] if page_name.endswith("の確認") else page_name
     if noun.endswith("か"):  # 例：「なぜこの仕様か」
         noun = f"「{noun}」"
-    return f"この案件の{noun}を確認する"
+    return f"機能画面で{noun}を見る"
 
 
 def first_after_meeting(steps: list[dict]) -> int | None:

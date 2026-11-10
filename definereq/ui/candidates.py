@@ -62,23 +62,43 @@ def _adopt_form(p: dict, c: dict, meeting: str | None) -> None:
                 touch(p)
                 st.session_state.pop("cand_open", None)
                 st.session_state["cand_done"] = {"cand": c["id"], "reqs": [r["id"] for r in created]}
+                st.session_state["cand_focus"] = c["id"]  # 採用した候補は一覧の後ろへ移るため、結果の位置へ移動する
                 st.rerun()
 
 
 def _decision_form(p: dict, c: dict, meeting: str | None) -> None:
-    """決定の候補の扱いを選ぶ。どれを選んでも合意にはならない。"""
+    """決定の候補の確認欄。開いただけではデータを変えない。「判断記録の下書きを作成」で1回だけ作成する（合意にはならない）。
+
+    選んだ要件との関係に合わせて、作成される内容を確定の前に示す。
+    """
     choices = {"link": "既存の要件に関連付ける", "new": "決定の内容から新しい要件の下書きを作る", "none": "要件を伴わない判断として記録する"}
-    with st.form(f"cand_dec_{c['id']}"):
+    with st.container(border=True, key=f"cand_dec_{c['id']}"):
         how = st.radio("要件との関係", list(choices), format_func=choices.get, key=f"cd_h_{c['id']}", index=0 if p["requirements"] else 1)
-        reqs = [r["id"] for r in p["requirements"]]
-        linked = st.multiselect("関連付ける要件（既存の要件に関連付ける場合）", reqs, format_func=lambda i: pj.label_of(p, i), key=f"cd_r_{c['id']}")
-        st.caption("判断記録の下書きを作ります。合意にするには、判断者・判断日・採用案を人が記録します。")
-        if st.form_submit_button("判断記録の下書きに追加", type="primary"):
-            label = guard(intake.apply, p, c["id"], meeting_id=meeting, link_requirements=linked if how == "link" else [], new_requirement=how == "new")
-            if label:
+        linked: list[str] = []
+        if how == "link":
+            reqs = [r["id"] for r in p["requirements"]]
+            linked = st.multiselect("関連付ける要件", reqs, format_func=lambda i: pj.label_of(p, i), key=f"cd_r_{c['id']}")
+        if how == "new":
+            plan = "判断記録と要件の下書きを作成します。"
+        elif how == "link" and linked:
+            plan = f"判断記録の下書きを作成し、{'、'.join(linked)} に関連付けます（要件の内容は変更しません）。"
+        elif how == "link":
+            plan = "判断記録の下書きを作成します。関連付ける要件を選んでいないため、要件には関連付けません。"
+        else:
+            plan = "判断記録の下書きだけを作成します（要件は作成しません）。"
+        st.html(f'<div class="dr-kind">作成する内容<b>{esc(plan)}</b></div>')
+        st.caption("合意にはなりません。合意は「決定・合意」で、判断者・判断日・採用案を人が記録して確定します。")
+        if st.button("判断記録の下書きを作成", type="primary", key=f"cd_go_{c['id']}"):
+            label = guard(intake.apply, p, c["id"], meeting_id=meeting, link_requirements=linked, new_requirement=how == "new")
+            if label:  # 既存の登録処理（候補の状態で二重登録を防ぐ）で作成できたときだけ、結果を候補の近くに出す
                 touch(p)
                 st.session_state.pop("cand_open", None)
-                ok_rerun("判断記録の下書きを作りました。「決定・合意」の画面で判断者と判断日を記録できます")
+                items = c.get("resolved_items") or []
+                decision = next((i for i in items if i.startswith("DEC")), None)
+                new_reqs = [i for i in items if i.startswith("REQ")] if how == "new" else []
+                st.session_state["cand_done"] = {"cand": c["id"], "kind": "decision", "decision": decision, "reqs": new_reqs, "linked": linked}
+                st.session_state["cand_focus"] = c["id"]  # 確定した候補は一覧の後ろへ移るため、結果の位置へ移動する
+                st.rerun()
 
 
 def _advanced(p: dict, c: dict, meeting: str | None) -> None:
@@ -148,6 +168,9 @@ def _after_adopt(p: dict, c: dict) -> None:
     if not done or done["cand"] != c["id"]:
         return
     ids = [i for i in done["reqs"] if pj.get(p, "requirements", i)]
+    if done.get("kind") == "decision":
+        _after_decision(p, c, done, ids)
+        return
     st.success(f"要件を下書きとして登録しました（{'、'.join(ids)}）。合意は「決定・合意」で人が記録します。")
     order = st.session_state.get("_cand_order", [])
     waiting = [i for i in order if (pj.get(p, "candidates", i) or {}).get("state") in ("候補", "要再確認")]
@@ -167,6 +190,34 @@ def _after_adopt(p: dict, c: dict) -> None:
                 state.open_requirements(ids, reason, "candidates")
             if st.button("要件一覧を開く", key="cand_all_reqs"):
                 state.goto("requirements")
+
+
+def _next_waiting(c: dict, p: dict) -> str | None:
+    """画面の表示順で、この候補の次にある確認待ちの候補。"""
+    order = st.session_state.get("_cand_order", [])
+    waiting = [i for i in order if (pj.get(p, "candidates", i) or {}).get("state") in ("候補", "要再確認")]
+    after = order[order.index(c["id"]) + 1:] if c["id"] in order else []
+    return next((i for i in after if i in waiting), waiting[0] if waiting else None)
+
+
+def _after_decision(p: dict, c: dict, done: dict, new_reqs: list[str]) -> None:
+    """判断記録の下書きを作った直後：実際に作成したものと、開く操作。自動では移動しない。"""
+    from . import state
+
+    dec = done.get("decision")
+    made = [f"判断記録の下書き {dec}"] + ([f"要件の下書き {'、'.join(new_reqs)}"] if new_reqs else [])
+    linked = f"（{'、'.join(done['linked'])} に関連付け）" if done.get("linked") else ""
+    st.success(f"{'と'.join(made)}を作成しました{linked}。合意は「決定・合意」で判断者・判断日・採用案を記録して確定します。")
+    nxt = _next_waiting(c, p)
+    with st.container(horizontal=True, key=f"cand_after_{c['id']}"):
+        if dec and st.button("決定・合意で下書きを開く", key="cand_open_dec", type="primary"):
+            state.goto("decisions", keep={"dc_sel": dec})
+        if new_reqs and st.button("要件の下書きを開く", key="cand_open_reqs"):
+            state.open_requirements(new_reqs, f"AI候補「{c['text'][:24]}」から作成した要件の下書き", "candidates")
+        if nxt and st.button("次の未確認候補へ", key="cand_next", type="tertiary"):
+            st.session_state.pop("cand_done", None)
+            st.session_state["cand_focus"] = nxt
+            st.rerun()
 
 
 def _row(p: dict, c: dict, meeting: str | None, key: str) -> None:
@@ -230,6 +281,6 @@ def board(p: dict, tasks: tuple[str, ...] | None, key: str, meeting: str | None 
                     st.divider()
                 _row(p, c, meeting, key)
     target = st.session_state.pop("cand_focus", None)
-    if target:  # 次の未確認候補の位置へ移動する
+    if target:  # 次の未確認候補、または確定した候補（結果の表示）の位置へ移動する
         st.iframe(f"<script>/*{target}-{pj.now_iso()}*/const t=()=>window.parent.document.getElementById('cand-{target}')?.scrollIntoView({{block:'start'}});setTimeout(t,200);setTimeout(t,700)</script>", height=1)
         st.session_state["cand_focus_shown"] = target

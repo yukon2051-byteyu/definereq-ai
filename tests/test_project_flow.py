@@ -1293,7 +1293,7 @@ def test_demo_steps_have_one_primary():
         at = next(b for b in at.button if b.key == f"tour_go_{n}").click().run() if n else at
         found = primaries(at)
         assert len(found) == 1, (n, found)
-    assert found == ["要件定義書の内容を見る"]  # 終了画面は成果物の確認を主操作にする
+    assert found == ["要件定義書の全文を見る"]  # 終了画面は成果物（要件定義書の全文）の確認を主操作にする
 
 
 def test_project_requirements_states_and_links(p):
@@ -1400,6 +1400,8 @@ def test_prep_to_meeting_to_records_keeps_selected_meeting(p):
     second = q["meetings"][-1]["id"]
     assert any("第2回打ち合わせ" in s.value and "登録しました" in s.value for s in at.success)
     assert primaries(at) == ["会議の記録を整理 →"] and key(at, "mtg_done_prep").label == "質問・議題に戻る"
+    labels = [b.label for b in at.main.button]
+    assert labels.count("会議の記録を整理 →") == 1 and labels.count("質問・議題に戻る") == 1  # 登録直後は完了欄に1組だけ
     at = key(at, "mtg_done_records").click().run()
     assert at.session_state["page"] == "records" and at.session_state["records_mtg"] == second  # 押した会議を選択済み
     assert any("対象の会議：" in c.value for c in at.caption)
@@ -1417,6 +1419,8 @@ def test_choose_other_meeting_from_list(p):
     continuity.add_meeting(p, "第2回打ち合わせ")
     at = open_app(p, "meetings")
     at = next(s for s in at.selectbox if s.key == "rq_mtg").set_value(first).run()
+    labels = [b.label for b in at.main.button]
+    assert labels.count("会議の記録を整理 →") == 1 and labels.count("質問・議題に戻る") == 1  # 開き直した会議の詳細に1組だけ
     at = key(at, "mtg_sel_records").click().run()
     assert at.session_state["page"] == "records" and at.session_state["records_mtg"] == first
 
@@ -1446,3 +1450,87 @@ def test_empty_requirements_show_candidate_and_manual_entrances(p):
     assert key(at, "rq_empty_cand").label.startswith("AI候補を確認する（確認待ち 1件）")
     at = key(at, "rq_empty_cand").click().run()
     assert at.session_state["page"] == "candidates"
+
+
+# ---- AI候補から判断記録の下書きを作る：確認欄を開くだけでは変わらず、確定で1回だけ作る ----
+def _dec_project(p):
+    m = registry.ingest_paste(p, "第1回議事録", "第1期は照合のみとする。", kind="議事録")
+    run(p, "extract", [cand("決定", "第1期は照合と履歴の閲覧のみ"), cand("要望", "確認時刻を記録する")], source_ids=[m["id"]])
+    return p
+
+
+@pytest.mark.parametrize("how", ["none", "new"])
+def test_decision_draft_confirm_then_create_once(p, how):
+    at = open_app(_dec_project(p), "candidates")
+    before = (len(at.session_state["project"]["decisions"]), len(at.session_state["project"]["requirements"]))
+    at = next(b for b in at.button if b.label == "判断記録の下書きの内容を確認").click().run()
+    q = at.session_state["project"]
+    assert (len(q["decisions"]), len(q["requirements"])) == before  # 確認欄を開くだけでは変更しない
+    cid = next(c["id"] for c in q["candidates"] if c["kind"] == "決定")
+    at = next(r for r in at.radio if r.key == f"cd_h_{cid}").set_value(how).run()
+    plan = "判断記録と要件の下書きを作成します。" if how == "new" else "判断記録の下書きだけを作成します（要件は作成しません）。"
+    assert plan in html(at)
+    at = key(at, f"cd_go_{cid}").click().run()
+    q = at.session_state["project"]
+    dec = q["decisions"][-1]["id"]
+    assert len(q["decisions"]) == before[0] + 1 and len(q["requirements"]) == before[1] + (1 if how == "new" else 0)
+    msg = next(s.value for s in at.success if "を作成しました" in s.value)
+    assert dec in msg and (("要件の下書き" in msg) == (how == "new"))
+    assert key(at, "cand_open_dec").label == "決定・合意で下書きを開く" and key(at, "cand_open_dec").proto.type == "primary"
+    assert any(b.key == "cand_open_reqs" for b in at.button) == (how == "new")
+    assert at.session_state["page"] == "candidates"  # 自動では移動しない
+    assert key(at, "cand_next").label == "次の未確認候補へ"  # 未確認の候補が残っている
+    assert not any(b.key == "cand_go_reqs" for b in at.button)  # 結果と違う「採用した要件を確認する」は出さない
+    # 同じ候補は二重に登録できない（既存の重複防止）
+    assert not any(b.key == f"cd_go_{cid}" for b in at.button)
+    if how == "new":  # 副導線：作成した要件の下書きを開く
+        new_req = q["requirements"][-1]["id"]
+        at = key(at, "cand_open_reqs").click().run()
+        assert at.session_state["page"] == "requirements" and at.session_state["req_focus"]["ids"] == [new_req]
+        return
+    at = key(at, "cand_open_dec").click().run()  # 主ボタン：作成した判断記録を選択済みで開く
+    assert at.session_state["page"] == "decisions" and next(s for s in at.selectbox if s.key == "dc_sel").value == dec
+    assert at.session_state["project"]["decisions"][-1]["state"] != "合意済み"  # 下書きと合意の確定は別の操作
+
+
+def test_decision_draft_link_existing_requirement_text(p):
+    reviewed(p)
+    _dec_project(p)
+    at = open_app(p, "candidates")
+    q = at.session_state["project"]
+    cid = next(c["id"] for c in q["candidates"] if c["kind"] == "決定" and c["state"] == "候補")
+    at = next(b for b in at.button if b.key == f"go_dec_{cid}").click().run()
+    req = q["requirements"][0]["id"]
+    at = next(m for m in at.multiselect if m.key == f"cd_r_{cid}").set_value([req]).run()
+    assert f"判断記録の下書きを作成し、{req} に関連付けます" in html(at)
+    at = key(at, f"cd_go_{cid}").click().run()
+    assert any(f"{req} に関連付け" in s.value for s in at.success) and not any(b.key == "cand_open_reqs" for b in at.button)
+
+
+# ---- 再開用ファイルの更新通知 ----
+def test_resume_file_notice_after_update_and_redownload(p):
+    from definereq.logic import continuity
+
+    at = open_app(p, "setup")
+    caps = lambda a: [c.value for c in a.caption]  # noqa: E731
+    assert not any("前回のファイル" in c for c in caps(at))  # 初回の未出力状態では「前回のファイル」と言わない
+    at.session_state["save_fp"] = pj.fingerprint(at.session_state["project"])  # ダウンロードした状態（mark_saved と同じ）
+    at.session_state["save_time"] = pj.now_iso()
+    at.run()
+    assert any("最新の内容でファイルを作成しました" in c for c in caps(at))
+    continuity.add_meeting(at.session_state["project"], "第2回打ち合わせ")  # 案件を更新
+    at.run()
+    assert any(c == "前回のファイルには、最新の変更が入っていません。閉じる前に、もう一度ダウンロードしてください。" for c in caps(at))
+    at.session_state["save_fp"] = pj.fingerprint(at.session_state["project"])  # 再出力
+    at.run()
+    assert not any("前回のファイル" in c for c in caps(at))
+    data = jsonio.dumps(at.session_state["project"])
+    assert [m["name"] for m in jsonio.loads(data)["meetings"]] == ["第2回打ち合わせ"]  # 読み戻すと更新した内容が戻る
+
+
+def test_resume_file_notice_separates_unsaved_input(p):
+    at = open_app(p, "prep")
+    at = next(t for t in at.text_area if t.key == f"draft_{p['id']}_prep_agenda").set_value("未反映の議題").run()
+    at.session_state["page"] = "setup"
+    at.run()
+    assert any("画面で入力中の内容（保存・反映の前）は、ファイルに含まれません" in c.value for c in at.caption)

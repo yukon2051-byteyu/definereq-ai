@@ -96,11 +96,11 @@ class Ctx:
                     continue
                 v = ev.speaker_view(r, seg)
                 out.append({"source_id": sid, "unit_id": seg["id"], "quote": e.get("quote"), "page": "recordings", "confirmed": v["confirmed"],
-                            "label": f"議事録の該当発言を見る（{format_time(seg['start'])} {v['label']}：{v['name']}）"})
+                            "label": f"機能画面で議事録の該当発言を見る（{format_time(seg['start'])} {v['label']}：{v['name']}）"})
             else:
                 src = pj.get(self.p, "sources", sid)
                 if src:
-                    out.append({"source_id": sid, "unit_id": e.get("unit_id"), "quote": e.get("quote"), "page": "sources", "confirmed": True, "label": f"「{src['name']}」の該当箇所を見る"})
+                    out.append({"source_id": sid, "unit_id": e.get("unit_id"), "quote": e.get("quote"), "page": "sources", "confirmed": True, "label": f"機能画面で「{src['name']}」の該当箇所を見る"})
         return out
 
     def conflict(self, change: dict) -> list[tuple]:
@@ -428,7 +428,7 @@ def _d1() -> dict:
         dict(process="判断", short="訂正方法の比較", stage=2, page="decisions", title="3案を比べて、再申請を採用した",
              lead=None,
              main=lambda g: [g.verdict("承認後の金額訂正の方式", "判断の確認メール", "金額の訂正は再申請で進めます")],
-             evidence_button="この判断に使った確認メールを見る",
+             evidence_button="機能画面でこの判断に使った確認メールを見る",
              more=lambda g: [],
              open=lambda g: [(DECIDE, f"{d['topic']}（{d['state']}：{d.get('hold_reason')}）") for d in g.p["decisions"] if d["state"] == "保留"], count=lambda g: f"代表例1件／判断 全{len(g.p['decisions'])}件"),
         dict(process="追加要望と影響", short="追加要望の影響", stage=3, page="changes", title="経理の直接訂正の要望が、過去の判断と衝突する",
@@ -584,6 +584,10 @@ def phase_of(demo_id: str, index: int) -> tuple[int, str]:
         if index < end:
             return n, name
     raise IndexError(index)
+
+# 最終画面で最初から見せる代表的な要件と、その要件の決め手になった判断（既存のデモデータのID）。
+# 案内で見た判断が、要件定義書にどう残ったかを1件で示す
+REPRESENTATIVE = {"d1": ("REQ-002", "DEC-004"), "d2": ("REQ-004", "DEC-005"), "d3": ("REQ-006", "DEC-001")}
 
 # デモ用の役割と、体験の振り返り。実案件の利用者の役割を決めるものではない
 INTRO = {

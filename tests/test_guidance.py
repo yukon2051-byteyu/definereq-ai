@@ -416,8 +416,9 @@ def test_final_screen_flow():
     at = to_end(app())
     assert not at.exception
     html = "".join(h.proto.body for h in at.get("html"))
-    assert "デモ体験はここで終了です" in html and "要件定義の完了を示すものではありません" in html and "作成されたサンプル資料" in html
-    assert html.index("デモ体験はここで終了です") < html.index("作成されたサンプル資料") < html.index("決まったことと残っていること")
+    # 大見出しは成果物。「デモ完了」は補助表示。見出しの直下に代表例、その後にほかの成果物
+    assert 'class="dr-g-h dr-end-h">この案件の要件定義書と成果物' in html and "✓ デモ完了" in html and "要件定義の完了を示すものではありません" in html
+    assert html.index("この案件の要件定義書と成果物") < html.index("代表的な要件の例") < html.index("ほかの成果物") < html.index("決まったことと残っていること")
     assert "残っていること：全4件" in html and "主な3件を表示しています" in html
     assert any(e.label == "全4件を見る" for e in at.expander)
     assert len(at.get("download_button")) == 4 and "demo_done" in at.session_state and "d1" in at.session_state["demo_done"]
@@ -561,10 +562,10 @@ def test_decision_shows_choice_reason_basis_then_table():
     assert "発言（話者確認済み）" in h and 'class="dr-t-win"' in h
     labels = [b.label for b in at.button]
     # 出典を開く操作は採用案と理由の近く（「次へ」より前）。「次へ」は1つだけ
-    assert labels.index("この判断に使った確認メールを見る") < labels.index("次へ：追加要望と影響") and labels.count("次へ：追加要望と影響") == 1
-    assert "議事録の該当発言を見る" in labels
+    assert labels.index("機能画面でこの判断に使った確認メールを見る") < labels.index("次へ：追加要望と影響") and labels.count("次へ：追加要望と影響") == 1
+    assert "機能画面で議事録の該当発言を見る" in labels
     assert any(e.label.startswith("判断の根拠と経緯を見る") for e in at.expander)
-    assert button(at, "tour_evidence").label == "この判断に使った確認メールを見る" and button(at, "tour_detail").label == "この案件の決定・合意を確認する"
+    assert button(at, "tour_evidence").label == "機能画面でこの判断に使った確認メールを見る" and button(at, "tour_detail").label == "機能画面で決定・合意を見る"
 
 
 def test_evidence_and_decision_list_return_to_origin_step():
@@ -596,17 +597,18 @@ def test_after_spec_summary_comes_before_table():
     assert [b.label for b in at.button if b.label.startswith("次へ：")] == ["次へ：要件定義書と成果物"]
     assert any(e.label.startswith("判断の詳細を見る") for e in at.expander)
     at = button(at, "tour_next").click().run()
-    assert at.session_state["tour_index"] == 7 and any(b.label == "要件定義書の内容を見る" for b in at.button)
+    assert at.session_state["tour_index"] == 7 and any(b.label == "要件定義書の全文を見る" for b in at.button)
 
 
 def test_finale_separates_end_and_open_items_and_puts_next_first():
     at = to_end(app())
     h = html_of(at)
-    assert "デモ体験はここで終了です" in h and "案件に残る未確認の項目" in h and '<div class="dr-end-n">4件</div>' in h
+    assert "この案件の要件定義書と成果物" in h and "案件に残る未確認の項目" in h and '<div class="dr-end-n">4件</div>' in h
     labels = [b.label for b in at.button]
-    assert labels.index("ほかのデモを見る") < labels.index("要件定義書の内容を見る")
-    assert "再申請方式を採用した理由と、未確認の項目がどう記録されたかを確認できます。" in h
+    # 代表例の下に、要件定義書の全文とWord。ほかの成果物や機能画面への導線はその後
+    assert labels.index("要件定義書の全文を見る") < labels.index("ほかのデモを見る") and labels.index("要件定義書の全文を見る") < labels.index("機能画面でこの案件の現在の状況を見る")
     downloads = [b.label for b in at.get("download_button")]
+    assert downloads[0] == "要件定義書をWordでダウンロード"
     assert "要件定義書をWordでダウンロード" in downloads and "要件一覧をExcelでダウンロード" in downloads
     at = button(at, "tour_view_spec").click().run()
     assert any("要件定義書の内容" in m.value for m in at.markdown)
@@ -638,7 +640,7 @@ def demo_at(demo="d1", step=None):
 @pytest.mark.parametrize("demo", ["d1", "d2", "d3"])
 def test_demo_profile_and_sources_are_browsable(demo):
     at = demo_at(demo)
-    at = button(at, "tour_profile").click().run()  # 冒頭の「登録された背景・目的・関係者を見る」
+    at = button(at, "tour_profile").click().run()  # 冒頭の「機能画面で背景・目的・関係者を見る」
     h = html_of(at)
     assert at.session_state["page"] == "profile" and "デモデータ · 閲覧専用" in h and button(at, "tour_back").label == "← デモステップ 1/8『案件の背景』に戻る"
     p = at.session_state["project"]
@@ -744,7 +746,7 @@ def test_step_labels_match_destination(demo):
 def test_open_process_and_return_to_step(entry):
     at = demo_at("d1", 2)  # デモステップ 3/8
     if entry == "body":
-        at = button(at, "tour_detail").click().run()  # 本文の補助ボタン（この案件の〇〇を確認する）
+        at = button(at, "tour_detail").click().run()  # 本文の補助ボタン（機能画面で〇〇を見る）
     else:
         at = button(at, "nav_group_3").click().run()  # サイドバーの工程を開き、機能を選ぶ
         assert at.session_state["tour_on"] and at.session_state["tour_index"] == 2
@@ -767,7 +769,7 @@ def test_open_process_and_return_to_step(entry):
 
 def test_body_detail_button_names_the_page():
     at = demo_at("d1", 2)
-    assert button(at, "tour_detail").label == "この案件のAI候補を確認する"
+    assert button(at, "tour_detail").label == "機能画面でAI候補を見る"
     assert button(at, "tour_detail").proto.type == "tertiary" and button(at, "tour_next").proto.type == "primary"
 
 
@@ -824,3 +826,24 @@ def test_sidebar_overview_from_step1_shows_time_and_return():
     assert any(s.label.startswith("表示するデータの時点") for s in at.get("button_group"))
     at = button(at, "tour_back").click().run()
     assert at.session_state["tour_on"] and at.session_state["tour_index"] == 0
+
+
+
+@pytest.mark.parametrize("demo,rid,did", [("d1", "REQ-002", "DEC-004"), ("d2", "REQ-004", "DEC-005"), ("d3", "REQ-006", "DEC-001")])
+def test_finale_shows_representative_requirement_first(demo, rid, did):
+    """最終画面：代表的な要件1件を追加操作なしで読める（内容・状態・元の記録・判断と理由）。値は既存のデモデータ。"""
+    from definereq.demos import builder
+
+    at = demo_at(demo, 7)
+    h = html_of(at)
+    p = builder.build(demo, 4)
+    r = next(x for x in p["requirements"] if x["id"] == rid)
+    d = next(x for x in p["decisions"] if x["id"] == did)
+    rep = h[h.index('class="dr-rep"'):]
+    assert f"{rid} {r['title']}" in rep and f"状態：{r['status']}" in rep and r["body"][:20] in rep
+    assert "元の記録" in rep and r["evidence"][0]["quote"][:10] in rep
+    assert d["topic"] in rep and d["rationale"][:15] in rep
+    assert h.index("この案件の要件定義書と成果物") < h.index('class="dr-rep"')
+    assert [b.label for b in at.get("download_button")][0] == "要件定義書をWordでダウンロード"
+    at = button(at, "tour_view_spec").click().run()
+    assert not at.exception and at.session_state["doc_view"] == "spec" and at.session_state["tour_index"] == 7
