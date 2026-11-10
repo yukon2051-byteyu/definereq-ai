@@ -94,7 +94,9 @@ def extract_runner(p: dict, src_ids: list[str], rec_ids: list[str], primary: boo
         st.session_state["ai_extract_basis"] = basis
         st.session_state["ai_src_extract"] = list(src_ids)
         st.session_state["ai_rec_extract"] = list(rec_ids)
-    names = {s["id"]: f"{s['name']}（{s['kind']}）" for s in sources}
+    # 今回登録した記録・未整理・整理済みを名前の横に示す。初期の選択は未整理の記録だけ（整理済みは必要なときに選び直せる）
+    fresh = set(st.session_state.get("rec_new") or [])
+    names = {s["id"]: f"{s['name']}（{s['kind']}・{'今回登録・' if s['id'] in fresh else ''}{'未整理' if s['id'] in src_ids else '整理済み' if s['kind'] == '議事録' else '参考資料'}）" for s in sources}
     chosen = st.multiselect("整理する議事録・資料", list(names), format_func=names.get, key="ai_src_extract")
     picked: list[str] = []
     if p["recordings"]:

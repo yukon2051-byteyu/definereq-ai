@@ -15,7 +15,7 @@ from .pages import decide, materials, organize, prepare, trace
 
 # 上位は作業の工程の5つ。デモと自分の案件で同じ定義からサイドバーを描画し、工程名と機能名をそろえる
 GROUPS = [
-    ("案件の準備", [("setup", "準備の概要", prepare.setup), ("overview", "現在の状況", prepare.overview), ("profile", "背景・目的・関係者", prepare.profile)]),
+    ("案件の準備", [("setup", "準備の概要", prepare.setup), ("overview", "現在の状況", prepare.overview), ("profile", "背景・目的・関係者", prepare.profile), ("refs", "参考資料", materials.references)]),
     ("会議の準備", [("prep", "質問・議題", prepare.prep), ("meetings", "会議", prepare.meetings)]),
     ("記録の取り込み・整理", [("records", "会議の記録を整理", materials.records), ("sources", "資料・議事録", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
     ("要件の確認・判断", [("candidates", "AI候補の確認", organize.candidates), ("requirements", "要件", organize.requirements), ("refine", "具体化・受入条件", organize.refine), ("decisions", "決定・合意", decide.decisions),
@@ -27,12 +27,12 @@ GROUPS = [
 PAGES = {key: (label, fn) for _, items in GROUPS for key, label, fn in items}
 GROUP_OF = {key: group for group, items in GROUPS for key, _, _ in items}
 # 画面の上部に独自の状態表示と主ボタンを持つ画面。共通の状態表示（situation.headline）は出さない
-CUSTOM_TOP = {"setup", "profile", "sources", "records", "candidates"}
+CUSTOM_TOP = {"setup", "profile", "refs", "sources", "records", "candidates", "prep", "meetings"}
 # 使う頻度の低い機能は「詳細メニュー」にまとめる。関連する作業の画面からも移動できる
 ADVANCED = {"refine", "nfr", "scope", "scenarios", "issues", "conflicts", "risks", "baseline", "usage"}
 
 # 各画面の次の行動（移動先）
-NEXT = {"setup": ("背景・目的・関係者を入力します", "profile"), "records": ("候補を確認して要件を整理します", "requirements"), "overview": ("残件のもとになる要件を確認します", "requirements"), "profile": ("会議の質問を準備します", "prep"), "meetings": ("次の会議の質問を準備します", "prep"), "prep": ("会議の資料を登録します", "sources"),
+NEXT = {"setup": ("背景・目的・関係者を入力します", "profile"), "records": ("候補を確認して要件を整理します", "requirements"), "overview": ("残件のもとになる要件を確認します", "requirements"), "profile": ("会議の質問を準備します", "prep"), "meetings": ("次の会議の質問を準備します", "prep"), "prep": ("会議の資料を登録します", "sources"), "refs": ("会議の質問を準備します", "prep"),
         "sources": ("録画と発言を確認します", "recordings"), "recordings": ("資料と発言から候補を整理します", "candidates"), "candidates": ("採用した内容を要件で確認します", "requirements"),
         "requirements": ("曖昧な要件を具体化します", "refine"), "refine": ("非機能を確認します", "nfr"), "nfr": ("今回の範囲を決めます", "scope"),
         "scope": ("通常と例外の流れを確認します", "scenarios"), "scenarios": ("意見の違いを整理します", "issues"), "issues": ("判断を記録します", "decisions"),
@@ -198,7 +198,7 @@ def render(p: dict) -> None:
     empty = key == "overview" and gd.phase(p) == "empty"
     if p.get("demo"):
         demo_bar(p)
-    elif mine and key not in ("setup", "profile", "sources") and not empty:
+    elif mine and key not in ("setup", "profile", "refs", "sources") and not empty:
         back_to_setup(key)  # 背景と資料の画面は、戻る操作を見出しの近くに独自に置く
     if mine and key not in CUSTOM_TOP and not empty:
         # 画面名 → 状態の1行と主ボタン の順にするため、見出しの直後に状態表示を出す（components.head が呼ぶ）

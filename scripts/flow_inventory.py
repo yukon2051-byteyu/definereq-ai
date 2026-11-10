@@ -71,6 +71,31 @@ def states() -> list[tuple[str, dict]]:
     return [("① 新規", a), ("② 議事録を登録", b), ("③ AI整理後・確認待ち6件", c), ("④ 確認待ち0件・要件あり", d)]
 
 
+def demo_guide_first_after(steps):
+    from definereq.ui.guide import first_after_meeting
+
+    return first_after_meeting(steps)
+
+
+# 本文の次の操作の一覧（画面の実装と同じ内容。変更したらここも直す）
+FLOW_RULES = [
+    ("案件の準備", "準備の概要", "常に", "背景・目的・関係者を入力／参考資料を登録する（カード）", "すでに議事録がある場合は、議事録を取り込む → 資料・議事録", "なし"),
+    ("案件の準備", "背景・目的・関係者", "保存の直後", "次へ：質問・議題 → 質問・議題（未整理の議事録・確認待ちの候補があればその作業）", "参考資料を登録する（参考資料が0件のとき）", "なし"),
+    ("案件の準備", "参考資料", "登録の直後", "会議の準備へ進む → 質問・議題（質問・議題から開いたときは「会議の準備に戻る」）", "続けて参考資料を追加", "質問・議題の入力途中の内容（下書き）"),
+    ("会議の準備", "質問・議題", "反映の直後（反映結果の近く）／それ以外（画面の下）", "会議へ進む → 会議", "会議が終わっていれば、議事録を取り込む／参考資料を追加する", "なし"),
+    ("会議の準備", "質問・議題", "未反映の入力があるとき", "案件内に反映", "反映して会議へ進む（入力は下書きに残る）", "入力途中の内容"),
+    ("会議の準備", "会議", "会議の登録直後／一覧で会議を選んだとき", "会議の記録を整理 → 会議の記録を整理", "質問・議題に戻る", "押した会議（議事録の関連付け先の初期値）"),
+    ("記録の取り込み・整理", "資料・議事録", "議事録の登録直後", "会議の記録を整理する → 会議の記録を整理", "続けて議事録を追加／参考資料を登録する", "今回登録した議事録（整理の対象に選択済み）"),
+    ("記録の取り込み・整理", "会議の記録を整理", "未整理の議事録があるとき", "選択した議事録をAIで整理する", "前回の整理で作成したAI候補を確認する", "整理済みの議事録は初期の選択に入れない"),
+    ("記録の取り込み・整理", "会議の記録を整理", "AI整理の後", "AI候補を確認する → AI候補の確認", "次回の質問を準備する", "なし"),
+    ("要件の確認・判断", "AI候補の確認", "採用の直後", "次の未確認候補へ（0件なら登録した要件を開く）", "登録した要件を開く／要件一覧を開く", "採用した候補から作った要件"),
+    ("要件の確認・判断", "要件", "要件が0件", "AI候補を確認する → AI候補の確認（候補がなければ会議の記録を整理）", "要件を追加する（手入力の欄を開いた状態）", "なし"),
+    ("要件の確認・判断", "決定・合意", "判断を合意済みにし、関連する要件へ反映し終えたとき", "確認資料・要件定義書へ進む → 確認資料・要件定義書", "なし", "なし"),
+    ("共有・変更管理", "確認資料・要件定義書", "Wordの作成後", "（ダウンロード）", "現在の状況へ戻る／再開用ファイルをダウンロード", "なし"),
+    ("各工程", "その他の画面・詳細メニュー", "常に", "状態に合う次の作業（見出しの直下）", "← 準備の概要に戻る", "残件から開いたときは対象の要件"),
+]
+
+
 def clean(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text)).strip()
 
@@ -86,7 +111,7 @@ def look(p: dict, page: str) -> dict:
     main = primary[0] if primary else None
     here = "この画面で作業します" in "".join(c.value for c in at.caption)
     back = any(b.label == "← 準備の概要に戻る" for b in at.button)  # 主ボタンを押して移動する前に判定する
-    cards = [b.label for b in at.button if b.key in ("setup_profile", "setup_sources")]
+    cards = [b.label for b in at.button if b.key in ("setup_profile", "setup_refs", "setup_minutes")]
     target = ""
     if main and "→" in main.label:
         try:
@@ -104,14 +129,18 @@ def main() -> None:
     lines = ["# 画面遷移の一覧", "",
              "`scripts/flow_inventory.py` で、実際の画面を描画して作成した一覧です（手で書き換えないでください）。AIは呼んでいません。",
              "主操作は、その状態で強調表示されるボタンです。「→」の付いた主操作は、押したときの移動先を記録しています。", "",
-             "## 自分の案件", ""]
+             "## 本文の次の操作（作業の結果から次の作業へ）", "",
+             "各画面の作業を終えた後に、本文に出る操作です。表示の条件と、移動先へ引き継ぐ対象を示します（`tests/test_project_flow.py` で確認）。", "",
+             "| 工程 | 画面 | 表示の条件 | 主操作 → 移動先 | 補助の操作 | 引き継ぐ対象 |", "|---|---|---|---|---|---|",
+             *[f"| {' | '.join(row)} |" for row in FLOW_RULES], "",
+             "## 自分の案件（状態ごとの主操作）", ""]
     for name, p in states():
         lines += [f"### {name}", "", "| 工程 | 画面 | 状態の表示 | 主操作 | 移動先 | 戻る操作 |", "|---|---|---|---|---|---|"]
         for key in names:
             r = look(p, key)
             menu = names[key] + ("（詳細メニュー）" if key in ADVANCED else "")
             to = names.get(r["target"], r["target"])
-            lines.append(f"| {group_of[key]} | {menu} | {r['status']} | {r['main']} | {to} | {'← 準備の概要に戻る' if r['back'] else '見出し付近に独自の戻る操作' if key in ('profile', 'sources') else 'ー'} |"
+            lines.append(f"| {group_of[key]} | {menu} | {r['status']} | {r['main']} | {to} | {'← 準備の概要に戻る' if r['back'] else '見出し付近に独自の戻る操作' if key in ('profile', 'refs', 'sources') else 'ー'} |"
                          + (" **エラー**" if r["error"] else ""))
         lines.append("")
     lines += ["## デモ（3件）", "", "| デモ | ステップ | 工程 | 本文の操作 |", "|---|---|---|---|"]
@@ -124,11 +153,18 @@ def main() -> None:
                 ops += ["要件定義書の内容を見る（主操作）", "ほかのデモを見る", "この案件の機能画面を詳しく見る", "Word／Excelのダウンロード"]
             else:
                 ops.append(f"次へ：{steps[n + 1]['process']}（主操作）")
-                ops.append(f"詳細：{s['detail'](demo_guide.Ctx(__import__('definereq.demos.builder', fromlist=['build']).build(demo_id, s['stage'])))}")
+                if n:  # ステップ1（案件の背景）からは機能画面へ直接は飛ばない（背景・目的・関係者を見る操作だけ）
+                    ops.append(f"詳細：{s['detail'](demo_guide.Ctx(__import__('definereq.demos.builder', fromlist=['build']).build(demo_id, s['stage'])))}")
+                else:
+                    ops.append("登録された背景・目的・関係者を見る")
+                if n == demo_guide_first_after(steps):
+                    ops.append("会議後に残った確認事項を見る（現在の状況を、この場面と同じ時点のデータで開く）")
             if n == target:
                 ops.append(f"トップの近道「{demo_guide.shortcut_label(demo_id)}」の行き先（前提の1文と「案件の背景から見る」を表示）")
             lines.append(f"| {demo_id} | {n + 1}. {s['process']} | {group_of.get(s['page'], '')} | {'／'.join(ops)} |")
-    lines += ["", "デモのステップからサイドバーで機能を開くと、本文の先頭に「← ステップN「ステップ名」に戻る」が出て、開いた元のステップへ戻ります（`tests/test_project_flow.py` の `test_every_demo_detail_page_returns_to_step`）。", ""]
+    lines += ["", "デモの案内中は、ステップを進めてもサイドバーの工程は自動で開きません（工程名を押すと開閉だけします）。"
+              "工程を開いて機能を選ぶと、その工程とページを選択表示し、本文の先頭に「← デモステップ N/8『ステップ名』に戻る」が出ます。"
+              "戻ると元のステップと、機能を開く前の開閉状態に戻ります（`tests/test_guidance.py` の `test_open_process_and_return_to_step`）。", ""]
     OUT.write_text("\n".join(lines), encoding="utf-8")
     print("作成", OUT)
 

@@ -204,6 +204,12 @@ def share_page(p: dict) -> None:
             st.success(f"{w['title']}を作成しました。下のボタンからダウンロードしてください。")
             st.download_button(f"{w['title']}をダウンロード（Word）", w["data"], file_name=w["name"], mime=artifacts.WORD, key="dl_word", on_click="ignore", type=main_type())
             st.caption("PDFが必要な場合は、Wordで開いて「名前を付けて保存」からPDFを選んでください。")
+            if not p.get("is_demo"):  # 作業の区切り：戻り先と、続きに備える再開用ファイル
+                with st.container(border=True, key="share_after"):
+                    st.markdown("**資料を作成した後**")
+                    if st.button("現在の状況へ戻る", key="share_back_ov", type="secondary"):
+                        state.goto("overview")
+                    save_controls(p, "save_share_after", note=False)
             c1, c2 = st.columns(2)
             if c1.button("未確認事項を確認する", key="go_overview_open", width="stretch"):
                 state.goto("overview")

@@ -62,6 +62,11 @@ def profile_state(p: dict) -> str:
     return "入力済み" if filled else "未入力"
 
 
+def references_count(p: dict) -> int:
+    """登録が完了した参考資料（議事録以外の資料）の件数。種別だけで判定する。"""
+    return sum(1 for s in p["sources"] if s.get("kind") != "議事録" and not s.get("superseded_by"))
+
+
 def records_count(p: dict) -> int:
     """取り込みが完了した資料・議事録・録画の件数。選んだだけのファイルや失敗は数えない。"""
     return sum(1 for s in p["sources"] if not s.get("superseded_by")) + len(p["recordings"])

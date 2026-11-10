@@ -169,6 +169,9 @@ def _reflect_requirements(p: dict, d: dict) -> None:
         return
     if not waiting:
         st.caption("関連する要件は全てこの判断に基づいて合意済みです。")
+        # 判断を記録し、要件へ反映し終えた後の次の作業：確認資料・要件定義書の作成
+        if st.button("確認資料・要件定義書へ進む →", key=f"dc_go_share_{d['id']}", type=main_type()):
+            state.goto("share")
         return
     with st.container(border=True):
         st.markdown(f"**判断を合意済みとして記録しました**　関連する要件 {len(waiting)}件に、この判断を反映できます。対象を確認して選んでください。")

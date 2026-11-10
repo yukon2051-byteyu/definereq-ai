@@ -22,13 +22,13 @@ def setup(p: dict) -> None:
     """案件の準備。背景と資料はどちらからでも始められ、あとから追加・編集できる。"""
     head("準備の概要", "背景の入力と資料の取り込みは、どちらからでも始められます。あとから追加・編集できます。", "案件ホーム")
     pstate = drafts.profile_state(p)
-    count = drafts.records_count(p)
-    rstate = f"取り込み済み {count}件" if count else "未取り込み"
+    count = drafts.references_count(p)  # 参考資料の件数（議事録は数えない）
+    rstate = f"登録済み {count}件" if count else "未登録"
     tone = {"未入力": "plain", "入力済み": "ok", "未保存の変更あり": "warn"}
     cards = (("背景・目的・関係者", "案件の背景、困りごと、目的、関係者を記録します。分からない項目は空欄で構いません。", chip(pstate, tone[pstate]),
               "背景・目的・関係者を入力" if pstate == "未入力" else "背景・目的・関係者を編集", "profile", "setup_profile"),
-             ("資料・議事録", "Word・Excel・PDF・テキストの資料や議事録を取り込みます。取り込んだ後も確認・追加できます。", chip(rstate, "ok" if count else "plain"),
-              "資料・議事録を取り込む", "sources", "setup_sources"))
+             ("参考資料", "現行のルール・運用資料・要望書など、会議の前に読む資料を登録します。Word・Excel・PDF・テキストに対応しています。", chip(rstate, "ok" if count else "plain"),
+              "参考資料を確認・追加する" if count else "参考資料を登録する", "refs", "setup_refs"))
     cols = st.columns(2)
     for col, (title, text, badge, label, page, key) in zip(cols, cards):
         with col, st.container(border=True, height="stretch"):
@@ -36,6 +36,9 @@ def setup(p: dict) -> None:
             st.space("stretch")
             if st.button(label, key=key, width="stretch"):
                 state.goto(page)
+    if not p.get("is_demo"):  # 会議がすでに終わっている人は、工程3の議事録の登録へ直接進める
+        if st.button("すでに議事録がある場合は、議事録を取り込む →", key="setup_minutes", type="tertiary"):
+            state.goto("sources")
     if not p.get("is_demo") and not gd.setup_next(p).get("empty"):  # 何も登録していないときは、上の2枚のカードが開始の操作
         st.caption("上の2つは、背景や資料をあとから追加・編集するときの入口です。")
         next_block(p, "setup_next")
@@ -188,7 +191,7 @@ def _backlog(p: dict, bl: dict, phase: str) -> None:
 def profile(p: dict) -> None:
     demo = p.get("is_demo")
     if not demo:
-        top_nav("go_setup_top", ("資料・議事録へ", "sources", "go_sources_top"))
+        top_nav("go_setup_top", ("参考資料へ", "refs", "go_sources_top"))
     head("背景・目的・関係者", "案件の背景・目的・課題を記録します。分からない項目は空欄のまま進められます。" if not demo else
          "確認済み・本人申告・仮説・未確認を区別して記録します。要件定義書の背景と目的はここを参照します。", "案件ホーム")
     # 編集中は「案件情報を保存」を主な操作にするため、上部に別の工程を勧める案内は出さない（詳しい案内は画面の下）
@@ -257,15 +260,18 @@ def _profile_form(p: dict) -> None:
             label, page = _after_save(p)
             with st.container(key="pf_saved_box"):
                 st.success(f"案件情報を保存しました（{saved['time']}）。")
-                if st.button(f"次へ：{label} →", key="pf_next_go", type="primary"):
-                    state.goto(page)
+                with st.container(horizontal=True, vertical_alignment="center"):
+                    if st.button(f"次へ：{label} →", key="pf_next_go", type="primary"):
+                        state.goto(page)
+                    if not drafts.references_count(p) and st.button("参考資料を登録する", key="pf_refs"):
+                        state.goto("refs")
 
 
 def _after_save(p: dict) -> tuple[str, str]:
-    """案件情報を保存した後の次の操作。資料が未登録なら取り込み、登録済みなら案件の状態に合う工程。"""
-    if not p["sources"] and not p["recordings"]:
-        return "資料・議事録を取り込む", "sources"
+    """案件情報を保存した後の次の操作。未整理の議事録や確認待ちの候補があればその作業、なければ会議の準備（質問・議題）。"""
     nx = gd.setup_next(p)
+    if nx["page"] in ("refs", "prep"):  # 会議前の準備の段階。議事録の登録へは誘導しない
+        return "質問・議題", "prep"
     return nx["label"], nx["page"]
 
 
@@ -358,30 +364,102 @@ def _domains(p: dict) -> None:
         note_slot("dom")
 
 
+PREP_FIELDS = ["prep_understanding", "prep_purpose", "prep_gaps", "prep_materials", "prep_agenda", "prep_decide"]
+
+
+def _prep_form(p: dict, pr: dict) -> None:
+    # 入力途中の内容は下書きに残す（参考資料の登録などで画面を離れて戻っても消えない）。案件には「案件内に反映」で反映する
+    pid = p["id"]
+    understanding = drafts.widget(pid, "prep_understanding", st.text_area, "現時点の理解", pr.get("understanding") or "")
+    purpose = drafts.widget(pid, "prep_purpose", st.text_input, "会議の目的", pr.get("purpose") or "")
+    c1, c2 = st.columns(2)
+    with c1:
+        gaps = drafts.widget(pid, "prep_gaps", st.text_area, "不足情報（1行に1件）", "\n".join(pr.get("gaps", [])))
+    with c2:
+        materials = drafts.widget(pid, "prep_materials", st.text_area, "必要な資料・計測（1行に1件）", "\n".join(pr.get("materials", [])))
+    with c1:
+        agenda = drafts.widget(pid, "prep_agenda", st.text_area, "議題（1行に1件）", "\n".join(pr.get("agenda", [])))
+    with c2:
+        decide = drafts.widget(pid, "prep_decide", st.text_area, "今回決めたいこと（1行に1件）", "\n".join(pr.get("decide_today", [])))
+    go = st.session_state.pop("prep_save_and_go", False)
+    # 主ボタンは1つ：未反映の入力があれば「案件内に反映」、なければ「会議へ進む」（反映の直後は結果の近く、それ以外は画面の下）
+    if st.button("案件内に反映", type=main_type() if prep_pending(p) else "secondary", key="prep_save") or go:
+        def lines(x: str) -> list[str]:
+            return [v.strip() for v in (x or "").splitlines() if v.strip()]
+        pr.update(understanding=understanding or None, purpose=purpose or None, gaps=lines(gaps), materials=lines(materials),
+                  agenda=lines(agenda), decide_today=lines(decide))
+        drafts.clear(pid, PREP_FIELDS)
+        touch(p)
+        st.session_state["prep_saved"] = {"project": pid, "time": pj.now_iso()[11:16], "scroll": True}
+        if go:
+            state.goto("meetings")
+        st.rerun()
+    saved = st.session_state.get("prep_saved")
+    if saved and saved["project"] == pid and not prep_pending(p):  # 反映の結果と次の操作は、反映ボタンのすぐ下に出す
+        with st.container(border=True, key="prep_saved_box"):
+            st.success(f"理解と議題を案件内に反映しました（{saved['time']}）。")
+            _to_meetings(p, "prep_saved_go", primary=True)
+        if saved.pop("scroll", False):  # 反映の結果が画面の下に隠れないよう、1回だけ結果の位置へ移動する
+            st.iframe(f"<script>/*{pj.now_iso()}*/const t=()=>window.parent.document.querySelector('.st-key-prep_saved_box')?.scrollIntoView({{block:'center'}});t();setTimeout(t,300)</script>", height=1)
+
+
+def prep_pending(p: dict) -> bool:
+    """質問・議題の「理解と議題」に、案件内へ反映していない入力があるか。"""
+    store = drafts.store(p["id"])
+    pr = p["prep"]
+    saved = {"prep_understanding": pr.get("understanding") or "", "prep_purpose": pr.get("purpose") or "", "prep_gaps": "\n".join(pr.get("gaps", [])),
+             "prep_materials": "\n".join(pr.get("materials", [])), "prep_agenda": "\n".join(pr.get("agenda", [])), "prep_decide": "\n".join(pr.get("decide_today", []))}
+    return any(name in store and (store[name] or "") != saved[name] for name in PREP_FIELDS)
+
+
+def _to_meetings(p: dict, key: str, primary: bool, minutes: bool = True) -> None:
+    """「会議へ進む」と、会議がすでに終わっている人向けの「議事録を取り込む」。"""
+    with st.container(horizontal=True, vertical_alignment="center"):
+        if st.button("会議へ進む →", key=key, type="primary" if primary else "secondary"):
+            state.goto("meetings")
+        st.caption("行き先：会議の準備 › 会議（会議を登録し、その会議の記録へ進めます）")
+        if minutes and st.button("会議が終わっていれば、議事録を取り込む", key=f"{key}_minutes", type="tertiary"):
+            state.goto("sources")
+
+
+def _prep_footer(p: dict) -> None:
+    """画面の下（どのタブを開いていても見える位置）の次の操作。反映の直後は反映結果の近くのボタンが主ボタン。"""
+    st.divider()
+    if prep_pending(p):  # 未反映の入力を黙って失わない（下書きは残る）。反映して進むか、編集を続けるかを選べる
+        st.caption("「理解と議題」に、案件内へ反映していない入力があります。入力は下書きとして残ります。")
+        with st.container(horizontal=True, vertical_alignment="center", key="prep_footer"):
+            if st.button("反映して会議へ進む →", key="prep_save_go", type="secondary"):
+                st.session_state["prep_save_and_go"] = True
+                st.rerun()
+            st.caption("編集を続ける場合は、このまま「理解と議題」で入力できます。")
+        return
+    saved = st.session_state.get("prep_saved")
+    with st.container(key="prep_footer"):
+        just = bool(saved and saved["project"] == p["id"])  # 反映の直後は、反映結果の近くの操作が主（ここは補助）
+        _to_meetings(p, "prep_go_meetings", primary=not just, minutes=not just)
+
+
+def _prep_entrances(p: dict) -> None:
+    """会議の準備から使う資料の入口：会議前に届いた参考資料の追加（議事録の登録は画面の下の「会議へ進む」の横）。"""
+    with st.container(horizontal=True, key="prep_entrances"):
+        if st.button("参考資料を追加する", key="prep_add_refs", type="tertiary"):  # 登録後は「会議の準備に戻る」
+            state.goto("refs", keep={"refs_from": "prep"})
+
+
 def prep(p: dict) -> None:
     head("質問・議題", "会議で確認することを準備します。AIに候補を作ってもらい、この画面で質問や議題へ追加できます。回答済みの観点は繰り返しません。", "会議の準備")
     pr = p["prep"]
+    if not p.get("is_demo"):
+        _prep_entrances(p)
     carryover_panel(p)
     tabs = st.tabs(["理解と議題", "質問", "分野別の確認観点"], key="prep_tabs")
     if p.get("is_demo"):
         with tabs[0]:
             definition([("現時点の理解", pr.get("understanding")), ("会議の目的", pr.get("purpose")), ("不足情報", pr.get("gaps")), ("必要な資料・計測", pr.get("materials")),
                         ("議題", pr.get("agenda")), ("今回決めたいこと", pr.get("decide_today"))])
-    with tabs[0], edit_block("prepf"), st.form("prep_form"):
-        understanding = st.text_area("現時点の理解", value=pr.get("understanding") or "")
-        purpose = st.text_input("会議の目的", value=pr.get("purpose") or "")
-        c1, c2 = st.columns(2)
-        gaps = c1.text_area("不足情報（1行に1件）", value="\n".join(pr.get("gaps", [])))
-        materials = c2.text_area("必要な資料・計測（1行に1件）", value="\n".join(pr.get("materials", [])))
-        agenda = c1.text_area("議題（1行に1件）", value="\n".join(pr.get("agenda", [])))
-        decide = c2.text_area("今回決めたいこと（1行に1件）", value="\n".join(pr.get("decide_today", [])))
-        if st.form_submit_button("案件内に反映", type=main_type()):
-            def lines(x: str) -> list[str]:
-                return [v.strip() for v in x.splitlines() if v.strip()]
-            pr.update(understanding=understanding or None, purpose=purpose or None, gaps=lines(gaps), materials=lines(materials),
-                      agenda=lines(agenda), decide_today=lines(decide))
-            touch(p)
-            ok_rerun("保存しました")
+    if not p.get("is_demo"):  # デモは上の表示だけ（入力欄は出さない）
+        with tabs[0], edit_block("prepf"):
+            _prep_form(p, pr)
     with tabs[1]:
         board(p, ("prep",), "prep_cand", heading="AIが作成した準備の候補")  # 実行した結果を最初に見せる
         qs = p["questions"]
@@ -421,6 +499,8 @@ def prep(p: dict) -> None:
         st.dataframe(pd.DataFrame([{"分野": "・".join("共通" if d == "common" else DOMAINS[d] for d in i["domains"]), "分類": i["category"], "確認すること": i["question"],
                                     "確認する理由": i["why"], "確認相手の例": i.get("ask"), "事前に用意": i.get("prep")} for i in items]), hide_index=True, width="stretch")
         st.caption("観点は config/checkpoints.toml で追加・変更できます。すべてを必須入力にはしていません。")
+    if not p.get("is_demo"):
+        _prep_footer(p)
 
 
 def _reflect_panel(p: dict) -> None:
@@ -463,19 +543,43 @@ def carryover_panel(p: dict) -> None:
                          hide_index=True, width="stretch")
 
 
+def _meeting_next(p: dict, meeting_id: str, key: str, primary: bool) -> None:
+    """会議の次の操作：その会議を選んだ状態で記録の整理へ。開催前なら質問・議題へ戻って準備を続ける。"""
+    with st.container(horizontal=True, vertical_alignment="center"):
+        if st.button("会議の記録を整理 →", key=f"{key}_records", type="primary" if primary else "secondary"):
+            state.goto("records", keep={"rec_meeting": meeting_id})
+        if st.button("質問・議題に戻る", key=f"{key}_prep"):
+            state.goto("prep")
+    st.caption(f"「会議の記録を整理」では、議事録を「{continuity.label(p, meeting_id)}」に関連付けて登録できます。会議の前なら「質問・議題に戻る」で準備を続けられます。")
+
+
 def meetings(p: dict) -> None:
     head("会議", "会議ごとに資料・発言・判断を関連付け、複数回の会議を同じ案件の続きとして記録します。", "準備")
     with edit_block("addmtg"), st.form("add_mtg", clear_on_submit=True):
         c1, c2 = st.columns([3, 1])
         name, held = c1.text_input("会議名", placeholder="例：第2回打ち合わせ"), c2.text_input("開催日（不明なら空欄）")
         note = st.text_input("補足")
-        if st.form_submit_button("会議を追加") and guard(continuity.add_meeting, p, name, held, note):
-            touch(p)
-            ok_rerun("追加しました")
+        if st.form_submit_button("会議を追加"):
+            added = guard(continuity.add_meeting, p, name, held, note)
+            if added:
+                touch(p)
+                st.session_state["mtg_done"] = {"project": p["id"], "id": added["id"]}
+                st.session_state["rq_mtg"] = added["id"]  # 下の一覧でも、登録した会議を選んだ状態にする
+                st.rerun()
+    done = st.session_state.get("mtg_done")
+    if done and done["project"] == p["id"] and pj.get(p, "meetings", done["id"]):  # 登録した会議の近くに次の操作
+        with st.container(border=True, key="mtg_done_box"):
+            st.success(f"会議「{continuity.label(p, done['id'])}」を登録しました。")
+            _meeting_next(p, done["id"], "mtg_done", primary=True)
     if p["meetings"]:
         st.dataframe(pd.DataFrame([{"ID": m["id"], "会議名": m["name"], "開催日": m.get("held_on") or "記録なし", "資料": len(continuity.meeting_items(p, m["id"])["資料"]) + len(continuity.meeting_items(p, m["id"])["録画"]),
                                     "判断": len(continuity.meeting_items(p, m["id"])["判断"]), "変更履歴": len(continuity.meeting_items(p, m["id"])["変更履歴"])} for m in p["meetings"]]), hide_index=True, width="stretch")
     m = select_item(p["meetings"], lambda x: continuity.label(p, x["id"]), "rq_mtg", "会議はまだありません。")
+    if m and not p.get("is_demo"):  # 開催日だけで開催済みとは判定しない。開催前でも記録の入口を使える
+        _meeting_next(p, m["id"], "mtg_sel", primary=not (done and done["project"] == p["id"]))
+    elif not p["meetings"] and not p.get("is_demo"):
+        if st.button("質問・議題に戻る", key="mtg_back_prep"):
+            state.goto("prep")
     if m:
         for name, items in continuity.meeting_items(p, m["id"]).items():
             if items:

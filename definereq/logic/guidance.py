@@ -154,10 +154,12 @@ def setup_next(p: dict) -> dict:
             return {"label": a.button, "page": a.page, "reason": a.short or a.reason, "status": a.title, "detail": None, "alts": [PREP[:2]] if a.page != "prep" else []}
         main, alts, status, detail = PREP, [], "要件を整理中", None
     elif p["sources"] or has_profile(p):
-        main, alts, detail = PREP, [("議事録を取り込む", "sources")] if not p["sources"] else [], None
-        status = "資料を登録済み" if p["sources"] else "背景を入力済み・資料は未登録"
+        minutes = any(s.get("kind") == "議事録" for s in p["sources"])
+        main, alts, detail = PREP, [] if minutes else [("議事録を取り込む", "sources")], None
+        refs = sum(1 for s in p["sources"] if s.get("kind") != "議事録" and not s.get("superseded_by"))
+        status = f"参考資料 {refs}件を登録済み" if refs else ("議事録を登録済み" if minutes else "背景を入力済み・参考資料は未登録")
     else:
-        return {"label": "資料・議事録を取り込む", "page": "sources", "reason": "議事録や要望書があれば取り込むと、次の作業を案内できます。背景の入力から始めることもできます。",
+        return {"label": "参考資料を登録する", "page": "refs", "reason": "議事録や要望書があれば取り込むと、次の作業を案内できます。背景の入力から始めることもできます。",
                 "status": "背景・資料とも未登録", "detail": None, "alts": [("背景・目的・関係者を入力", "profile")], "empty": True}
     return {"label": main[0], "page": main[1], "reason": main[2], "status": status, "detail": detail, "alts": [x[:2] for x in alts]}
 

@@ -15,6 +15,7 @@ from definereq.ai.client import AIResult
 from definereq.export import jsonio, share, wordx
 from definereq.ingest import registry
 from definereq.logic import agreement as ag
+from definereq.logic import continuity
 from definereq.logic import guidance as gd
 from definereq.logic import intake
 
@@ -627,7 +628,7 @@ def test_deciding_stage_with_requirements_points_to_them(p):
 def test_profile_page_has_back_and_go(p):
     at = open_app(p, "profile")
     labels = [b.label for b in at.button]
-    assert "案件情報を保存" in labels and "保存して資料・議事録へ進む" in labels and "← 準備の概要に戻る" in labels and "資料・議事録へ" in labels
+    assert "案件情報を保存" in labels and "保存して質問・議題へ進む" in labels and "← 準備の概要に戻る" in labels and "参考資料へ" in labels
     assert "準備の概要を開く" not in labels and labels.count("← 準備の概要に戻る") == 1  # 準備へ戻る操作は見出し付近の1か所だけ
     assert any("この欄の入力を案件に反映します" in c.value for c in at.caption)
 
@@ -649,9 +650,11 @@ def test_sources_shows_import_first(p):
     at = open_app(p, "sources")
     assert "dr-brief" in html(at) and 'class="dr-sit dr-sit-work"' not in html(at)
     labels = [b.label for b in at.button]
-    assert labels.count("← 準備の概要に戻る") == 1 and "背景・目的・関係者を入力" in labels
-    assert next(r for r in at.radio if r.key == "src_mode").value == "議事録を取り込む"
-    assert "登録する種類<b>議事録</b>" in html(at)
+    # 工程3の入口は議事録の登録だけ。参考資料は対応する入口（工程1の参考資料）を案内する
+    assert labels.count("← 準備の概要に戻る") == 1 and "参考資料を登録する" in labels
+    assert not any(r.key == "src_mode" for r in at.radio) and "登録する種類<b>議事録</b>" in html(at)
+    assert key(at, "paste_go").label == "貼り付けた文章を議事録として登録" and key(at, "src_read").label == "ファイルを議事録として登録"
+    assert any(s.key == "src_mtg" for s in at.selectbox)  # 登録する会議は隠さずに選べる
 
 
 def paste(at, text, title="議事録"):
@@ -664,26 +667,26 @@ def test_minutes_mode_registers_minutes_for_ai(p):
     at = paste(open_app(p, "sources"), "講師が出欠を登録する。", "初回の議事録")
     q = at.session_state["project"]
     assert q["sources"][0]["kind"] == "議事録" and gd.unanalyzed_minutes(q) == ["初回の議事録"]
-    assert any(s.value == "議事録1件を登録しました" for s in at.success)
+    assert any(s.value == "議事録を登録しました（1件）" for s in at.success)
     assert at.session_state["src_done"]  # 登録直後は追加のフォームを閉じる（画面では見えなくする）
     at = key(at, "src_more").click().run()
     assert "src_done" not in at.session_state
     assert next(t for t in at.text_area if t.key.startswith("paste_b_")).value == ""  # 二重登録を防ぐため空にする
 
 
-def test_other_mode_registers_chosen_kind_and_keeps_text(p):
-    at = open_app(p, "sources")
+def test_reference_entrance_registers_chosen_kind_and_keeps_text(p):
+    at = open_app(p, "refs")
+    assert at.session_state["page"] == "refs" and "参考資料" in html(at) and not at.exception
     next(t for t in at.text_area if t.key.startswith("paste_b_")).set_value("申込の手順")
-    at = next(r for r in at.radio if r.key == "src_mode").set_value("その他の資料を取り込む").run()
-    assert next(t for t in at.text_area if t.key.startswith("paste_b_")).value == "申込の手順"  # 種類を切り替えても入力は残る
     at = next(s for s in at.selectbox if s.key == "src_kind").set_value("手順").run()
-    assert "登録する種類<b>手順</b>" in html(at) and "議事録" not in next(s for s in at.selectbox if s.key == "src_kind").options
-    at = next(r for r in at.radio if r.key == "src_mode").set_value("議事録を取り込む").run()
-    at = next(r for r in at.radio if r.key == "src_mode").set_value("その他の資料を取り込む").run()
-    at = next(s for s in at.selectbox if s.key == "src_kind").set_value("手順").run()
+    assert next(t for t in at.text_area if t.key.startswith("paste_b_")).value == "申込の手順"  # 種別を切り替えても入力は残る
+    assert "登録する種類<b>参考資料（手順）</b>" in html(at) and "議事録" not in next(s for s in at.selectbox if s.key == "src_kind").options
+    assert key(at, "paste_go").label == "貼り付けた文章を参考資料として登録"
     at = key(at, "paste_go").click().run()
     q = at.session_state["project"]
     assert q["sources"][0]["kind"] == "手順" and gd.unanalyzed_minutes(q) == []
+    assert any(s.value == "参考資料を登録しました（種別：手順　1件）" for s in at.success)
+    assert at.session_state["page"] == "refs"  # 登録直後は同じ工程で結果を見せる
 
 
 def test_empty_paste_shows_reason(p):
@@ -772,8 +775,9 @@ def test_new_project_shows_setup_without_zero_stats(p):
     at = open_app(p, "setup")
     text = html(at)
     assert "案件の準備" in text and "どちらからでも始められます" in text and 'class="dr-stat"' not in text and "基準版なし" not in text
-    assert key(at, "setup_profile").label == "背景・目的・関係者を入力" and key(at, "setup_sources").label == "資料・議事録を取り込む"
-    assert "未入力" in text and "未取り込み" in text and not at.exception
+    assert key(at, "setup_profile").label == "背景・目的・関係者を入力" and key(at, "setup_refs").label == "参考資料を登録する"
+    assert "未入力" in text and "未登録" in text and not at.exception
+    assert key(at, "setup_minutes").label == "すでに議事録がある場合は、議事録を取り込む →"
 
 
 def test_empty_overview_shows_setup(p):
@@ -786,17 +790,21 @@ def test_setup_keeps_both_items_after_progress(p):
     registry.ingest_paste(p, "資料", "本文2", kind="要望")
     at = open_app(p, "setup")
     text = html(at)
-    assert "入力済み" in text and "取り込み済み 2件" in text
-    assert key(at, "setup_profile").label == "背景・目的・関係者を編集" and key(at, "setup_sources").label == "資料・議事録を取り込む"
+    assert "入力済み" in text and "登録済み 1件" in text  # 参考資料の件数（議事録は数えない）
+    assert key(at, "setup_profile").label == "背景・目的・関係者を編集" and key(at, "setup_refs").label == "参考資料を確認・追加する"
 
 
 def test_start_from_records(p):
-    at = key(open_app(p, "setup"), "setup_sources").click().run()
+    at = key(open_app(p, "setup"), "setup_refs").click().run()
+    assert at.session_state["page"] == "refs"
+    at = key(at, "go_minutes_top").click().run()  # 参考資料から議事録の登録へ
     assert at.session_state["page"] == "sources"
-    at = key(at, "go_profile_top").click().run()
-    assert at.session_state["page"] == "profile"
-    at = key(at, "go_setup_top").click().run()
+    at = key(at, "go_refs_top").click().run()
+    assert at.session_state["page"] == "refs"
+    at = key(at, "go_setup_refs").click().run()
     assert at.session_state["page"] == "setup"
+    at = key(at, "setup_minutes").click().run()  # 議事録が手元にある人は、工程1から工程3の議事録の登録へ直接
+    assert at.session_state["page"] == "sources" and "登録する種類<b>議事録</b>" in html(at)
 
 
 def bg_key(p, name):
@@ -825,7 +833,7 @@ def test_save_and_save_go(p):
     assert any(s.value.startswith("案件情報を保存しました") for s in at.success)
     next(t for t in at.text_area if t.key == bg_key(p, "v_purpose")).set_value("目的の文").run()
     at = key(at, "pf_save_go").click().run()
-    assert at.session_state["page"] == "sources" and at.session_state["project"]["profile"]["purpose"]["value"] == "目的の文"
+    assert at.session_state["page"] == "prep" and at.session_state["project"]["profile"]["purpose"]["value"] == "目的の文"
     assert any("案件情報を保存しました" in s.value for s in at.success)  # 移動先で保存したことが分かる
     at.session_state["page"] = "setup"
     at.run()
@@ -863,7 +871,8 @@ def test_imported_records_survive_round_trip_and_status(p):
     p["profile"]["purpose"].update(value="目的")
     q = jsonio.loads(jsonio.dumps(p))
     at = open_app(q, "setup")
-    assert "取り込み済み 1件" in html(at) and "入力済み" in html(at)
+    assert "未登録" in html(at) and "入力済み" in html(at)  # 議事録は参考資料の件数に入れない
+    assert key(at, "setup_next_go").label == "会議の記録を整理する →"
     assert q["sources"][0]["units"][0]["text"].startswith("講師が出欠")
 
 
@@ -957,7 +966,7 @@ def test_precheck_on_share_page(p):
 
 # ---- 案件の準備の「次にすること」と、資料の登録直後の案内 ----
 def test_setup_next_follows_project_state(p):
-    assert gd.setup_next(p)["page"] == "sources"  # 何もない
+    assert gd.setup_next(p)["page"] == "refs"  # 何もない
     p["profile"]["background"].update(value="背景")
     assert (gd.setup_next(p)["label"], gd.setup_next(p)["page"]) == ("会議の準備へ進む", "prep")
     registry.ingest_paste(p, "要望書", "申込を一覧で見たい", kind="要望")
@@ -990,20 +999,54 @@ def test_setup_page_next_button_opens_work_screen(p):
 
 def test_after_register_shows_next_near_success(p):
     at = paste(open_app(p, "sources"), "講師が出欠を登録する。", "第1回議事録")
-    assert any(s.value == "議事録1件を登録しました" for s in at.success)
-    assert key(at, "src_next_go").label == "会議の記録を整理する →" and key(at, "src_more").label == "続けて資料を追加する"
-    assert not at.session_state.get("flash")
+    assert any(s.value == "議事録を登録しました（1件）" for s in at.success)
+    assert key(at, "src_next_go").label == "会議の記録を整理する →" and key(at, "src_more").label == "続けて議事録を追加"
+    assert not at.session_state.get("flash") and at.session_state["page"] == "sources"
+    new_id = at.session_state["project"]["sources"][0]["id"]
     at = key(at, "src_next_go").click().run()
     assert at.session_state["page"] == "records" and "src_done" not in at.session_state
+    # 今回登録した議事録を整理の対象に選択済みにし、「今回登録」と示す
+    assert at.session_state["ai_src_extract"] == [new_id] and any("今回登録した議事録：第1回議事録" in c.value for c in at.caption)
 
 
-def test_after_register_other_material_suggests_prep(p):
-    at = open_app(p, "sources")
-    at = next(r for r in at.radio if r.key == "src_mode").set_value("その他の資料を取り込む").run()
-    at = paste(at, "申込を一覧で見たい", "要望書")
-    assert key(at, "src_next_go").label == "会議の準備へ進む →"
+def test_after_register_reference_suggests_prep(p):
+    at = paste(open_app(p, "refs"), "申込を一覧で見たい", "要望書")
+    assert key(at, "src_next_go").label == "会議の準備へ進む →" and key(at, "src_more").label == "続けて参考資料を追加"
     at = key(at, "src_more").click().run()
     assert not any(b.key == "src_next_go" for b in at.button)
+    at = paste(at, "現行の申込手順", "手順書")
+    at = key(at, "src_next_go").click().run()
+    assert at.session_state["page"] == "prep"
+
+
+def test_prep_adds_reference_and_returns_with_draft(p):
+    at = open_app(p, "prep")
+    k = f"draft_{p['id']}_prep_agenda"
+    at = next(t for t in at.text_area if t.key == k).set_value("申込の流れ").run()  # 反映前の入力
+    at = key(at, "prep_add_refs").click().run()
+    assert at.session_state["page"] == "refs"
+    at = paste(at, "追加で届いた要望", "追加要望書")
+    assert key(at, "src_next_go").label == "会議の準備に戻る →"
+    at = key(at, "src_next_go").click().run()
+    assert at.session_state["page"] == "prep"
+    assert next(t for t in at.text_area if t.key == k).value == "申込の流れ"  # 入力途中の議題が残る
+    assert [s["name"] for s in at.session_state["project"]["sources"]] == ["追加要望書"]
+    at = key(at, "prep_save").click().run()
+    assert at.session_state["project"]["prep"]["agenda"] == ["申込の流れ"]
+
+
+def test_second_minutes_distinguished_from_processed(p):
+    m = registry.ingest_paste(p, "第1回議事録", "講師が出欠を登録する。", kind="議事録")
+    run(p, "extract", [cand("要望", "出欠を登録する")], source_ids=[m["id"]])
+    continuity.add_meeting(p, "第1回打ち合わせ")  # 既存の会議があっても、新しい議事録は自動でひもづけない
+    at = paste(open_app(p, "sources"), "定員は30名。", "第2回議事録")
+    second = next(s for s in at.session_state["project"]["sources"] if s["name"] == "第2回議事録")
+    assert second.get("meeting_id") is None  # 前回の会議に自動でひもづけない
+    at = key(at, "src_next_go").click().run()
+    assert at.session_state["ai_src_extract"] == [second["id"]]  # 前回分は再処理の対象にしない
+    sel = next(s for s in at.multiselect if s.key == "ai_src_extract")
+    labels = {o for o in sel.options}
+    assert any("第2回議事録（議事録・今回登録・未整理）" in o for o in labels) and any("第1回議事録（議事録・整理済み）" in o for o in labels)
 
 
 def test_no_next_panel_without_registration(p):
@@ -1056,10 +1099,10 @@ def test_empty_setup_uses_cards_as_start(p):
 
 def test_profile_after_save_points_to_next(p):
     at = open_app(p, "profile")
-    assert key(at, "pf_save_go").label == "保存して資料・議事録へ進む"
+    assert key(at, "pf_save_go").label == "保存して質問・議題へ進む"
     next(t for t in at.text_area if t.key == bg_key(p, "v_background")).set_value("背景").run()
     at = key(at, "pf_save").click().run()
-    assert key(at, "pf_next_go").label == "次へ：資料・議事録を取り込む →"
+    assert key(at, "pf_next_go").label == "次へ：質問・議題 →" and key(at, "pf_refs").label == "参考資料を登録する"
     registry.ingest_paste(at.session_state["project"], "議事録", "本文", kind="議事録")
     at.run()
     assert key(at, "pf_save_go").label == "保存して会議の記録を整理へ進む" and key(at, "pf_next_go").label == "次へ：会議の記録を整理する →"
@@ -1166,9 +1209,9 @@ def test_every_project_page_has_next_or_back_in_body(p):
         assert not at.exception, page
         keys = {b.key for b in at.button}
         body = html(at) + "".join(c.value for c in at.caption)
-        assert keys & {"guide_go", "setup_next_go", "pf_save", "src_read", "paste_go", "ai_go_extract", "records_go_cand", "cand_go_list", "cand_go_reqs", "cand_go_overview"} \
+        assert keys & {"guide_go", "setup_next_go", "pf_save", "src_read", "paste_go", "ai_go_extract", "records_go_cand", "cand_go_list", "cand_go_reqs", "cand_go_overview", "prep_go_meetings", "mtg_back_prep", "mtg_sel_records"} \
             or "この画面で作業します" in body, page
-        if page not in ("setup", "profile", "sources"):
+        if page not in ("setup", "profile", "refs", "sources"):
             assert any(b.label == "← 準備の概要に戻る" for b in at.button), page
 
 
@@ -1221,7 +1264,7 @@ def test_primary_follows_the_state(p):
     assert primaries(at) == ["案件情報を保存"]  # 編集中は保存
     next(t for t in at.text_area if t.key == bg_key(p, "v_background")).set_value("背景").run()
     at = key(at, "pf_save").click().run()
-    assert primaries(at) == ["次へ：資料・議事録を取り込む →"]  # 保存した直後は次の工程
+    assert primaries(at) == ["次へ：質問・議題 →"]  # 保存した直後は次の工程（会議の準備）
     q = at.session_state["project"]
     registry.ingest_paste(q, "議事録", "講師が出欠を登録する。", kind="議事録")
     at = open_app(q, "records")  # テストではAIのキーがないため押せない。主ボタン（押せるとオレンジ）であることを確かめる
@@ -1337,3 +1380,69 @@ def test_after_split_adopt_opens_only_new_requirements(p):
     assert len(q["requirements"]) >= 2  # 分割して採用
     at = key(at, "cand_open_reqs").click().run()
     assert set(at.session_state["req_focus"]["ids"]) == {r["id"] for r in q["requirements"]}
+
+
+# ---- 質問・議題 → 会議 → 会議の記録を整理（本文の操作だけで進む） ----
+def test_prep_to_meeting_to_records_keeps_selected_meeting(p):
+    at = open_app(p, "prep")
+    at = next(t for t in at.text_area if t.key == f"draft_{p['id']}_prep_agenda").set_value("申込の流れ").run()
+    assert primaries(at) == ["案件内に反映"]  # 未反映の入力があるときは反映が主
+    at = key(at, "prep_save").click().run()
+    assert any(s.value.startswith("理解と議題を案件内に反映しました") for s in at.success)
+    assert primaries(at) == ["会議へ進む →"] and key(at, "prep_saved_go").proto.type == "primary"  # 反映結果の近く
+    assert key(at, "prep_saved_go_minutes").label == "会議が終わっていれば、議事録を取り込む"
+    at = key(at, "prep_saved_go").click().run()
+    assert at.session_state["page"] == "meetings"
+    for name in ("第1回打ち合わせ", "第2回打ち合わせ"):
+        at.text_input[0].set_value(name)
+        at = next(b for b in at.button if b.label == "会議を追加").click().run()
+    q = at.session_state["project"]
+    second = q["meetings"][-1]["id"]
+    assert any("第2回打ち合わせ" in s.value and "登録しました" in s.value for s in at.success)
+    assert primaries(at) == ["会議の記録を整理 →"] and key(at, "mtg_done_prep").label == "質問・議題に戻る"
+    at = key(at, "mtg_done_records").click().run()
+    assert at.session_state["page"] == "records" and at.session_state["records_mtg"] == second  # 押した会議を選択済み
+    assert any("対象の会議：" in c.value for c in at.caption)
+    next(t for t in at.text_input if t.key == "records_paste_t").set_value("第2回議事録")
+    next(t for t in at.text_area if t.key == "records_paste_b").set_value("定員は30名。")
+    at = key(at, "records_paste_go").click().run()
+    src = next(s for s in at.session_state["project"]["sources"] if s["name"] == "第2回議事録")
+    assert src["meeting_id"] == second and any(b.key == "ai_go_extract" for b in at.button)
+
+
+def test_choose_other_meeting_from_list(p):
+    from definereq.logic import continuity
+
+    first = continuity.add_meeting(p, "第1回打ち合わせ")["id"]
+    continuity.add_meeting(p, "第2回打ち合わせ")
+    at = open_app(p, "meetings")
+    at = next(s for s in at.selectbox if s.key == "rq_mtg").set_value(first).run()
+    at = key(at, "mtg_sel_records").click().run()
+    assert at.session_state["page"] == "records" and at.session_state["records_mtg"] == first
+
+
+def test_prep_main_is_meeting_even_with_old_candidates(p):
+    m = registry.ingest_paste(p, "第1回議事録", "講師が出欠を登録する。", kind="議事録")
+    run(p, "extract", [cand("要望", "出欠を登録する")], source_ids=[m["id"]])
+    at = open_app(p, "prep")
+    assert primaries(at) == ["会議へ進む →"] and not any(b.key == "guide_go" for b in at.button)
+
+
+def test_share_after_word_shows_return_and_resume_file(p):
+    reviewed(p)
+    at = open_app(p, "share")
+    at = key(at, "share_word").click().run()
+    assert any(b.key == "share_back_ov" for b in at.button)
+    at = key(at, "share_back_ov").click().run()
+    assert at.session_state["page"] == "overview"
+
+
+def test_empty_requirements_show_candidate_and_manual_entrances(p):
+    at = open_app(p, "requirements")
+    assert any(b.key == "rq_empty_records" for b in at.button)
+    m = registry.ingest_paste(p, "第1回議事録", "講師が出欠を登録する。", kind="議事録")
+    run(p, "extract", [cand("要望", "出欠を登録する")], source_ids=[m["id"]])
+    at = open_app(p, "requirements")
+    assert key(at, "rq_empty_cand").label.startswith("AI候補を確認する（確認待ち 1件）")
+    at = key(at, "rq_empty_cand").click().run()
+    assert at.session_state["page"] == "candidates"

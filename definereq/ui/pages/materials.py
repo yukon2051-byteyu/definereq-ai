@@ -25,113 +25,154 @@ from ..candidates import board
 from ..components import main_type, chips, edit_block, esc, head, meeting_select, ok_rerun, play_at, select_item, touch
 
 
-MODES = {"議事録を取り込む": "議事録", "その他の資料を取り込む": None}
 OTHER_KINDS = [k for k in SOURCE_KINDS if k != "議事録"]
+# 資料を使う目的で入口を分ける。登録の処理・保存先・一覧は共通で、入口・初期の種別・登録後の案内だけが違う
+#   参考資料（工程1）：会議の前に読む現行ルール・運用資料・要望書など。登録後は会議の準備へ
+#   議事録（工程3）：会議で話した内容。登録後は会議の記録の整理へ
+PURPOSE = {"refs": "参考資料", "minutes": "議事録"}
 
 
-def sources(p: dict) -> None:
+def is_reference(s: dict) -> bool:
+    """参考資料か。資料の種別だけで決める（何件目か・ファイル名では分類しない）。"""
+    return s.get("kind") != "議事録"
+
+
+def references(p: dict) -> None:
+    """工程1の「参考資料」：会議の前に読む資料を登録・確認する。"""
     from . import prepare
-    from .. import drafts, situation
 
     demo = p.get("is_demo")
     if not demo:
-        pstate = drafts.profile_state(p)
-        prepare.top_nav("go_setup_src", ("背景・目的・関係者を入力" if pstate == "未入力" else "背景・目的・関係者を編集", "profile", "go_profile_top"))
-    head("資料・議事録", "議事録や資料を、ファイルまたは文章の貼り付けで取り込みます。録画は不要です。" if not demo else
+        prepare.top_nav("go_setup_refs", ("議事録を取り込む", "sources", "go_minutes_top"))
+    head("参考資料", "現行のルール・運用資料・要望書など、会議の前に読む資料を登録します。登録した資料は、質問・議題の準備やAIの整理で選べます。", "案件の準備")
+    if not demo:
+        done = _after_register(p, "refs")
+        with st.container(key="src_form_hidden" if done else "src_form"):
+            _source_import(p, "refs")
+    _source_list(p, only="refs")
+
+
+def sources(p: dict) -> None:
+    """工程3の「資料・議事録」：会議の議事録を登録する。登録済みの資料（参考資料を含む）もここで一覧できる。"""
+    from . import prepare
+    from .. import situation
+
+    demo = p.get("is_demo")
+    if not demo:
+        prepare.top_nav("go_setup_src", ("参考資料を登録する", "refs", "go_refs_top"))
+    head("資料・議事録", "会議で話した内容（議事録）を、ファイルまたは文章の貼り付けで登録します。録画は不要です。登録済みの参考資料もここで確認できます。" if not demo else
          "議事録はWord・Excel・PDF・テキストのファイル、または文章の貼り付けで取り込めます。録画は不要です。", "資料")
     # 登録前は取り込みに集中できるよう、上部に共通の案内を出さない（詳しい案内は画面の下）
     from ...logic import guidance as gd
 
     guide = None if demo else gd.assess(p, "sources", st.session_state.get("resumed", False))
     if not demo:
-        done = _after_register(p)  # 登録した直後は、結果と次の操作を出し、追加のフォームは閉じる
+        done = _after_register(p, "minutes")  # 登録した直後は、結果と次の操作を出し、追加のフォームは閉じる
         # 閉じている間もフォームは描画して見えなくするだけにする。描画しないと、入力途中の文章や選んだファイルが消えるため
         with st.container(key="src_form_hidden" if done else "src_form"):
-            _source_import(p)
+            _source_import(p, "minutes")
     _source_list(p)
     if guide:
         situation.details(p, "sources", guide, skip={"setup", "profile", "sources"})
 
 
-def _source_import(p: dict) -> None:
-    """取り込みの入口。先に「議事録」か「その他の資料」かを選び、選んだ種類で登録する。
+def _source_import(p: dict, purpose: str) -> None:
+    """登録の入口。参考資料は種別を選んで、議事録は「議事録」として登録する。
 
-    ファイルと貼り付けの入力欄は常に同じ名前で置くため、種類や取り込み方法を切り替えても入力は消えない。
+    ファイルと貼り付けの入力欄は常に同じ名前で置くため、取り込み方法を切り替えても入力は消えない。
     """
     with edit_block("src"), st.container(border=True, key="src_box"):
-        # フォームを閉じている間に消えた選択を戻す（続けて同じ種類の資料を追加しやすくする）
-        for k in ("src_mode", "src_kind"):
-            if k not in st.session_state and st.session_state.get(f"{k}_keep"):
-                st.session_state[k] = st.session_state[f"{k}_keep"]
-        mode = st.radio("取り込むもの", list(MODES), horizontal=True, key="src_mode")
-        if MODES[mode]:
-            kind = MODES[mode]
-            st.caption("議事録として登録します。「会議の記録を整理」で、AIで整理する会議の記録として扱われます。")
+        meeting = None
+        if purpose == "refs":
+            if "src_kind" not in st.session_state and st.session_state.get("src_kind_keep"):  # 続けて同じ種別を追加しやすくする
+                st.session_state["src_kind"] = st.session_state["src_kind_keep"]
+            kind = st.selectbox("資料の種別", OTHER_KINDS, key="src_kind")
+            st.caption("参考資料として登録します。会議の質問・議題を準備するときや、AIで候補を作るときに、送信する資料として選べます。"
+                       "会議の議事録は、工程3の「議事録を取り込む」から登録してください。")
         else:
-            kind = st.selectbox("資料の種類", OTHER_KINDS, key="src_kind")
-            st.caption("議事録以外の資料として登録します。AIで候補を作るときに、送信する資料として選べます。")
-        with st.expander("補足項目（公開範囲・資料の日付・関連付ける会議）　未設定でも登録できます"):
+            kind = "議事録"
+            st.caption("議事録として登録します。「会議の記録を整理」で、AIで整理する会議の記録として扱われます。"
+                       "要望書や現行ルールなどの参考資料は、工程1の「参考資料」から登録してください。")
+            # 登録する会議は、補足項目に隠さずに確認できるようにする。前回の会議へ自動ではひもづけない
+            meeting = meeting_select(p, "src_mtg")
+            if p["meetings"]:
+                st.caption("この議事録がどの会議の記録かを選びます。前回の会議には自動で関連付けません。")
+        with st.expander("補足項目（公開範囲・資料の日付" + ("・関連付ける会議" if purpose == "refs" else "") + "）　未設定でも登録できます"):
             c1, c2 = st.columns(2)
             vis = c1.selectbox("公開範囲", VISIBILITY, key="src_vis")
             date = c2.text_input("資料の日付（不明なら空欄）", key="src_date")
-            meeting = meeting_select(p, "src_mtg")
+            if purpose == "refs":
+                meeting = meeting_select(p, "src_mtg")
         tabs = st.tabs(["ファイルから取り込む", "文章を貼り付けて取り込む"])
         st.caption("利用の許可がある資料だけを登録してください。構成資料に認証情報が含まれていないことを確認してください。")
-        kind_note = f'<div class="dr-kind">登録する種類<b>{esc(kind)}</b></div>'
+        what = f"{PURPOSE[purpose]}（{kind}）" if purpose == "refs" else "議事録"
+        kind_note = f'<div class="dr-kind">登録する種類<b>{esc(what)}</b></div>'
         with tabs[0]:
             n = st.session_state.get("src_up_round", 0)  # 登録が終わったら選択を空にする（同じファイルの二重登録を防ぐ）
             files = st.file_uploader("ファイル（PDF / Word / Excel / PowerPoint / テキスト / SRT / VTT）", accept_multiple_files=True,
                                      type=["pdf", "docx", "xlsx", "pptx", "txt", "srt", "vtt"], key=f"src_up_{n}")
             st.html(kind_note)
-            if st.button("読み込む", type="primary", disabled=not files, key="src_read"):
-                done = 0
+            if st.button(f"ファイルを{PURPOSE[purpose]}として登録", type="primary", disabled=not files, key="src_read"):
+                ids = []
                 for f in files:
                     try:
-                        registry.ingest_bytes(p, f.name, f.getvalue(), kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
-                        done += 1
+                        ids.append(registry.ingest_bytes(p, f.name, f.getvalue(), kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)["id"])
                     except IngestError as e:
                         st.error(f"{safe_filename(f.name)}：{e}")
-                if done:  # 1件以上の登録に成功したときだけ、次の操作を案内する
+                if ids:  # 1件以上の登録に成功したときだけ、次の操作を案内する
                     st.session_state["src_up_round"] = n + 1
                     touch(p)
-                    _registered(p, kind, done)
+                    _registered(p, purpose, kind, ids)
         with tabs[1]:
             m = st.session_state.get("paste_round", 0)
             title = st.text_input("貼り付ける文章の名称", key=f"paste_t_{m}")
             text = st.text_area("文章を貼り付ける", key=f"paste_b_{m}")
             st.html(kind_note)
-            if st.button("貼り付けた文章を案件内に登録", key="paste_go", type="primary"):  # 表示中のタブの登録ボタンが主操作
+            if st.button(f"貼り付けた文章を{PURPOSE[purpose]}として登録", key="paste_go", type="primary"):  # 表示中のタブの登録ボタンが主操作
                 if not (text or "").strip():
                     st.error("貼り付ける文章を入力してください。")
                 else:
-                    registry.ingest_paste(p, title, text, kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
+                    item = registry.ingest_paste(p, title, text, kind=kind, visibility=vis, occurred_at=date or None, meeting_id=meeting)
                     st.session_state["paste_round"] = m + 1
                     touch(p)
-                    _registered(p, kind, 1)
+                    _registered(p, purpose, kind, [item["id"]])
 
 
-def _registered(p: dict, kind: str, count: int) -> None:
+def _registered(p: dict, purpose: str, kind: str, ids: list[str]) -> None:
     """登録の成功を記録して再描画する。件数と種類は実際の登録結果を使う。
 
-    表示は、別の画面へ移るか「続けて資料を追加する」を押すまで残す。
+    表示は、別の画面へ移るか「続けて〜を追加」を押すまで残す。
     """
-    st.session_state["src_mode_keep"] = st.session_state.get("src_mode")
     st.session_state["src_kind_keep"] = st.session_state.get("src_kind")
-    st.session_state["src_done"] = {"project": p["id"], "message": f"{kind}{count}件を登録しました", "scroll": True}
+    detail = f"（種別：{kind}　{len(ids)}件）" if purpose == "refs" else f"（{len(ids)}件）"
+    st.session_state["src_done"] = {"project": p["id"], "purpose": purpose, "ids": ids, "message": f"{PURPOSE[purpose]}を登録しました{detail}", "scroll": True}
     st.rerun()
 
 
-def _after_register(p: dict) -> bool:
-    """登録した直後の表示：成功メッセージと次の主ボタン。追加のフォームは閉じ、「続けて資料を追加する」で開く。"""
-    from .prepare import next_block
+def _after_register(p: dict, purpose: str) -> bool:
+    """登録した直後の表示：成功メッセージと次の主ボタン。追加のフォームは閉じ、「続けて〜を追加」で開く。
+
+    参考資料 → 会議の準備（質問・議題から開いたときは「会議の準備に戻る」）。議事録 → 会議の記録の整理（今回の議事録を選択済み）。
+    工程の移動は、利用者が次のボタンを押したときだけ行う。
+    """
+    from .. import state
 
     done = st.session_state.get("src_done")
-    if not done or done["project"] != p["id"]:
+    if not done or done["project"] != p["id"] or done.get("purpose", "minutes") != purpose:
         return False
     with st.container(border=True, key="src_done_box"):
         st.success(done["message"])
-        next_block(p, "src_next", "次の操作")
-        if st.button("続けて資料を追加する", key="src_more"):
+        with st.container(horizontal=True, vertical_alignment="center"):
+            if purpose == "refs":
+                back = st.session_state.get("refs_from") == "prep"
+                if st.button("会議の準備に戻る →" if back else "会議の準備へ進む →", key="src_next_go", type="primary"):
+                    state.goto("prep")
+                st.caption("行き先：会議の準備 › 質問・議題")
+            else:
+                if st.button("会議の記録を整理する →", key="src_next_go", type="primary"):
+                    state.goto("records", keep={"rec_new": done["ids"]})
+                st.caption("行き先：記録の取り込み・整理 › 会議の記録を整理（今回登録した議事録を選択済み）")
+        if st.button("続けて参考資料を追加" if purpose == "refs" else "続けて議事録を追加", key="src_more"):
             st.session_state.pop("src_done", None)
             st.rerun()
     if done.pop("scroll", False):  # 登録ボタンの位置から下へ隠れないよう、結果の位置へ1回だけ移動する
@@ -139,15 +180,17 @@ def _after_register(p: dict) -> bool:
     return True
 
 
-def _source_list(p: dict) -> None:
-    st.subheader("取り込んだ資料")
-    if not p["sources"]:
-        st.caption("取り込んだ資料はまだありません。")
+def _source_list(p: dict, only: str | None = None) -> None:
+    """登録済みの資料の一覧と、選んだ資料の本文。only="refs" なら参考資料だけを出す。"""
+    items = [s for s in p["sources"] if is_reference(s)] if only == "refs" else p["sources"]
+    st.subheader("登録した参考資料" if only == "refs" else "取り込んだ資料")
+    if not items:
+        st.caption("登録した参考資料はまだありません。" if only == "refs" else "取り込んだ資料はまだありません。")
         return
     demo = p.get("is_demo")
     rows = [{"ID": s["id"], "名称": s["name"], "版": f"v{s['version']}", "種類": s["kind"], "日付": s.get("occurred_at") or "未設定",
              "この案件で使った箇所": _usage_short(p, s["id"]), "公開範囲": s["visibility"],
-             "会議": continuity.label(p, s.get("meeting_id")), "単位数": len(s["units"]), "警告": len(s["warnings"]), "状態": "旧版" if s.get("superseded_by") else "最新"} for s in p["sources"]]
+             "会議": continuity.label(p, s.get("meeting_id")), "単位数": len(s["units"]), "警告": len(s["warnings"]), "状態": "旧版" if s.get("superseded_by") else "最新"} for s in items]
     cols = ["ID", "名称", "種類", "日付", "この案件で使った箇所", "単位数", "状態"] if demo else ["ID", "名称", "版", "種類", "日付", "公開範囲", "会議", "単位数", "警告", "状態"]
     st.dataframe(pd.DataFrame(rows, columns=cols), hide_index=True, width="stretch")
     if demo and p["recordings"]:  # 録画・字幕は、録画・発言の画面で発言ごとに確認する
@@ -159,7 +202,7 @@ def _source_list(p: dict) -> None:
                 from .. import state
                 st.session_state["rec_sel"] = r["id"]
                 state.goto("recordings")
-    src = select_item(p["sources"], lambda s: f"{s['id']} {s['name']} v{s['version']}", "src_sel", "資料はまだありません。")
+    src = select_item(items, lambda s: f"{s['id']} {s['name']} v{s['version']}", "src_sel", "資料はまだありません。")
     if not src:
         return
     focus = _focus_unit(p, src)
@@ -407,6 +450,9 @@ def records(p: dict) -> None:
         wait_src = [s["id"] for s in latest if s["name"] in waiting]
         wait_rec = [r["id"] for r in p["recordings"] if r["name"] in waiting]
         st.html(_status(f"未整理の議事録 {len(waiting)}件", "、".join(sorted(waiting))))
+        fresh = [s["name"] for s in latest if s["id"] in (st.session_state.get("rec_new") or [])]
+        if fresh:  # 議事録の登録直後に移動してきたときは、今回登録した記録を示す（下の選択欄でも「今回登録」と表示）
+            st.caption(f"今回登録した議事録：{'、'.join(fresh)}（整理する対象に選択済み）")
         with st.container(border=True, key="records_run"):
             ai_panel_extract(p, wait_src, wait_rec)
     elif names:
@@ -425,6 +471,8 @@ def records(p: dict) -> None:
     else:
         st.html(_status("会議の記録はまだありません", "議事録のファイルを選ぶか、文章を貼り付けて登録してください。録画がなくても進められます。"))
     meeting = None
+    if st.session_state.get("rec_meeting") and pj.get(p, "meetings", st.session_state["rec_meeting"]):
+        st.caption(f"対象の会議：{continuity.label(p, st.session_state['rec_meeting'])}（議事録を追加すると、この会議に関連付けます。下の「関連付ける会議」で変更できます）")
     if names:
         if waiting and gd.candidate_status(p)["waiting"]:  # 前回の整理の候補が残っているときは、補助の操作として出す
             if st.button("前回の整理で作成したAI候補を確認する", key="records_go_cand_prev", type="tertiary"):
@@ -434,13 +482,13 @@ def records(p: dict) -> None:
             with st.expander("AIでもう一度整理する（対象を選んで実行）"):
                 ai_panel_extract(p, [], [], primary=False)
         with edit_block("records"), st.expander("議事録・録画を追加する"):
-            meeting = meeting_select(p, "records_mtg")
+            meeting = meeting_select(p, "records_mtg", st.session_state.get("rec_meeting"))
             minutes_import(p, meeting, "records", main="secondary")
             st.markdown("**録画から文字起こしする（録画がある場合）**")
             _transcribe_ui(p, meeting)
     else:
         with edit_block("records"), st.container(border=True):
-            meeting = meeting_select(p, "records_mtg")
+            meeting = meeting_select(p, "records_mtg", st.session_state.get("rec_meeting"))
             minutes_import(p, meeting, "records", main="primary")
             with st.expander("録画から文字起こしする（録画がある場合）"):
                 _transcribe_ui(p, meeting)

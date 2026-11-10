@@ -6,6 +6,7 @@ import streamlit as st
 
 from ... import project as pj
 from ...logic import checks, continuity
+from ...logic import guidance as gd
 from ...project import display, field_state
 from ...export import share
 from .. import state
@@ -125,7 +126,14 @@ def requirements(p: dict) -> None:
         st.caption(f"表示中のデータ：{STAGES[p['demo']['stage']]}の時点。閲覧専用のため、内容・根拠・版の履歴を確認できます（編集はできません）。")
     focus = _req_focus(p)
     if not p["requirements"] and not p.get("is_demo"):
-        st.info("要件はまだ登録されていません。議事録をAIで整理し、AI候補を確認して採用すると、ここに並びます。")
+        st.info("要件はまだ登録されていません。議事録をAIで整理し、AI候補を確認して採用すると、ここに並びます。下の「要件を追加する」から手で登録することもできます。")
+        waiting = gd.requirement_candidates(p)
+        with st.container(horizontal=True, key="rq_empty_next"):
+            if waiting:
+                if st.button(f"AI候補を確認する（確認待ち {len(waiting)}件） →", key="rq_empty_cand", type=main_type()):
+                    state.goto("candidates")
+            elif st.button("会議の記録を整理する →", key="rq_empty_records", type=main_type()):
+                state.goto("records")
     rows = [{"ID": r["id"], "名称": r["title"], "版": r["version"], "分野": DOMAINS.get(r.get("domain"), "未設定"), "種類": display(r.get("kind")), "優先": display(r.get("priority")),
              "対象範囲": share.scope_label(r.get("scope")), "合意状態": r["status"], "受入条件": len(r.get("acceptance") or []), "根拠": len(r.get("evidence") or [])} for r in p["requirements"]]
     if rows:  # 要件がないときは絞り込みを出さない
@@ -134,7 +142,7 @@ def requirements(p: dict) -> None:
         fq = c2.text_input("検索", key="rq_q")
         rows = [r for r in rows if (not fs or r["合意状態"] in fs) and (not fq or fq in r["名称"] or fq in r["ID"]) and (focus is None or r["ID"] in focus)]
         st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
-    with edit_block("addreq"), st.expander("要件を追加する"):
+    with edit_block("addreq"), st.expander("要件を追加する", expanded=not p["requirements"]):
         with st.form("add_req", clear_on_submit=True):
             title = st.text_input("名称")
             body = st.text_area("本文")

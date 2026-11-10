@@ -130,8 +130,9 @@ with sync_playwright() as pw:
     wait(g, 700)
     check(g.get_by_label("時期", exact=True).first.input_value() == "来年4月に開始したい（未確認）", "5 任意項目を開閉しても入力が残る")
     click(g, "案件情報を保存", 2800)
-    check(btn(g, "次へ：資料・議事録を取り込む →").count() == 1, "5 保存後：資料が未登録なので「資料・議事録を取り込む」")
-    click(g, "次へ：資料・議事録を取り込む →")
+    check(btn(g, "次へ：質問・議題 →").count() == 1 and btn(g, "参考資料を登録する").count() == 1, "5 保存後：会議の準備（質問・議題）と参考資料の登録を案内")
+    click(g, "← 準備の概要に戻る")
+    click(g, "すでに議事録がある場合は、議事録を取り込む →")  # 議事録が手元にある人は工程3へ直接
 
     g.get_by_role("tab", name="文章を貼り付けて取り込む").click()
     wait(g, 600)
@@ -139,7 +140,7 @@ with sync_playwright() as pw:
     g.get_by_role("textbox", name="文章を貼り付ける").fill(MINUTES)
     g.get_by_role("textbox", name="文章を貼り付ける").press("Tab")
     wait(g, 900)
-    click(g, "貼り付けた文章を案件内に登録", 3200)
+    click(g, "貼り付けた文章を議事録として登録", 3200)
     click(g, "会議の記録を整理する →", 3000)
     check("未整理の議事録 1件" in now(g) and in_view(btn(g, "選択した議事録をAIで整理する")), f"2 記録の整理：{now(g)}")
     btn(g, "選択した議事録をAIで整理する").click()

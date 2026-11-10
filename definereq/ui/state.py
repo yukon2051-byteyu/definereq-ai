@@ -109,6 +109,11 @@ def goto(page: str, keep: dict | None = None) -> None:
     st.session_state["resumed"] = False  # 再開の通知は、作業を始めたら閉じる
     st.session_state.pop("req_focus", None)  # 残件から開いたときの絞り込みは、その移動のときだけ
     st.session_state.pop("cand_done", None)  # 候補を採用した直後の案内は、別の画面へ移ったら閉じる
+    st.session_state.pop("refs_from", None)  # 質問・議題から参考資料を開いた印（戻り先）は、その移動のときだけ
+    st.session_state.pop("rec_new", None)  # 今回登録した議事録の印は、議事録の登録直後の移動のときだけ
+    st.session_state.pop("rec_meeting", None)  # 会議の画面から選んだ会議（記録の整理で関連付ける会議の初期値）
+    st.session_state.pop("prep_saved", None)  # 質問・議題の反映直後の案内
+    st.session_state.pop("mtg_done", None)  # 会議の登録直後の案内
     for k, v in (keep or {}).items():
         st.session_state[k] = v
     st.session_state["page"] = page

@@ -480,7 +480,7 @@ def project_app(p, page="overview", **state):
 
 def test_project_panel_can_close_and_reopen_and_has_no_demo_words(blank):
     """見出しの直後に状態の1行と主ボタン。理由などの詳しい説明は画面の下の開閉式の欄にまとめる。"""
-    at = project_app(blank, "prep")
+    at = project_app(blank, "trail")  # 共通の状態表示を使う画面（質問・議題は「会議へ進む」が主）
     html = "".join(h.proto.body for h in at.get("html"))
     assert "案件を作成した直後" in html and "デモ体験中" not in html and not at.exception
     assert button(at, "guide_go").label == "準備の概要を開く →"
