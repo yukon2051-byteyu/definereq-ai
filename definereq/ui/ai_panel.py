@@ -63,7 +63,7 @@ def ai_panel(p: dict, task_key: str, extra: str = "", recordings: bool = False, 
         if same:
             st.info(f"同じ入力の結果 {same[-1]['id']} があります。再実行せずに候補を利用できます。")
             again = st.checkbox("費用がかかることを理解して、もう一度実行する", key=f"ai_again_{task_key}")
-        if st.button("この内容でAIを実行", disabled=not (rd.ai and code and again), key=f"ai_go_{task_key}"):  # 折りたたみの中の実行は補助の見た目（記録の整理の実行欄だけ主ボタン）
+        if st.button("この内容でAIを実行", disabled=not (rd.ai and code and again), key=f"ai_go_{task_key}", type="primary"):  # 押せる・押せないが切り替わるボタンは、押せるときオレンジ・押せないとき点線の枠にする
             _run(p, task_key, code, rd, chosen, rec_ids, extra)
 
 
@@ -117,7 +117,7 @@ def extract_runner(p: dict, src_ids: list[str], rec_ids: list[str], primary: boo
         st.info(f"同じ対象の結果 {same[-1]['id']} があります。再実行せずに下の候補を利用できます。")
         again = st.checkbox("費用がかかることを理解して、もう一度実行する", key="ai_again_extract")
     ready = rd.ai and bool(code) and again and not too_long and bool(chosen or picked)
-    if st.button("選択した議事録をAIで整理する", disabled=not ready, key="ai_go_extract", type="primary" if primary else "secondary"):
+    if st.button("選択した議事録をAIで整理する", disabled=not ready, key="ai_go_extract", type="primary"):  # 押せる・押せないが切り替わるボタンは、押せるときオレンジ・押せないとき点線の枠にする
         _run(p, "extract", code, rd, chosen, picked)
     with st.expander("送信する内容の詳細（案件の情報・送信しないもの）"):
         refs = ai.reference_items(p)

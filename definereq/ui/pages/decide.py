@@ -185,7 +185,7 @@ def _reflect_requirements(p: dict, d: dict) -> None:
                     ag.reconfirm_version(p, d["id"], r["id"], "human")
                     touch(p)
                     ok_rerun("判断の対象を更新しました")
-        if st.button("選んだ要件を合意済みにする", key=f"rf_go_{d['id']}", type=main_type(), disabled=not chosen):
+        if st.button("選んだ要件を合意済みにする", key=f"rf_go_{d['id']}", type="primary", disabled=not chosen):  # 押せる・押せないが切り替わるボタンは、押せるときオレンジ・押せないとき点線の枠にする
             if guard(ag.apply_decision, p, d["id"], chosen, "human") is not None:
                 touch(p)
                 ok_rerun("要件へ反映しました")

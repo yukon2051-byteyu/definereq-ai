@@ -1195,7 +1195,8 @@ def PAGES_KEYS():
 # ---- 主ボタン（オレンジ）は、その状態で進める操作を1つだけ ----
 def primaries(at):
     """本文の主ボタン（サイドバーの選択表示を除く）。タブで切り替わる登録ボタンは、表示中のタブの1つとして数える。"""
-    labels = [b.label for b in at.main.button if b.proto.type == "primary"]  # サイドバーの選択表示は数えない
+    # 押せるオレンジのボタン（押せない主ボタンは点線の枠で表示されるため数えない。サイドバーの選択表示も数えない）
+    labels = [b.label for b in at.main.button if b.proto.type == "primary" and not b.disabled]
     labels += [b.label for b in at.get("download_button") if b.proto.type == "primary"]
     if {"読み込む", "貼り付けた文章を案件内に登録"} <= set(labels):
         labels.remove("貼り付けた文章を案件内に登録")
@@ -1220,7 +1221,8 @@ def test_primary_follows_the_state(p):
     assert primaries(at) == ["次へ：資料・議事録を取り込む →"]  # 保存した直後は次の工程
     q = at.session_state["project"]
     registry.ingest_paste(q, "議事録", "講師が出欠を登録する。", kind="議事録")
-    assert primaries(open_app(q, "records")) == ["選択した議事録をAIで整理する"]
+    at = open_app(q, "records")  # テストではAIのキーがないため押せない。主ボタン（押せるとオレンジ）であることを確かめる
+    assert key(at, "ai_go_extract").proto.type == "primary" and primaries(at) == []
     run(q, "extract", [cand("要望", "出欠を登録する")], source_ids=[q["sources"][0]["id"]])
     assert primaries(open_app(q, "records")) == ["AI候補を確認する →"]
     at = open_app(q, "candidates")

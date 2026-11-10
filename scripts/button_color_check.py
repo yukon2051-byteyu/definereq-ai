@@ -31,7 +31,7 @@ def wait(g, ms=2600):
 
 def oranges(g):
     """表示されているオレンジのボタンの文字（本文のみ）。"""
-    return g.evaluate(f"""[...document.querySelectorAll('[data-testid=stMain] button, .dr-hero a.dr-btn')].filter(b=>b.offsetParent&&b.getBoundingClientRect().width>0
+    return g.evaluate(f"""[...document.querySelectorAll('[data-testid=stMain] button, .dr-hero a.dr-btn')].filter(b=>b.offsetParent&&b.getBoundingClientRect().width>0&&!b.closest('details:not([open])')
         &&getComputedStyle(b).backgroundColor==='{ORANGE}').map(b=>b.innerText.trim())""")
 
 

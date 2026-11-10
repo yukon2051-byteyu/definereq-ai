@@ -301,7 +301,7 @@ def _transcribe_ui(p: dict, meeting: str | None) -> None:
         ready = tr.local_available()
         if not ready:
             st.caption("このサーバーにはローカル処理の部品（faster-whisper）が入っていません。")
-    if st.button("この内容で文字起こしを実行", type=main_type(), disabled=not ready or end - start > max_min, key="rec_go"):
+    if st.button("この内容で文字起こしを実行", type="primary", disabled=not ready or end - start > max_min, key="rec_go"):
         run_id = None
         try:
             if choice == "openai":
@@ -368,7 +368,7 @@ def minutes_import(p: dict, meeting: str | None, key: str, main: str | None = No
     visibility = c2.selectbox("公開範囲", VISIBILITY, key=f"{key}_vis")
     kind = main or main_type()  # 記録がまだないときだけ取り込みを主操作にする（呼び出し側が指定）
     # 主操作は1つ：ファイルを選んだらファイルの取り込み、選んでいなければ貼り付けた文章の登録
-    file_kind, paste_kind = (kind, "secondary") if files else ("secondary", kind)
+    file_kind, paste_kind = ("primary", "secondary") if files else ("secondary", kind)  # ファイルを選んだら、取り込みのボタンをオレンジに
     if st.button("ファイルを取り込む", type=file_kind, disabled=not files, key=f"{key}_go"):
         done = _import_files(p, files, visibility, date or None, meeting)
         if done:
