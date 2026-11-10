@@ -260,11 +260,11 @@ def _profile_form(p: dict) -> None:
             label, page = _after_save(p)
             with st.container(key="pf_saved_box"):
                 st.success(f"案件情報を保存しました（{saved['time']}）。")
-                with st.container(horizontal=True, vertical_alignment="center"):
-                    if st.button(f"次へ：{label} →", key="pf_next_go", type="primary"):
-                        state.goto(page)
+                with st.container(horizontal=True, vertical_alignment="center", horizontal_alignment="right"):  # 「次へ」は右端
                     if not drafts.references_count(p) and st.button("参考資料を登録する", key="pf_refs"):
                         state.goto("refs")
+                    if st.button(f"次へ：{label} →", key="pf_next_go", type="primary"):
+                        state.goto(page)
 
 
 def _after_save(p: dict) -> tuple[str, str]:

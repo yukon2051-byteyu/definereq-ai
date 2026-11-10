@@ -356,8 +356,9 @@ def step_page(p: dict) -> str:
 
 
 def _next_inline(steps: list[dict], i: int, label: str | None = None) -> None:
-    """本文の要点のすぐ下に置く「次へ」。詳細を開いたり最後まで読んだりしなくても押せる。"""
-    st.button(label or next_label(steps, i), key="tour_next", type="primary", on_click=jump, args=(steps, i + 1, False))
+    """本文の要点のすぐ下に置く「次へ」。詳細を開いたり最後まで読んだりしなくても押せる。「次へ」はどの画面でも右端に置く。"""
+    with st.container(horizontal=True, horizontal_alignment="right", key="tour_next_row"):
+        st.button(label or next_label(steps, i), key="tour_next", type="primary", on_click=jump, args=(steps, i + 1, False))
 
 
 RECORD_PAGES = {"sources", "recordings", "records"}  # 「記録の取り込み・整理」の工程の画面
@@ -419,7 +420,7 @@ def _focus(demo_id: str, i: int) -> str:
 def _start(steps: list[dict], i: int, demo_id: str) -> None:
     """最初の画面の進み方。順に見る人と、見どころから入りたい人の両方に対応する。"""
     # 冒頭は順番に進む操作を1つ。見どころへの近道はトップのデモ一覧に置く
-    with st.container(key="tour_start", horizontal=True):
+    with st.container(key="tour_start", horizontal=True, horizontal_alignment="right"):  # 「次へ」は右端
         st.button(next_label(steps, i), key="tour_next", type="primary", on_click=jump, args=(steps, i + 1, False))
 
 
@@ -448,8 +449,9 @@ def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx, show_next: bool 
     # ステップ1（案件の背景）からは、会議後の要件や残件へ直接は飛ばない（背景の確認は本文の補助操作で開ける）
     if i > 0 and c2.button(detail_label(page_name), key="tour_detail", type="tertiary", width="stretch"):
         open_detail(step["page"])
-    if show_next:
-        c3.button(next_label(steps, i), key="tour_next", type="primary", width="stretch", on_click=jump, args=(steps, i + 1, False))
+    if show_next:  # 「次へ」は右端（前へ・詳細は左側）
+        with c3.container(horizontal=True, horizontal_alignment="right", key="tour_next_row"):
+            st.button(next_label(steps, i), key="tour_next", type="primary", on_click=jump, args=(steps, i + 1, False))
 
 
 def detail_label(page_name: str) -> str:
