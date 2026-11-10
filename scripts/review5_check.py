@@ -107,7 +107,8 @@ with sync_playwright() as pw:
 
     # ---- 1 ----
     main(g).get_by_label("貼り付ける議事録の名称").fill("第1回議事録")
-    main(g).get_by_label("議事録の文章を貼り付ける").fill("第1期は照合と履歴の閲覧のみとする。キャンセルは開始前日17時までとする。")
+    # 実際のAIでも「決定」と分類されるよう、決定したことが文から分かる書き方にする（「〜とする」だけでは決定と読まれないことがある）
+    main(g).get_by_label("議事録の文章を貼り付ける").fill("第1回打ち合わせでは、第1期の範囲を照合と履歴の閲覧のみとすることを決定した（決定者：山田部長）。保存期間は未定で、次回確認する。")
     main(g).get_by_label("議事録の文章を貼り付ける").press("Tab")
     wait(g, 900)
     click(g, "貼り付けた文章を議事録として登録", 3000)
@@ -116,6 +117,12 @@ with sync_playwright() as pw:
     wait(g, 2500)
     click(g, "会議記録の候補確認へ進む →", 3000)
     check("必要なものを要件の下書きや確認事項などに登録できます" in main(g).inner_text(), "5 自分の案件の候補確認は、登録できる説明")
+    if main(g).get_by_role("button", name="判断記録の下書きの内容を確認").count() == 0:  # AIの結果に決定の候補がないときは、区分を記録して止める
+        kinds = [x.inner_text().split(chr(10))[-1] for x in main(g).locator("[data-testid=stExpander] summary").all()]
+        g.screenshot(path=OUT / "1_決定の候補なし.png", full_page=True)
+        check(False, f"1 AIの結果に決定の候補がない（出た区分：{'、'.join(kinds)}）")
+        print("問題", len(problems))
+        sys.exit(1)
     main(g).get_by_role("button", name="判断記録の下書きの内容を確認").first.click()
     wait(g, 2500)
     main(g).get_by_text("決定の内容から新しい要件の下書きを作る", exact=True).click()
