@@ -746,7 +746,9 @@ def test_open_process_and_return_to_step(entry):
     if entry == "body":
         at = button(at, "tour_detail").click().run()  # 本文の補助ボタン（この案件の〇〇を確認する）
     else:
-        at = button(at, "nav_group_3").click().run()  # サイドバーの工程
+        at = button(at, "nav_group_3").click().run()  # サイドバーの工程を開き、機能を選ぶ
+        assert at.session_state["tour_on"] and at.session_state["tour_index"] == 2
+        at = button(at, "nav_candidates").click().run()
     assert not at.session_state["tour_on"] and button(at, "tour_back").label == "← デモステップ 3/8『会議後の整理』に戻る"
     page = at.session_state["page"]
     assert button(at, f"nav_{page}").proto.type == "primary"  # 実際に表示しているページだけを選択
@@ -755,6 +757,10 @@ def test_open_process_and_return_to_step(entry):
     assert button(at, "tour_back").label == "← デモステップ 3/8『会議後の整理』に戻る"
     at = button(at, "tour_back").click().run()
     assert at.session_state["tour_on"] and at.session_state["tour_index"] == 2 and "デモステップ 3/8 · 会議後の整理" in html_of(at)
+    # 戻ると機能ページの選択表示は外れ、サイドバーは機能画面を開く前の開閉状態に戻る
+    side = {b.key for b in at.sidebar.button}
+    assert not any(b.proto.type == "primary" for b in at.sidebar.button)
+    assert ("nav_candidates" in side) == (entry == "sidebar") and "nav_records" not in side
     at = button(at, "tour_next").click().run()
     assert at.session_state["tour_index"] == 3
 
@@ -767,10 +773,54 @@ def test_body_detail_button_names_the_page():
 
 def test_highlight_start_is_the_return_point_and_restart():
     at = button(app(), "tour_d1_hl").click().run()
-    at = button(at, "nav_group_1").click().run()
+    at = button(at, "nav_group_1").click().run()  # 案内中は工程を開くだけ。機能を選ぶと機能画面へ
+    at = button(at, "nav_prep").click().run()
     assert button(at, "tour_back").label == "← デモステップ 5/8『判断』に戻る"
     at = button(at, "nav_tour").click().run()  # デモを最初から見る
     assert at.session_state["tour_on"] and at.session_state["tour_index"] == 0
     at = button(at, "nav_home").click().run()
     at = button(at, "tour_d3").click().run()  # 別のデモは、そのデモの開始位置から
     assert at.session_state["project"]["demo"]["id"] == "d3" and at.session_state["tour_index"] == 0
+
+
+# ---- デモ冒頭から会議後の状況へ飛ばない。残件は会議後の場面で、その時点のデータで見せる ----
+@pytest.mark.parametrize("demo", ["d1", "d2", "d3"])
+def test_step1_has_no_jump_to_post_meeting_state(demo):
+    at = demo_at(demo)
+    keys = {b.key for b in at.button}
+    assert "tour_detail" not in keys and "tour_todo_open" not in keys and "tour_profile" in keys
+    assert button(at, "tour_next").label == "次へ：会議前の準備"
+    at = button(at, "tour_next").click().run()
+    assert at.session_state["tour_index"] == 1 and "デモステップ 2/8 · 会議前の準備" in html_of(at)
+
+
+@pytest.mark.parametrize("demo", ["d1", "d2", "d3"])
+def test_post_meeting_todo_link_shows_same_time_and_returns(demo):
+    from definereq.demos import guide as demo_guide
+    from definereq.ui.guide import first_after_meeting
+
+    steps = demo_guide.load(demo)
+    n = first_after_meeting(steps)
+    at = demo_at(demo, n)
+    assert sum(1 for b in at.button if b.key == "tour_todo_open") == 1
+    assert any("会議後の時点" in c.value for c in at.caption)
+    at = button(at, "tour_todo_open").click().run()
+    assert at.session_state["page"] == "overview" and at.session_state["project"]["demo"]["stage"] == 2
+    body = html_of(at)
+    assert "表示中のデータ：会議後の時点" in body and "デモの段階" not in body
+    assert button(at, "tour_back").label == f"← デモステップ {n + 1}/8『{steps[n]['process']}』に戻る"
+    at = button(at, "tour_back").click().run()
+    assert at.session_state["tour_on"] and at.session_state["tour_index"] == n
+    at = button(at, "tour_next").click().run()
+    assert at.session_state["tour_index"] == n + 1
+
+
+def test_sidebar_overview_from_step1_shows_time_and_return():
+    at = demo_at("d3")
+    at = button(at, "nav_group_0").click().run()
+    at = button(at, "nav_overview").click().run()
+    assert "表示中のデータ：会議後の時点" in html_of(at)
+    assert button(at, "tour_back").label == "← デモステップ 1/8『案件の背景』に戻る"
+    assert any(s.label.startswith("表示するデータの時点") for s in at.get("button_group"))
+    at = button(at, "tour_back").click().run()
+    assert at.session_state["tour_on"] and at.session_state["tour_index"] == 0

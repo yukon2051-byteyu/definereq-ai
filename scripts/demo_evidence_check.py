@@ -84,6 +84,7 @@ with sync_playwright() as pw:
     for demo in DEMOS:
         # 1. 共通サイドバーから登録内容を開く
         start(g, demo, sidebar_open=True)
+        side(g, "1. 案件の準備")  # 案内中は工程を開くだけ
         side(g, "背景・目的・関係者")
         t = g.inner_text("body")
         check(g.locator(".dr-title").first.inner_text() == "背景・目的・関係者" and "デモデータ · 閲覧専用" in t and g.get_by_text("関係者", exact=True).count() > 0

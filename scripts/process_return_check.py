@@ -78,7 +78,10 @@ with sync_playwright() as pw:
             if opener.count() and opener.first.is_visible():
                 opener.first.click()
                 wait(g, 900)
-            side(g).get_by_role("button", name="4. 要件の確認・判断").click()
+            side(g).get_by_role("button", name="4. 要件の確認・判断").click()  # 案内中は工程を開くだけ（ステップは変わらない）
+            wait(g, 2000)
+            check(loc(g) == "デモステップ 3/8 · 会議後の整理" and selected(g) == [], "サイドバー：工程を開いてもステップは変わらず、選択表示もしない")
+            side(g).get_by_role("button", name="AI候補の確認", exact=True).click()
         wait(g, 3000)
         back = main(g).get_by_role("button", name="← デモステップ 3/8『会議後の整理』に戻る")
         check(back.count() == 1, f"{entry}：工程を開くと本文に「← デモステップ 3/8『会議後の整理』に戻る」")
@@ -101,6 +104,8 @@ with sync_playwright() as pw:
     main(g).get_by_role("button", name="ステップ5「判断」から見る").click()
     wait(g, 3500)
     side(g).get_by_role("button", name="2. 会議の準備").click()
+    wait(g, 2000)
+    side(g).get_by_role("button", name="質問・議題", exact=True).click()
     wait(g, 3000)
     check(main(g).get_by_role("button", name="← デモステップ 5/8『判断』に戻る").count() == 1, "見どころから始めても、開いたステップ（5/8）が戻り先")
     side(g).get_by_role("button", name="デモを最初から見る").click()

@@ -43,7 +43,7 @@ def palette_css() -> str:
 CSS = """
 <style>
 __PALETTE_CSS__
-:root{--btn-main:#F97832;--btn-main-hover:#F95C0E;--btn-main-active:#E8520A;--btn-main-ink:#171717;--ink:#161618;--muted:#5A5C63;--line:#E2E3E7;--panel:#F5F5F7;--g1:var(--c-orange);--g2:var(--c-coral);--g3:var(--c-magenta)}
+:root{--btn-main:#F99052;--btn-main-hover:#F97832;--btn-main-active:#F95C0E;--btn-main-ink:#171717;--ink:#161618;--muted:#5A5C63;--line:#E2E3E7;--panel:#F5F5F7;--g1:var(--c-orange);--g2:var(--c-coral);--g3:var(--c-magenta)}
 .dr-chips{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px}
 .dr-chip{display:inline-block;padding:2px 9px;border-radius:3px;font-size:12px;font-weight:700;line-height:1.7;white-space:nowrap}
 .dr-head{margin:0 0 14px;padding-left:14px;border-left:6px solid;border-image:linear-gradient(180deg,var(--g1),var(--g2),var(--g3)) 1}
@@ -196,6 +196,8 @@ __PALETTE_CSS__
 .dr-setup-h b{font-weight:900}
 .dr-setup-t{font-size:14.5px;line-height:1.65;color:#2F3036;margin-top:4px}
 .dr-anchor{scroll-margin-top:70px;height:0}
+/* トップの入口へ移動したときは、先に操作するAIパスワード欄も見えるよう、上に余白をとって止める */
+.st-key-home_new .dr-anchor{scroll-margin-top:230px}
 /* デモ一覧：このデモで分かること（背景より強く見せる）と、共通の説明 */
 .dr-take{margin-top:10px;padding:8px 12px;border-left:4px solid #D9330F;background:#FBF3E8}
 .dr-take .dr-demo-l{margin-top:0;color:#7A3A00}
@@ -276,7 +278,9 @@ __PALETTE_CSS__
 .dr-resume-t{font-size:13px;line-height:1.65;color:var(--muted)}
 .dr-resume-t b{display:block;color:#45474D;font-size:13.5px;margin-bottom:2px}
 /* トップで選んだ入口（新規作成か再開か）の欄を強調する。URLの#で判定するため、パスワード確定後も続く */
-.st-key-home_new [data-testid="stColumn"]:has(#dr-new-create:target),.st-key-home_new [data-testid="stColumn"]:has(#dr-resume:target){outline:2px solid #D9330F;outline-offset:6px;border-radius:4px;background:#FFF8F3}
+/* トップで選んだ入口（新規作成か再開か）は、見出し横の短いオレンジの縦線で示す。入力エラーと見分けられるよう、欄全体の枠や色面は使わない */
+.dr-home-h{font-size:16px;font-weight:800;color:var(--ink);line-height:1.5;padding-left:0;border-left:4px solid transparent;margin-left:-12px;padding-left:8px}
+.dr-anchor:target + .dr-home-h{border-left-color:var(--btn-main-hover)}
 .dr-ai-note{border-left:3px solid #2A5DB0;background:#F7F9FC;padding:6px 12px;margin:4px 0}
 .dr-ai-t{font-size:14.5px;font-weight:700;line-height:1.6;color:var(--ink)}
 button:focus-visible,a:focus-visible{outline:2px solid #2A5DB0;outline-offset:2px}
@@ -344,7 +348,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #2A5DB0;outline-offset:2p
 .st-key-home_new{gap:10px}
 /* AIパスワード欄の「表示」ボタンは出さない。Tabキーでこのボタンへ移ると入力が確定されず、「案件を作成」が押せないままになるため */
 .st-key-home_code button{display:none}
-/* 主ボタン：その場で進める操作。やや柔らかいオレンジに濃い文字（コントラスト比 通常 約6.6:1、ホバー 約5.4:1）。色は :root の --btn-main で管理。
+/* 主ボタン：その場で進める操作。柔らかいオレンジに濃い文字（コントラスト比 通常 約7.8:1、ホバー 約6.6:1）。マウスを乗せると一段濃くなる。色は :root の --btn-main で管理。
    テーマの赤（注意・エラー・選択の表示）は変えず、本文の主ボタンだけに適用する */
 [data-testid="stMain"] button[kind="primary"],[data-testid="stMain"] button[kind="primaryFormSubmit"]{background:var(--btn-main);border:1px solid var(--btn-main);color:var(--btn-main-ink)}
 [data-testid="stMain"] button[kind="primary"] p,[data-testid="stMain"] button[kind="primaryFormSubmit"] p{color:#171717;font-weight:700}

@@ -202,7 +202,7 @@ def app(**state):
 
 def test_home_shows_both_entry_points():
     at = app()
-    assert any("保存した案件から再開する" in m.value for m in at.markdown)
+    assert any("保存した案件から再開する" in h.proto.body for h in at.get("html"))
     assert any("引き継いで" in c.value for c in at.caption)
     assert at.get("file_uploader")
 
@@ -213,7 +213,7 @@ def test_back_to_top_keeps_project_and_warns():
     next(b for b in at.button if b.key == "nav_home").click()
     at = at.run()
     assert at.session_state["project"]["name"] == p["name"]
-    assert any("別の案件へ切り替える前に保存" in w.value for w in at.warning)
+    assert any("変更を保存するには、再開用ファイルをダウンロード" in w.value for w in at.warning)
     assert any(b.key == "back_work" for b in at.button)
     next(b for b in at.button if b.key == "back_work").click()
     at = at.run()
@@ -227,9 +227,12 @@ def test_create_blocked_until_discard_confirmed(monkeypatch):
     at = at.run()
     create = next(b for b in at.button if b.key == "create_project")
     assert create.disabled
+    # 押せない理由と解除の方法を、ボタンの近くに示す
+    assert any("保存していない変更があるため、まだ作成できません" in c.value for c in at.caption)
     next(c for c in at.checkbox if c.key == "discard_ok").check()
     at = at.run()
     assert not next(b for b in at.button if b.key == "create_project").disabled
+    assert not any("まだ作成できません" in c.value for c in at.caption)
 
 
 def test_demo_does_not_lose_work_in_progress():

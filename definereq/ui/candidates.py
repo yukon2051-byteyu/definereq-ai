@@ -58,10 +58,11 @@ def _adopt_form(p: dict, c: dict, meeting: str | None) -> None:
         values = [row(n, item) for n, item in enumerate(rows)]
         if st.form_submit_button("この内容で採用", type="primary"):
             created = guard(intake.adopt_requirement, p, c["id"], None, values, "利用者", meeting)
-            if created:
+            if created:  # 登録できたときだけ、採用した候補の近くに結果と次の操作を出す
                 touch(p)
                 st.session_state.pop("cand_open", None)
-                ok_rerun("、".join(r["id"] for r in created) + " を要件（下書き）として採用しました")
+                st.session_state["cand_done"] = {"cand": c["id"], "reqs": [r["id"] for r in created]}
+                st.rerun()
 
 
 def _decision_form(p: dict, c: dict, meeting: str | None) -> None:
@@ -139,8 +140,39 @@ def _actions(p: dict, c: dict, meeting: str | None, key: str) -> None:
             _advanced(p, c, meeting)
 
 
+def _after_adopt(p: dict, c: dict) -> None:
+    """採用した直後：結果と、続ける操作（次の未確認候補へ）・採用結果への導線（登録した要件を開く）。"""
+    from . import state
+
+    done = st.session_state.get("cand_done")
+    if not done or done["cand"] != c["id"]:
+        return
+    ids = [i for i in done["reqs"] if pj.get(p, "requirements", i)]
+    st.success(f"要件を下書きとして登録しました（{'、'.join(ids)}）。合意は「決定・合意」で人が記録します。")
+    order = st.session_state.get("_cand_order", [])
+    waiting = [i for i in order if (pj.get(p, "candidates", i) or {}).get("state") in ("候補", "要再確認")]
+    after = order[order.index(c["id"]) + 1:] if c["id"] in order else []
+    nxt = next((i for i in after if i in waiting), waiting[0] if waiting else None)  # 画面の表示順で次の確認待ち
+    reason = f"AI候補「{c['text'][:24]}」から登録した要件"
+    with st.container(horizontal=True, key=f"cand_after_{c['id']}"):
+        if nxt:
+            if st.button("次の未確認候補へ", key="cand_next", type="primary"):
+                st.session_state.pop("cand_done", None)
+                st.session_state["cand_focus"] = nxt
+                st.rerun()
+            if st.button("登録した要件を開く", key="cand_open_reqs"):
+                state.open_requirements(ids, reason, "candidates")
+        else:
+            if st.button("登録した要件を開く", key="cand_open_reqs", type="primary"):
+                state.open_requirements(ids, reason, "candidates")
+            if st.button("要件一覧を開く", key="cand_all_reqs"):
+                state.goto("requirements")
+
+
 def _row(p: dict, c: dict, meeting: str | None, key: str) -> None:
     run = _run_state(p, c)
+    focus = st.session_state.get("cand_focus") == c["id"]
+    st.html(f'<div id="cand-{esc(c["id"])}" class="dr-anchor{" dr-cand-focus" if focus else ""}"></div>')
     done = c["state"] in ("採用", "修正して採用")
     flags = (chip("採用済み", "ok") if done else chip(c["state"])) + chip(run, "ok" if run == "最新の解析" else "plain")
     if c.get("no_evidence") and c["kind"] not in PLANNING_KINDS:
@@ -157,6 +189,7 @@ def _row(p: dict, c: dict, meeting: str | None, key: str) -> None:
     if c["state"] in ("候補", "要再確認"):
         _actions(p, c, meeting, key)
     elif c.get("resolved_as") or c.get("resolved_label"):
+        _after_adopt(p, c)
         target = c.get("resolved_items") or ([c["resolved_as"]] if c.get("resolved_as") else [])
         names = "、".join(pj.label_of(p, x) for x in target) or c.get("resolved_label")
         st.caption(f"反映先：{names}（人が確定した内容です）")
@@ -180,6 +213,9 @@ def board(p: dict, tasks: tuple[str, ...] | None, key: str, meeting: str | None 
     view = st.segmented_control("表示", list(STATE_FILTER), default="すべて", key=f"{key}_state", required=True)
     states = STATE_FILTER.get(view or "すべて")
     shown = sorted((c for c in items if states is None or c["state"] in states), key=lambda c: c["state"] not in ("候補", "要再確認"))
+    kinds_order = list(dict.fromkeys(c["kind"] for c in shown))
+    st.session_state["_cand_order"] = [c["id"] for k in kinds_order for c in shown if c["kind"] == k]  # 画面の表示順
+    focus = st.session_state.get("cand_focus") or (st.session_state.get("cand_done") or {}).get("cand")
     if not shown:
         st.caption("該当する候補はありません。")
     kinds = list(dict.fromkeys(c["kind"] for c in shown))
@@ -187,8 +223,13 @@ def board(p: dict, tasks: tuple[str, ...] | None, key: str, meeting: str | None 
         group = [c for c in shown if c["kind"] == kind]
         route = intake.route_for(kind)
         waiting = sum(1 for c in group if c["state"] in ("候補", "要再確認"))
-        with st.expander(f"{kind}　{len(group)}件（確認待ち{waiting}件）→ 確定すると：{DESTINATION.get(route.kind, '記録のみ')}", expanded=len(shown) <= 12 or kind == kinds[0]):
+        has_focus = any(c["id"] == focus for c in group)  # 次に確認する候補・採用した候補がある区分は開く
+        with st.expander(f"{kind}　{len(group)}件（確認待ち{waiting}件）→ 確定すると：{DESTINATION.get(route.kind, '記録のみ')}", expanded=len(shown) <= 12 or kind == kinds[0] or has_focus):
             for n, c in enumerate(group):
                 if n:
                     st.divider()
                 _row(p, c, meeting, key)
+    target = st.session_state.pop("cand_focus", None)
+    if target:  # 次の未確認候補の位置へ移動する
+        st.iframe(f"<script>/*{target}-{pj.now_iso()}*/const t=()=>window.parent.document.getElementById('cand-{target}')?.scrollIntoView({{block:'start'}});setTimeout(t,200);setTimeout(t,700)</script>", height=1)
+        st.session_state["cand_focus_shown"] = target

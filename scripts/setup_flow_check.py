@@ -96,16 +96,20 @@ with sync_playwright() as pw:
         g.get_by_role("link", name=link).click()
         wait(g, 1500)
         height = CTX["viewport"]["height"]
-        mark = f"(()=>{{const c=document.getElementById('{anchor}').closest('[data-testid=stColumn]');return getComputedStyle(c).outlineStyle}})()"
+        # 選んだ欄の見出し横だけに短いオレンジの縦線。欄全体の枠や色面は使わない
+        bar = lambda a: g.evaluate(f"getComputedStyle(document.getElementById('{a}').nextElementSibling).borderLeftColor")
+        frame = f"(()=>{{const c=document.getElementById('{anchor}').closest('[data-testid=stColumn]');return getComputedStyle(c).outlineStyle}})()"
         other = "dr-resume" if anchor == "dr-new-create" else "dr-new-create"
-        unmarked = f"(()=>{{const c=document.getElementById('{other}').closest('[data-testid=stColumn]');return getComputedStyle(c).outlineStyle}})()"
         before = position(g, anchor)
-        hint = "作成するには" if anchor == "dr-new-create" else "再開するには"
-        check(-10 <= before <= height - 200 and g.evaluate(mark) == "solid" and g.evaluate(unmarked) == "none" and hint in body(g), f"6 「{link}」で目的の欄が見え、その欄だけ強調（上端 {before}px）。パスワードの説明あり")
+        pw_box = g.get_by_label("AIパスワード").bounding_box()
+        common = "AIパスワードを入力し、Enterキーで確定すると" in body(g)
+        check(-10 <= before <= height - 200 and bar(anchor) == "rgb(249, 120, 50)" and bar(other) == "rgba(0, 0, 0, 0)" and g.evaluate(frame) == "none"
+              and pw_box and 0 <= pw_box["y"] < height and common,
+              f"6 「{link}」で選んだ欄の見出しに縦線、AIパスワード欄も見える（見出し {before}px、パスワード {round(pw_box['y']) if pw_box else None}px）")
         login(g)
         wait(g, 1500)
         after = position(g, anchor)
-        check(-10 <= after <= height - 200 and g.evaluate(mark) == "solid", f"6 パスワード確定後も同じ欄が見えて強調が続く（上端 {after}px）")
+        check(-10 <= after <= height - 200 and bar(anchor) == "rgb(249, 120, 50)", f"6 パスワード確定後も同じ欄が見えて縦線が続く（上端 {after}px）")
         g.screenshot(path=OUT / f"{SIZE}_{anchor}.png")
         g.context.close()
 
@@ -210,6 +214,8 @@ with sync_playwright() as pw:
                 sidebar(g, "背景・目的・関係者")
             else:
                 click(g, "背景・目的・関係者を編集")
+            g.get_by_text("案件情報を詳しく入力", exact=False).first.click()  # 時期は開閉式の詳しい入力欄にある
+            wait(g, 900)
             ok = ok and g.get_by_label("時期", exact=True).first.input_value() == "来年4月の開始を希望（未確認）"
             check(ok, "5 改修後のファイルから、保存済みの入力と取り込み件数が戻る")
         else:

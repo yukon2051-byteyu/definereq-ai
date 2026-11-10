@@ -14,7 +14,7 @@ from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 URL, OUT, CODE = sys.argv[1], Path(sys.argv[2]), sys.argv[3]
 OUT.mkdir(parents=True, exist_ok=True)
-ORANGE, HOVER, INK = "rgb(249, 120, 50)", "rgb(249, 92, 14)", "rgb(23, 23, 23)"
+ORANGE, HOVER, INK = "rgb(249, 144, 82)", "rgb(249, 120, 50)", "rgb(23, 23, 23)"
 problems: list[str] = []
 MINUTES = "第1回打ち合わせ（架空）。講師が出欠を登録し、月別CSVを出力する。"
 
@@ -75,7 +75,7 @@ with sync_playwright() as pw:
     card.hover()
     wait(g, 400)
     hv = style(card)
-    check(hv["bg"] == HOVER and hv["color"] == INK, f"ホバー：#F95C0E に変わり、濃い文字のまま（{hv['bg']}）")
+    check(hv["bg"] == HOVER and hv["color"] == INK, f"ホバー：#F97832 に変わり、濃い文字のまま（{hv['bg']}）")
     g.mouse.move(5, 5)
     card.focus()
     g.keyboard.press("Shift+Tab")

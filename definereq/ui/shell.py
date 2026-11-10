@@ -44,8 +44,10 @@ NEXT = {"setup": ("背景・目的・関係者を入力します", "profile"), "
 def sidebar(p: dict) -> None:
     """サイドバー：案件名 → モード固有の情報と操作 → 共通の工程メニュー。
 
-    工程メニューはデモと自分の案件で同じ定義（GROUPS）から描画する。デモの案内中は、現在のステップに
-    ひもづく工程と機能を強調し、機能を開いた後は本文の「← 戻る」で元のステップへ戻れる。
+    工程メニューはデモと自分の案件で同じ定義（GROUPS）から描画する。
+    デモの案内中は、ステップを進めても工程を自動では開かない（開いた時点ではすべて閉じ、利用者が開閉した状態を保つ）。
+    現在地は本文上部の「デモステップ N/8」で伝える。機能画面を開いたときだけ、その工程を開いてページを選択表示し、
+    本文の「← デモステップ」で戻ると、選択表示を外して案内中の開閉状態に戻る。
     """
     tour = bool(p.get("demo")) and st.session_state.get("tour_on")
     with st.sidebar:
@@ -66,9 +68,9 @@ def sidebar(p: dict) -> None:
                     state.goto("demo_map")
             elif not p.get("is_demo"):
                 save_controls(p, "save_side")
-        # 案内中は、ステップに対応する工程の見出しだけを控えめに強調する（開いていない機能ページは選択表示にしない）
         current = None if tour else st.session_state.get("page", "overview")
-        group_now = GROUP_OF.get(guide.step_page(p) if tour else current)
+        # 案内中に利用者が開いた工程（デモを開いた時点では空。機能画面へ行って戻っても変わらない）
+        opened: set = st.session_state.setdefault("tour_side_open", set())
 
         def open_page(key: str) -> None:
             if tour:  # デモの案内中に機能を開くと、本文に元のステップへ戻る操作が出る
@@ -82,10 +84,13 @@ def sidebar(p: dict) -> None:
 
         st.caption("工程")
         for n, (group, items) in enumerate(GROUPS):
-            active = group == group_now
-            if st.button(f"{n + 1}. {group}", key=f"nav_group_{n}", type="tertiary" if active else "secondary", width="stretch"):
+            active = (n in opened) if tour else group == GROUP_OF.get(current)
+            if st.button(f"{n + 1}. {group}", key=f"nav_group_{n}", type="tertiary" if active and not tour else "secondary", width="stretch"):
+                if tour:  # 案内中は工程名で開閉するだけ（ステップの位置は変えない）
+                    opened.symmetric_difference_update({n})
+                    st.rerun()
                 open_page(items[0][0])
-            if active:  # 現在の工程の機能だけを表示する
+            if active:  # 開いている工程の機能だけを表示する
                 with st.container(key=f"nav_sub_{n}"):
                     for key, label, _ in items:
                         if key not in ADVANCED:
@@ -102,7 +107,7 @@ def context_bar(p: dict, page_label: str) -> None:
     if p["baselines"]:
         parts.insert(2, f"基準版：{esc(p['baselines'][-1]['label'])}")
     if p.get("demo"):
-        parts.append(f"デモの段階：{esc(STAGES[p['demo']['stage']])}")
+        parts.append(f"表示中のデータ：{esc(guide.data_time(p['demo']['stage']))}")  # デモ本編のステップとは別
         parts.append("閲覧専用・架空データ")
     st.html('<div class="dr-bar">' + "".join(f"<span>{x}</span>" for x in parts) + "</div>")
 
@@ -112,7 +117,8 @@ def stage_control(p: dict) -> None:
     if not d or st.session_state.get("tour_on"):
         return
     stages = list(STAGES)
-    choice = st.segmented_control("デモの段階", stages, default=d["stage"], format_func=STAGES.get, key=f"stage_seg_{d['stage']}")
+    # デモ本編のステップ位置は変えずに、機能画面で表示するデータの時点だけを切り替える（戻るとステップの時点に戻る）
+    choice = st.segmented_control("表示するデータの時点（デモのステップ位置は変わりません）", stages, default=d["stage"], format_func=STAGES.get, key=f"stage_seg_{d['stage']}")
     if choice and choice != d["stage"]:
         state.set_stage(choice)
 
@@ -121,7 +127,19 @@ def scroll_top_on_change(p: dict, key: str) -> None:
     """画面や段階が変わったら先頭へ戻す（案内パネルが画面外に隠れないように）。"""
     marker = f"{p['id']}:{key}:{(p.get('demo') or {}).get('stage')}:{st.session_state.get('tour_on')}:{st.session_state.get('tour_index')}:{st.session_state.get('scroll_nonce', 0)}"
     # st.html のスクリプトは初回しか実行されないため、埋め込み枠から親の画面を操作する
-    script = ("const d=window.parent.document;const t=()=>{d.querySelector('[data-testid=stMain]')?.scrollTo(0,0);window.parent.scrollTo(0,0)};"
+    # 先頭へ戻すのは、画面が切り替わった直後だけ。利用者がスクロール・クリック・キー操作をしたら、遅れて動く分を取り消す
+    # （戻った直後に「次へ」まで移動して押した瞬間にページが上へ戻り、クリックが成立しないことがあったため）
+    # 利用者の操作の時刻は親画面に記録する（この枠の読み込みが遅れても、それより前の操作を判定できるように）
+    # S は、この枠が画面に置かれた時刻（枠の文書の開始時刻）。枠の読み込みが遅れても、置かれた後の操作を判定できる
+    script = ("const w=window.parent,d=w.document,S=Math.round(performance.timeOrigin);"
+              "if(!w.__drIn){w.__drIn={click:0,move:0,down:false};const c=()=>{w.__drIn.click=Date.now();w.__drIn.down=true},u=()=>{w.__drIn.down=false},m=()=>{w.__drIn.move=Date.now()};"
+              "d.addEventListener('pointerdown',c,true);d.addEventListener('pointerup',u,true);d.addEventListener('pointercancel',u,true);for(const e of ['wheel','touchmove','keydown']){d.addEventListener(e,m,true)}}"
+              # 画面が切り替わった後（枠が置かれた後）に利用者がスクロールやクリックをしていたら、先頭へ戻さない。
+              # 枠の読み込みが利用者の操作より遅れることもあるため、ボタンを押している最中や、
+              # 画面を切り替えるクリックの後にスクロールしていたときも動かさない（押した瞬間にボタンが動いてクリックが外れるのを防ぐ）
+              # 前回この処理で先頭へ戻した後に位置が変わっていたら（スクロールバーや画面内移動を含む）、利用者の操作とみなす
+              "let mine=null;const t=()=>{const i=w.__drIn,el=d.querySelector('[data-testid=stMain]');if(!el||i.down||i.move>S||i.click>S||i.move>i.click)return;"
+              "if(mine!==null&&el.scrollTop!==mine)return;el.scrollTo(0,0);w.scrollTo(0,0);mine=el.scrollTop};"
               "t();setTimeout(t,150);setTimeout(t,500);"
               # スマートフォン幅ではサイドバーが本文を覆うため、画面を移動したら閉じる
               "if(window.parent.innerWidth<=760){d.querySelector('[data-testid=stSidebarCollapseButton] button')?.click()}")
@@ -174,6 +192,7 @@ def render(p: dict) -> None:
     context_bar(p, label)
     st.session_state["_group"] = GROUP_OF.get(key)  # 見出しの上の工程名（サイドバーと同じ名前）
     st.session_state["_demo"] = bool(p.get("is_demo"))  # デモの機能画面は、見出し付近に「デモデータ · 閲覧専用」
+    st.session_state["_demo_time"] = guide.data_time(p["demo"]["stage"]) if p.get("demo") else None  # と、表示中のデータの時点
     mine = not p.get("is_demo")
     st.session_state["_main_elsewhere"] = False
     empty = key == "overview" and gd.phase(p) == "empty"

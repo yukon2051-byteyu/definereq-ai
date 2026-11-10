@@ -11,6 +11,7 @@ import streamlit as st
 
 from .. import project as pj
 from ..demos import guide
+from ..demos.builder import STAGES
 from ..project import display
 from . import artifacts, situation, state
 from .components import STATUS_TONE, chip, esc, play_at
@@ -321,6 +322,10 @@ def render(p: dict) -> None:
         st.caption(done)
     _support(step)
     _open(step["open"](ctx))
+    if i == first_after_meeting(steps):  # 会議後の最初の場面で、残った確認事項をこの時点のデータで見せる
+        if st.button("会議後に残った確認事項を見る", key="tour_todo_open", type="tertiary"):
+            open_detail("overview")
+        st.caption(f"開くと「現在の状況」に、この場面と同じ時点（{data_time(step['stage'])}）の残件が表示されます。")
     _more(step, ctx)
     count = step["count"](ctx)
     if count:  # 代表例と全件の数は、詳細の画面へ移るボタンの近くに置く
@@ -444,7 +449,8 @@ def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx, show_next: bool 
         jump(steps, i - 1)
     # 機能ページを開く補助ボタン。開く内容が分かる名前にし、「次へ」と見分ける（工程番号とステップ番号は対応づけない）
     page_name = st.session_state.get("_page_names", {}).get(step["page"], ("", step["detail"](ctx)))[1]
-    if c2.button(detail_label(page_name), key="tour_detail", type="tertiary", width="stretch"):
+    # ステップ1（案件の背景）からは、会議後の要件や残件へ直接は飛ばない（背景の確認は本文の補助操作で開ける）
+    if i > 0 and c2.button(detail_label(page_name), key="tour_detail", type="tertiary", width="stretch"):
         open_detail(step["page"])
     if show_next and c3.button(next_label(steps, i), key="tour_next", type="primary", width="stretch"):
         jump(steps, i + 1)
@@ -456,6 +462,16 @@ def detail_label(page_name: str) -> str:
     if noun.endswith("か"):  # 例：「なぜこの仕様か」
         noun = f"「{noun}」"
     return f"この案件の{noun}を確認する"
+
+
+def first_after_meeting(steps: list[dict]) -> int | None:
+    """会議後の時点のデータを使う、最初のステップ（ステップ1は除く）。"""
+    return next((n for n, x in enumerate(steps) if n > 0 and x["stage"] == 2 and not x.get("finale")), None)
+
+
+def data_time(stage: int) -> str:
+    """機能画面で表示しているデータの時点の名前（デモ本編のステップとは別）。"""
+    return f"{STAGES[stage]}の時点"
 
 
 def next_label(steps: list[dict], i: int) -> str:

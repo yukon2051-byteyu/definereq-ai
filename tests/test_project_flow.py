@@ -882,7 +882,10 @@ def test_home_has_separate_entrances():
     assert 'href="#dr-new-create"' in text and 'href="#dr-resume"' in text and 'id="dr-new"' in text
     assert 'id="dr-new-create"' in text and 'id="dr-resume"' in text
     caps = [c.value for c in at.caption]
-    assert any("作成するには" in c for c in caps) and any("再開するには" in c for c in caps)
+    common = "AIパスワードを入力し、Enterキーで確定すると、案件の作成・再開ができます。"
+    assert sum(common in c for c in caps) == 1  # 共通の案内は一度だけ
+    assert 'class="dr-home-h">新しい案件を始める' in text and 'class="dr-home-h">保存した案件から再開する' in text
+    assert any("案件名と対象分野" in c for c in caps) and any("案件JSON" in c for c in caps)  # 各欄の固有の説明
 
 
 def test_carryover_hidden_on_first_use(p):
@@ -1285,3 +1288,52 @@ def test_resumed_project_next_matches_state(p):
     at.session_state["project"], at.session_state["page"], at.session_state["resumed"] = q, q.pop("last_page"), True
     at.run()
     assert key(at, "guide_go").label == "AI候補を確認する →" and "行き先：要件の確認・判断 › AI候補の確認" in "".join(c.value for c in at.caption)
+
+
+# ---- AI候補の採用直後：次の未確認候補へ、登録した要件を開く ----
+def adopt_via_ui(at, label="要件に採用する内容を確認"):
+    at = next(b for b in at.button if b.label == label).click().run()
+    return next(b for b in at.button if b.label == "この内容で採用").click().run()
+
+
+def test_after_adopt_shows_next_and_open_requirement(p):
+    reviewed(p)
+    run(p, "extract", [cand("要望", "申込の状況を一覧で見る")], source_ids=[p["sources"][0]["id"]])  # 採用できる要望を2件にする
+    at = adopt_via_ui(open_app(p, "candidates"))
+    q = at.session_state["project"]
+    new = [r["id"] for r in q["requirements"]][1:]
+    assert any(s.value.startswith("要件を下書きとして登録しました") and new[0] in s.value for s in at.success)
+    assert key(at, "cand_next").label == "次の未確認候補へ" and key(at, "cand_next").proto.type == "primary"
+    assert key(at, "cand_open_reqs").label == "登録した要件を開く" and key(at, "cand_go_list").proto.type == "secondary"  # オレンジは1つ
+    at = key(at, "cand_next").click().run()
+    assert at.session_state.get("cand_focus_shown") in [c["id"] for c in q["candidates"] if c["state"] == "候補"]
+    at = adopt_via_ui(open_app(p, "candidates"))
+    at = key(at, "cand_open_reqs").click().run()
+    assert at.session_state["page"] == "requirements" and set(at.session_state["req_focus"]["ids"]) == {at.session_state["project"]["requirements"][-1]["id"]}
+    assert key(at, "req_back").label == "← AI候補の確認に戻る"
+    at = key(at, "req_back").click().run()
+    assert at.session_state["page"] == "candidates"
+
+
+def test_after_adopt_with_no_waiting_opens_requirement(p):
+    reviewed(p)
+    target = next(c for c in p["candidates"] if c["state"] == "候補" and c["kind"] == "要望")
+    for c in p["candidates"]:
+        if c["state"] == "候補" and c is not target:
+            c["state"] = "却下"
+    at = adopt_via_ui(open_app(p, "candidates"))
+    assert key(at, "cand_open_reqs").proto.type == "primary" and key(at, "cand_all_reqs").label == "要件一覧を開く"
+    assert not any(b.key == "cand_next" for b in at.button)
+    before = len(at.session_state["project"]["requirements"])
+    at.run()  # 再描画しても二重に登録しない
+    assert len(at.session_state["project"]["requirements"]) == before
+
+
+def test_after_split_adopt_opens_only_new_requirements(p):
+    m = registry.ingest_paste(p, "議事録", "講師が出欠を登録し、月別CSVを出力する。", kind="議事録")
+    run(p, "extract", [cand("要望", "講師が出欠を登録し、月別CSVを出力する")], source_ids=[m["id"]])
+    at = adopt_via_ui(open_app(p, "candidates"))
+    q = at.session_state["project"]
+    assert len(q["requirements"]) >= 2  # 分割して採用
+    at = key(at, "cand_open_reqs").click().run()
+    assert set(at.session_state["req_focus"]["ids"]) == {r["id"] for r in q["requirements"]}

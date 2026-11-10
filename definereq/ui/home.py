@@ -39,13 +39,15 @@ def render() -> None:
 # ブラウザが保存済みのパスワードを自動入力すると、欄には値が見えても、アプリには入力の操作が届かない
 # （「案件を作成」が押せないままになる）。欄に値があり、利用者がその欄を操作していないときだけ、入力と確定を補う。
 # 値を読み書きするのは、利用者のブラウザの中だけ（サーバーには通常の入力と同じ経路で送られる）。
+# ブラウザは利用者がページを操作するまで自動入力の値を隠すことがあるため、時間を区切らずに確認し続ける
+# （確定できたらこの部品ごと消えるので、確認も止まる）。同じ値でも3秒ごとに確定をやり直す。
 _AUTOFILL = """<script>
-const d=window.parent.document;let last=null;
-const sync=()=>{const i=d.querySelector('.st-key-home_code input');if(!i||!i.value||i===d.activeElement||i.value===last)return;
- last=i.value;const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;const v=i.value;
+const d=window.parent.document;let last=null,at=0;
+const sync=()=>{const i=d.querySelector('.st-key-home_code input');if(!i||!i.value||i===d.activeElement)return;
+ if(i.value===last&&Date.now()-at<3000)return;last=i.value;at=Date.now();const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;const v=i.value;
  set.call(i,'');i.dispatchEvent(new Event('input',{bubbles:true}));set.call(i,v);i.dispatchEvent(new Event('input',{bubbles:true}));
  i.dispatchEvent(new FocusEvent('focusout',{bubbles:true}));i.dispatchEvent(new FocusEvent('blur'));};
-let n=0;const timer=setInterval(()=>{sync();if(++n>240)clearInterval(timer)},500);
+setInterval(sync,500);
 </script>"""
 
 
@@ -111,31 +113,37 @@ def _sections() -> None:
         valid = gate.check_code(code)
         if code and not valid:
             st.warning("AIパスワードが正しくありません。")
-        st.caption("案件の作成と再開にはAIパスワードが必要です。入力後にEnterキーを押してください。入力した案件はアプリ利用中のみ保持されるため、続きを行うときはJSONで保存してください。")
+        # 新規作成と再開に共通の案内は、ここに一度だけ出す
+        st.caption("AIパスワードを入力し、Enterキーで確定すると、案件の作成・再開ができます。入力した案件はアプリ利用中のみ保持されるため、続きを行うときは再開用ファイルで保存してください。")
         left, right = st.columns(2)
         with left:
-            st.html('<div id="dr-new-create" class="dr-anchor"></div>')
-            st.markdown("**新しい案件を始める**")
+            # トップの「新しい案件を始める」から移動したときは、見出し横の短いオレンジの縦線で移動先を示す
+            st.html('<div id="dr-new-create" class="dr-anchor"></div><div class="dr-home-h">新しい案件を始める</div>')
+            st.caption("案件名と対象分野を入力して作成します。分野はあとから変更できます。")
             name = st.text_input("案件名", placeholder="例：勤怠システムの更新", key="new_name")
             domains = st.multiselect("対象分野（複合は複数選択）", list(DOMAINS), format_func=DOMAINS.get, default=["app"], key="new_dom")
-            if not valid:
-                st.caption("作成するには、上の「AIパスワード」を入力し、Enterキーで確定してください。")
             # 押せるときはオレンジ、押せないときは色を抜いた点線の枠（パスワードが確定すると色が変わる）
             if st.button("案件を作成", type="primary", disabled=not (valid and switch_ok), key="create_project"):
                 created = guard(pj.new_project, name, domains)
                 if created:
                     st.session_state["ai_code"] = code.strip()  # AI実行の画面で使う（入力欄はここだけ）
                     state.open_project(created)
+            _blocked_note(valid, switch_ok, "作成")
         with right:
-            st.html('<div id="dr-resume" class="dr-anchor"></div>')
-            st.markdown("**保存した案件から再開する**")
-            if not valid:
-                st.caption("再開するには、上の「AIパスワード」を入力し、Enterキーで確定してください。ファイルの選択は先にできます。")
-            st.caption("前回保存した案件JSONを読み込むと、要件・未決事項・判断・変更履歴を引き継いで、次の会議の準備や整理を続けられます。")
+            st.html('<div id="dr-resume" class="dr-anchor"></div><div class="dr-home-h">保存した案件から再開する</div>')
+            st.caption("ファイルの選択はパスワードの確定前でもできます。前回保存した案件JSONを読み込むと、要件・未決事項・判断・変更履歴を引き継いで、次の会議の準備や整理を続けられます。")
             _resume(code, valid and switch_ok)
+            _blocked_note(valid, switch_ok, "再開")
 
     st.html('<p class="dr-tiny" style="margin-top:16px">要件定義の完全性や正しさを保証するものではありません。人が確認・判断するための根拠と残件を示します。'
             '公開環境の無料CPUは利用がないと休止するため、開くまでに時間がかかることがあります。</p>')
+
+
+def _blocked_note(valid: bool, switch_ok: bool, verb: str) -> None:
+    """パスワードは確定しているのに押せないとき、その理由と解除の方法をボタンの近くに示す。"""
+    if valid and not switch_ok:
+        st.caption(f"作業中の案件に保存していない変更があるため、まだ{verb}できません。上の「再開用ファイルをダウンロード」で保存するか、"
+                   f"「保存せずに別の案件へ切り替える」にチェックすると{verb}できます。")
 
 
 def _current_work() -> bool:
@@ -149,7 +157,7 @@ def _current_work() -> bool:
             state.back_to_work()
         if not state.is_dirty(p):
             return True
-        st.warning("保存用ファイルの作成後に変更があります。別の案件へ切り替える前に保存してください。")
+        st.warning("案件に変更があります。変更を保存するには、再開用ファイルをダウンロードしてください。")
         save_controls(p, "save_home")
         return st.checkbox("保存せずに別の案件へ切り替える", key="discard_ok")
 

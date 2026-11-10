@@ -161,7 +161,14 @@ with sync_playwright() as pw:
     after = now(g)
     check(f"確認待ち{waiting - 1}件" in after and "要件に採用 1件" in after and main(g).get_by_text("採用済み").count() > 0, f"4 1件採用後：{after}、採用した候補に「採用済み」")
     check(btn(g, "この内容で採用").count() == 0, "4 確定後は確認欄が閉じ、同じ候補を再び採用できない")
+    msg = main(g).get_by_text("要件を下書きとして登録しました", exact=False)
+    nxt, open_req = btn(g, "次の未確認候補へ"), btn(g, "登録した要件を開く")
+    check(msg.count() == 1 and in_view(msg.first) and nxt.count() == 1 and open_req.count() == 1, "4 採用直後：結果の表示と「次の未確認候補へ」「登録した要件を開く」が見える")
     g.screenshot(path=OUT / "2_1件採用後.png")
+    click(g, "登録した要件を開く", 3000)
+    check(title(g).endswith("の要件一覧") and "から登録した要件" in g.inner_text("body"), "4 「登録した要件を開く」で今回登録した要件だけを開く")
+    click(g, "← AI候補の確認に戻る", 3000)
+    check(title(g) == "AI候補の確認", "4 要件からAI候補の確認へ戻る")
     for _ in range(12):  # 残りは却下して、確認待ち0件の状態にする
         rej = main(g).get_by_role("button", name="却下", exact=True)
         if not rej.count():

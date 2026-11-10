@@ -53,7 +53,8 @@ def _candidates_top(p: dict) -> None:
     st.html(f'<div class="dr-now"><b>{esc(title)}</b><span>{esc(s["text"])}</span></div>')
     if s["waiting"]:
         # 候補の確認欄を開いているときは、その確定ボタンを主操作にする
-        if st.button("未確認の候補を確認する ↓", key="cand_go_list", type="secondary" if st.session_state.get("cand_open") else "primary"):
+        # 候補の確認欄を開いているとき・採用した直後は、その場の操作（確定、次の未確認候補へ）を主操作にする
+        if st.button("未確認の候補を確認する ↓", key="cand_go_list", type="secondary" if st.session_state.get("cand_open") or st.session_state.get("cand_done") else "primary"):
             # 一覧の位置へ移動する（絞り込まない。確認待ちが先に並び、採用した候補にも「採用済み」が残る）
             st.session_state["cand_scroll"] = pj.now_iso()
             st.rerun()
@@ -112,7 +113,7 @@ def _req_focus(p: dict) -> list[str] | None:
     return ids
 
 
-PAGE_NAMES = {"overview": "現在の状況", "setup": "準備の概要"}
+PAGE_NAMES = {"overview": "現在の状況", "setup": "準備の概要", "candidates": "AI候補の確認"}
 
 
 def requirements(p: dict) -> None:
@@ -121,7 +122,7 @@ def requirements(p: dict) -> None:
 
     head(f"{p['name']}の要件一覧", _req_lead(p), "整理")
     if p.get("demo"):
-        st.caption(f"デモの段階：{STAGES[p['demo']['stage']]}の時点。閲覧専用のため、内容・根拠・版の履歴を確認できます（編集はできません）。")
+        st.caption(f"表示中のデータ：{STAGES[p['demo']['stage']]}の時点。閲覧専用のため、内容・根拠・版の履歴を確認できます（編集はできません）。")
     focus = _req_focus(p)
     if not p["requirements"] and not p.get("is_demo"):
         st.info("要件はまだ登録されていません。議事録をAIで整理し、AI候補を確認して採用すると、ここに並びます。")

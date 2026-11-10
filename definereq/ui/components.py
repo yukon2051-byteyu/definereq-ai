@@ -47,7 +47,8 @@ def head(title: str, lead: str = "", eyebrow: str = "") -> None:
     作業画面では、見出しの直後に状態の1行と主ボタンを出す（shell が _head_hook に設定する。1画面に1回だけ）。
     """
     group = st.session_state.get("_group") or eyebrow
-    badge = '<span class="dr-demo-ro">デモデータ · 閲覧専用</span>' if st.session_state.get("_demo") else ""
+    when = st.session_state.get("_demo_time")
+    badge = (f'<span class="dr-demo-ro">デモデータ · 閲覧専用{" · 表示中のデータ：" + esc(when) if when else ""}</span>') if st.session_state.get("_demo") else ""
     st.html(f'<div class="dr-head"><div class="dr-eyebrow">{esc(group)}{badge}</div>'
             f'<h1 class="dr-title">{esc(title)}</h1><p class="dr-lead">{esc(lead)}</p></div>')
     hook = st.session_state.pop("_head_hook", None)

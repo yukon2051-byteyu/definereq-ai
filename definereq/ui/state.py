@@ -17,7 +17,7 @@ def current() -> dict | None:
 
 def _clear_widgets() -> None:
     keep = {"project", "page", "demo_copies", "tour_index", "tour_on", "media_paths", "ai_code", "flash", "last_view", "save_fp", "save_time", "show_home", "work_project",
-            "demo_done", "artifact_files", "guidance_hidden", "scroll_nonce", "drafts", "home_was_valid", "resumed", "scroll_to", "guide_ai_busy"}
+            "demo_done", "artifact_files", "guidance_hidden", "scroll_nonce", "drafts", "home_was_valid", "resumed", "scroll_to", "guide_ai_busy", "tour_side_open"}
     for k in list(st.session_state.keys()):
         if k not in keep:
             del st.session_state[k]
@@ -84,6 +84,7 @@ def open_demo(demo_id: str, tour: bool = True, stage: int | None = None, start: 
     stage = stage or (steps[start]["stage"] if tour else 4)
     st.session_state["project"] = demo_copy(demo_id, stage)
     st.session_state["tour_on"] = tour
+    st.session_state["tour_side_open"] = set()  # デモを開いた時点では、サイドバーの工程はすべて閉じる
     st.session_state["tour_index"] = start
     st.session_state["page"] = steps[start]["page"] if tour else "overview"
     st.session_state.pop("ev_focus", None)
@@ -107,6 +108,7 @@ def goto(page: str, keep: dict | None = None) -> None:
     st.session_state.pop("pf_saved", None)  # 背景の保存直後の案内も同じ
     st.session_state["resumed"] = False  # 再開の通知は、作業を始めたら閉じる
     st.session_state.pop("req_focus", None)  # 残件から開いたときの絞り込みは、その移動のときだけ
+    st.session_state.pop("cand_done", None)  # 候補を採用した直後の案内は、別の画面へ移ったら閉じる
     for k, v in (keep or {}).items():
         st.session_state[k] = v
     st.session_state["page"] = page
