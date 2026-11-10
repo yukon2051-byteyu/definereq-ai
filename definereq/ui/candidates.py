@@ -16,10 +16,63 @@ from .components import chip, edit_block, esc, evidence_block, guard, ok_rerun, 
 # これから確認する内容で、事実の主張ではない種類。根拠がないのが普通なので注意を出さない
 PLANNING_KINDS = {"質問", "議題", "必要資料", "今回決めたいこと", "不足情報"}
 STATE_FILTER = {"すべて": None, "未処理": ("候補", "要再確認"), "採用": ("採用", "修正して採用"), "却下": ("却下",)}
-# 候補を確定したときに登録される場所（logic/intake.py の反映先と同じ）。AIの候補と、人が確定した内容を区別して示す
+# 候補を確定したときに登録される場所（logic/intake.py の反映先と同じ）。AIの候補と、人が登録した内容を区別して示す
 DESTINATION = {"requirement": "要件一覧（下書き）", "decision": "判断記録の下書き（決定・合意）", "confirm": "確認事項（質問・議題）", "question": "会議の質問（質問・議題）",
                "agenda": "議題（質問・議題）", "material": "資料の依頼事項（質問・議題）", "decide_today": "今回決めたいこと（質問・議題）", "action": "確認・依頼事項（現在の状況）",
                "risk": "リスク一覧", "issue": "意見調整", "profile": "案件情報（背景・目的・関係者）", "note": "記録のみ"}
+
+
+# 質問・確認事項などへ反映したときの表示（実際の反映先）
+ADDED = {"question": "会議の質問", "confirm": "確認事項", "agenda": "議題", "material": "資料の依頼事項", "decide_today": "今回決めたいこと",
+         "action": "確認・依頼事項", "risk": "リスク一覧", "issue": "意見調整", "profile": "案件情報"}
+
+
+def processed(p: dict, c: dict) -> tuple[str, str | None]:
+    """候補をどう処理したか（登録の履歴）と、反映先の現在の状態（反映先の実データ）。
+
+    候補を確認して下書きに登録したことと、関係者が正式に合意したことを混同しないよう、
+    処理は「〜に登録済み」「〜に追加済み」で示し、合意などの状態は反映先の記録から読む。
+    """
+    if c["state"] == "却下":
+        return "却下（案件には反映していません）", None
+    if c["state"] in ("候補", "要再確認"):
+        return "未確認（まだ反映していません）", None
+    items = [x for x in (c.get("resolved_items") or [c.get("resolved_as")]) if x]
+    decs = [x for x in items if x.startswith("DEC")]
+    reqs = [x for x in items if x.startswith("REQ")]
+    linked: list[str] = []
+    for d in decs:
+        linked += [r for r in (pj.get(p, "decisions", d) or {}).get("related_requirements", []) if r not in reqs and r not in linked]
+    route = intake.route_for(c["kind"]).kind
+    if decs and reqs:
+        hist = f"判断記録の下書き {'、'.join(decs)} と要件の下書き {'、'.join(reqs)} を作成しました"
+    elif decs:
+        hist = f"判断記録の下書きに登録済み（{'、'.join(decs)}）"
+    elif reqs:
+        hist = f"要件の下書きに登録済み（{'、'.join(reqs)}）"
+    elif route == "note":
+        hist = "記録として残しました"
+    elif route in ADDED and (items or c.get("resolved_label")):
+        hist = f"{ADDED[route]}に追加済み" + (f"（{items[0]}）" if items else "")
+    else:
+        hist = "採用（反映先の記録はありません）"
+    if linked:
+        hist += f"。既存要件 {'、'.join(linked)} に関連付け済み"
+    now = []
+    for x in decs + reqs + linked:
+        rec = pj.get(p, "decisions" if x.startswith("DEC") else "requirements", x)
+        if rec:
+            now.append(f"{x} {rec.get('state') or rec.get('status')}")
+    return hist, ("／".join(now) if now else None)
+
+
+def judge_html(p: dict, c: dict) -> str:
+    """「人の判断」の欄。処理の履歴と、反映先の現在の状態を分けて示す。却下は記録された説明を添える。"""
+    hist, now = processed(p, c)
+    note = f'<div class="dr-meta">記録された説明：{esc(c["detail"])}</div>' if c["state"] == "却下" and c.get("detail") else ""
+    cur = f'<div class="dr-meta">反映先の現在の状態：{esc(now)}</div>' if now else ""
+    tone = " dr-judge-no" if c["state"] == "却下" else ""
+    return f'<div class="dr-judge{tone}"><b>人の判断</b>{esc(hist)}{note}{cur}</div>'
 
 
 def _run_state(p: dict, c: dict) -> str:
@@ -225,25 +278,25 @@ def _row(p: dict, c: dict, meeting: str | None, key: str) -> None:
     focus = st.session_state.get("cand_focus") == c["id"]
     st.html(f'<div id="cand-{esc(c["id"])}" class="dr-anchor{" dr-cand-focus" if focus else ""}"></div>')
     done = c["state"] in ("採用", "修正して採用")
-    flags = (chip("採用済み", "ok") if done else chip(c["state"])) + chip(run, "ok" if run == "最新の解析" else "plain")
+    rejected = c["state"] == "却下"  # 却下は候補名のすぐ横に出し、拾い読みでも採用と取り違えないようにする
+    flags = (chip("採用済み", "ok") if done else chip("却下（人の判断）", "bad") if rejected else chip(c["state"])) + chip(run, "ok" if run == "最新の解析" else "plain")
     if c.get("no_evidence") and c["kind"] not in PLANNING_KINDS:
         flags += chip("根拠なし（推測）", "warn")
     if c.get("unsupported_numbers"):
         flags += chip("資料にない数値：" + "、".join(c["unsupported_numbers"]), "bad")
     if c.get("already_known"):
         flags += chip(f"登録済みの「{c['already_known']}」と重複の可能性", "warn")
-    detail = f'<div class="dr-g-sub">{esc(c["detail"])}</div>' if c.get("detail") else ""
+    detail = f'<div class="dr-g-sub">{esc(c["detail"])}</div>' if c.get("detail") and not rejected else ""  # 却下の説明は「人の判断」に出す
     ask = f'<div class="dr-meta">確認相手の候補：{esc(c["ask"])}</div>' if c.get("ask") and c["kind"] != "案件情報" else ""
     st.html(f'<div class="dr-cand"><div class="dr-ai-t">{esc(c["text"])}</div>{detail}{ask}<div class="dr-chips">{flags}</div></div>')
     for i, e in enumerate(c.get("evidence", [])):
         evidence_block(p, e, f"{key}_{c['id']}_{i}")
     if c["state"] in ("候補", "要再確認"):
         _actions(p, c, meeting, key)
-    elif c.get("resolved_as") or c.get("resolved_label"):
+        return
+    st.html(judge_html(p, c))  # 元の発言（上の引用）→ AIが拾った候補（見出し）→ 人の判断 の順に続けて読める
+    if c.get("resolved_as") or c.get("resolved_label"):
         _after_adopt(p, c)
-        target = c.get("resolved_items") or ([c["resolved_as"]] if c.get("resolved_as") else [])
-        names = "、".join(pj.label_of(p, x) for x in target) or c.get("resolved_label")
-        st.caption(f"反映先：{names}（人が確定した内容です）")
         if c.get("resolved_page") and st.button("反映先を確認する", key=f"go_to_{key}_{c['id']}"):
             st.session_state["page"] = c["resolved_page"]
             st.rerun()

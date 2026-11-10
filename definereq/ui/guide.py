@@ -280,8 +280,7 @@ def _ai_role(p: dict, steps: list[dict], i: int, step: dict) -> None:
     会議前：次の会議で何を聞くか（質問・議題の候補）。会議後：会議で出た要望・決定・未決事項のうち、どれを案件に反映するか
     （元の発言 → AIが拾った内容 → 人が確認した反映先）。未確認の候補は未確認と表示する。
     """
-    from .candidates import DESTINATION
-    from ..logic import intake
+    from .candidates import processed
 
     tasks = {r["id"]: r["task"] for r in p["ai_runs"]}
     if step["process"] == "会議前の準備":
@@ -296,18 +295,18 @@ def _ai_role(p: dict, steps: list[dict], i: int, step: dict) -> None:
     extracted = [c for c in p["candidates"] if tasks.get(c.get("origin_run")) == "extract"]
     if not extracted:  # このデモには会議記録から抽出した候補がない
         return
+    # 元の発言のある候補から選ぶ。却下した候補があれば優先する（候補名だけでは決定と取り違えやすいため）
     rank = {"決定": 0, "要望": 1, "保留": 2}
-    c = sorted((x for x in extracted if x.get("evidence")), key=lambda x: (x["state"] not in ("採用", "修正して採用"), rank.get(x["kind"], 9)))
+    c = sorted((x for x in extracted if x.get("evidence")), key=lambda x: (x["state"] != "却下", x["state"] not in ("採用", "修正して採用"), rank.get(x["kind"], 9)))
     c = c[0] if c else extracted[0]
     quote = (c.get("evidence") or [{}])[0].get("quote")
-    if c["state"] in ("採用", "修正して採用"):
-        where = f"{DESTINATION.get(intake.route_for(c['kind']).kind, '記録のみ')}に登録済み"
-    elif c["state"] == "却下":
-        where = "却下（案件には反映していない）"
-    else:
-        where = "未確認（まだ反映していない）"
+    hist, now = processed(p, c)
+    if c["state"] == "却下" and c.get("detail"):
+        hist += f"。記録された説明：{c['detail']}"
+    if now:
+        hist += f"（反映先の現在の状態：{now}）"
     chain = (f'<li><b>元の発言</b>「{esc(quote)}」</li>' if quote else "") + \
-            f'<li><b>AIが拾った内容</b>{esc(c["kind"])}：「{esc(c["text"])}」</li><li><b>人が確認した反映先</b>{esc(where)}</li>'
+            f'<li><b>AIが拾った内容</b>{esc(c["kind"])}：「{esc(c["text"])}」</li><li><b>人の判断</b>{esc(hist)}</li>'
     st.html('<div class="dr-ai-role"><div class="dr-v-lab">会議後：会議で出た内容のうち、どれを案件に反映するか</div>'
             '<div class="dr-g-sub">議事録や録画の発言から、AIが要望・決定・未決事項などを拾い出し、人が確認して反映先を決めます（「会議記録の候補確認」の画面）。</div>'
             f'<ol class="dr-chain">{chain}</ol></div>')

@@ -13,6 +13,7 @@ from definereq.ui.guide import first_after_meeting
 
 APP = str(__import__("pathlib").Path(__file__).resolve().parent.parent / "app.py")
 EXPLAIN = "議事録や録画の発言から、AIが要望・決定・未決事項などを拾い出します。内容を確認し、必要なものを要件の下書きや確認事項などに登録できます。"
+DEMO_EXPLAIN = "このデモでは、議事録や録画からAIが拾った候補と、人が確認した結果を閲覧できます。"
 PREP_EXPLAIN = "案件の背景や参考資料をもとに、会議で聞く質問や、当日決めたいことをAIが提案します。"
 
 
@@ -103,11 +104,84 @@ def test_demo_explains_before_and_after_meeting(demo):
         return
     assert "会議後：会議で出た内容のうち、どれを案件に反映するか" in h
     chain = h[h.index('class="dr-chain"'):]
-    assert chain.index("元の発言") < chain.index("AIが拾った内容") < chain.index("人が確認した反映先")
+    assert chain.index("元の発言") < chain.index("AIが拾った内容") < chain.index("人の判断")
     label = "機能画面で会議記録の候補を見る"
     key = next(b.key for b in at.button if b.label == label)
     at = button(at, key).click().run()
     assert at.session_state["page"] == "candidates" and button(at, "nav_candidates").proto.type == "primary"
-    assert "会議記録の候補確認" in html(at) and EXPLAIN in html(at)
+    # デモは閲覧専用の説明（登録できるとは書かない）
+    assert "会議記録の候補確認" in html(at) and DEMO_EXPLAIN in html(at) and EXPLAIN not in html(at)
     at = button(at, "tour_back").click().run()  # 元のステップへ戻る
     assert at.session_state["tour_on"] and at.session_state["tour_index"] == n_after
+
+
+# ---- 公開版レビューの5点 ----
+def _extract_project(p):
+    m = registry.ingest_paste(p, "第1回議事録", "講師が出欠を登録する。定員は30名とする。", kind="議事録")
+    ai.run_task(p, "extract", "c", Ledger(), LLM([item("決定", "定員は30名とする"), item("決定", "申込は先着順とする"), item("質問", "講師の登録方法は"), item("要望", "出欠を登録する")]),
+                source_ids=[m["id"]])
+    return p
+
+
+def test_processed_shows_registration_not_agreement(p):
+    """候補の処理は「登録済み・追加済み」で示し、反映先の現在の状態は反映先の記録から読む。"""
+    from definereq.logic import intake
+    from definereq.ui.candidates import processed
+
+    _extract_project(p)
+    d1, d2, q, r = p["candidates"]
+    intake.apply(p, d1["id"], new_requirement=True)
+    hist, now = processed(p, d1)
+    dec, req = d1["resolved_items"]
+    assert hist == f"判断記録の下書き {dec} と要件の下書き {req} を作成しました" and now == f"{dec} 下書き／{req} 下書き"
+    intake.apply(p, d2["id"], link_requirements=[req])
+    hist, _ = processed(p, d2)
+    assert hist.startswith("判断記録の下書きに登録済み（DEC-") and hist.endswith(f"既存要件 {req} に関連付け済み")
+    intake.apply(p, q["id"])
+    assert processed(p, q)[0].startswith("会議の質問に追加済み")
+    created = intake.adopt_requirement(p, r["id"])
+    hist, now = processed(p, r)
+    assert hist == f"要件の下書きに登録済み（{created[0]['id']}）" and now.endswith("下書き")
+    created[0]["status"] = "合意済み"  # 後から正式に合意された場合：処理の履歴は変えず、現在の状態は反映先の実データ
+    hist2, now2 = processed(p, r)
+    assert hist2 == hist and now2 == f"{created[0]['id']} 合意済み"
+    at = open_app(p, "candidates")
+    h = html(at)
+    assert "人が確定した内容です" not in h and f"反映先の現在の状態：{created[0]['id']} 合意済み" in h and "要件の下書きに登録済み" in h
+
+
+def test_network_demo_shows_proposal_and_rejection_together():
+    from definereq.demos import builder
+
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at = button(at, "tour_d3").click().run()
+    at = button(at, "tour_go_2").click().run()  # ステップ3「録画の発言」
+    h = html(at)
+    chain = h[h.index('class="dr-chain"'):]
+    assert "外部からの遠隔保守を提案します" in chain and "遠隔保守を採用する" in chain and "却下" in chain and "提案であり、決定ではない" in chain
+    at = button(at, "tour_cand_open").click().run()
+    h = html(at)
+    card = h[h.index("遠隔保守を採用する"):]
+    assert card.index("却下（人の判断）") < card.index("人の判断") and "記録された説明：岡田の発言。提案であり、決定ではない。" in card
+    assert DEMO_EXPLAIN in h
+    at = button(at, "tour_back").click().run()
+    assert at.session_state["tour_on"] and at.session_state["tour_index"] == 2
+
+
+def test_prep_ai_entrance_opens_confirmation_without_running(p):
+    at = open_app(p, "prep")
+    key = f"draft_{p['id']}_prep_agenda"
+    at = next(t for t in at.text_area if t.key == key).set_value("入力途中の議題").run()
+    runs = len(at.session_state["project"]["ai_runs"])
+    at = button(at, "prep_ai_open").click().run()  # 初期画面（理解と議題）から見つけられる入口
+    assert at.session_state["prep_tabs"] == "質問" and at.session_state["ai_exp_prep"] is True
+    assert len(at.session_state["project"]["ai_runs"]) == runs and at.session_state["project"]["prep"].get("agenda") in (None, [])  # 実行も保存もしない
+    assert any(b.label == "この内容でAIを実行" for b in at.button)  # 実行は確認欄のボタンで
+    assert next(t for t in at.text_area if t.key == key).value == "入力途中の議題"  # 入力途中の議題を保持
+
+
+def test_prep_meeting_button_once_after_save(p):
+    at = open_app(p, "prep")
+    at = next(t for t in at.text_area if t.key == f"draft_{p['id']}_prep_agenda").set_value("申込の流れ").run()
+    at = button(at, "prep_save").click().run()
+    assert [b.label for b in at.button].count("会議へ進む →") == 1

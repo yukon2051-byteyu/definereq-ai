@@ -394,13 +394,6 @@ def _prep_form(p: dict, pr: dict) -> None:
         if go:
             state.goto("meetings")
         st.rerun()
-    saved = st.session_state.get("prep_saved")
-    if saved and saved["project"] == pid and not prep_pending(p):  # 反映の結果と次の操作は、反映ボタンのすぐ下に出す
-        with st.container(border=True, key="prep_saved_box"):
-            st.success(f"理解と議題を案件内に反映しました（{saved['time']}）。")
-            _to_meetings(p, "prep_saved_go", primary=True)
-        if saved.pop("scroll", False):  # 反映の結果が画面の下に隠れないよう、1回だけ結果の位置へ移動する
-            st.iframe(f"<script>/*{pj.now_iso()}*/const t=()=>window.parent.document.querySelector('.st-key-prep_saved_box')?.scrollIntoView({{block:'center'}});t();setTimeout(t,300)</script>", height=1)
 
 
 def prep_pending(p: dict) -> bool:
@@ -434,14 +427,28 @@ def _prep_footer(p: dict) -> None:
             st.caption("編集を続ける場合は、このまま「理解と議題」で入力できます。")
         return
     saved = st.session_state.get("prep_saved")
+    if saved and saved["project"] == p["id"]:  # 反映の直後：結果と「会議へ進む」を1か所にまとめる（タブの外なので、どのタブからも見える）
+        with st.container(border=True, key="prep_saved_box"):
+            st.success(f"理解と議題を案件内に反映しました（{saved['time']}）。")
+            _to_meetings(p, "prep_saved_go", primary=True)
+        if saved.pop("scroll", False):  # 反映の結果が画面の下に隠れないよう、1回だけ結果の位置へ移動する
+            st.iframe(f"<script>/*{pj.now_iso()}*/const t=()=>window.parent.document.querySelector('.st-key-prep_saved_box')?.scrollIntoView({{block:'center'}});t();setTimeout(t,300)</script>", height=1)
+        return
     with st.container(key="prep_footer"):
-        just = bool(saved and saved["project"] == p["id"])  # 反映の直後は、反映結果の近くの操作が主（ここは補助）
-        _to_meetings(p, "prep_go_meetings", primary=not just, minutes=not just)
+        _to_meetings(p, "prep_go_meetings", primary=True)
+
+
+def _open_prep_ai() -> None:
+    """「質問」タブと、AIの実行確認欄を開く。開くだけで、AIの実行・入力の保存・送信はしない。"""
+    st.session_state["prep_tabs"] = "質問"
+    st.session_state["ai_exp_prep"] = True
+    st.session_state["prep_ai_scroll"] = True
 
 
 def _prep_entrances(p: dict) -> None:
-    """会議の準備から使う資料の入口：会議前に届いた参考資料の追加（議事録の登録は画面の下の「会議へ進む」の横）。"""
+    """会議の準備の冒頭の操作：AIで質問・議題を提案する（実行確認欄を開く）、会議前に届いた参考資料の追加。"""
     with st.container(horizontal=True, key="prep_entrances"):
+        st.button("AIで質問・議題を提案する", key="prep_ai_open", on_click=_open_prep_ai)
         if st.button("参考資料を追加する", key="prep_add_refs", type="tertiary"):  # 登録後は「会議の準備に戻る」
             state.goto("refs", keep={"refs_from": "prep"})
 
@@ -452,7 +459,8 @@ def prep(p: dict) -> None:
     if not p.get("is_demo"):
         _prep_entrances(p)
     carryover_panel(p)
-    tabs = st.tabs(["理解と議題", "質問", "分野別の確認観点"], key="prep_tabs")
+    # タブは開いた状態を覚える（冒頭の「AIで質問・議題を提案する」から「質問」タブの実行確認欄を開くため）
+    tabs = st.tabs(["理解と議題", "質問", "分野別の確認観点"], key="prep_tabs", on_change="rerun")
     if p.get("is_demo"):
         with tabs[0]:
             definition([("現時点の理解", pr.get("understanding")), ("会議の目的", pr.get("purpose")), ("不足情報", pr.get("gaps")), ("必要な資料・計測", pr.get("materials")),
@@ -490,7 +498,10 @@ def prep(p: dict) -> None:
                 touch(p)
                 ok_rerun("追加しました")
         st.caption("案件の背景や参考資料をもとに、会議で聞く質問や、当日決めたいことをAIが提案します。")
-        ai_panel(p, "prep")
+        with st.container(key="prep_ai_box"):
+            ai_panel(p, "prep", key="ai_exp_prep")
+        if st.session_state.pop("prep_ai_scroll", False):  # 冒頭のボタンから来たときは、実行確認欄（送信対象・送信先・費用見込み）へ移動する
+            st.iframe(f"<script>/*{pj.now_iso()}*/const t=()=>window.parent.document.querySelector('.st-key-prep_ai_box')?.scrollIntoView({{block:'start'}});setTimeout(t,200);setTimeout(t,700)</script>", height=1)
         ai_runs_list(p, "prep")
     with tabs[2]:
         items = checks.perspectives_for(p["domains"])

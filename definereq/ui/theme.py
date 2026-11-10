@@ -247,6 +247,10 @@ __PALETTE_CSS__
 .dr-cs-next{margin:6px 0 4px}
 /* 終了画面：体験の終了と、案件に残る項目を分ける */
 .dr-end-row{display:grid;grid-template-columns:3fr 2fr;gap:10px;margin-top:8px}
+.dr-judge{border-left:3px solid #1C7A4D;background:#F4FAF6;padding:6px 12px;margin:4px 0 8px;border-radius:0 4px 4px 0;font-size:14px;line-height:1.6}
+.dr-judge b{margin-right:10px;font-size:12.5px;color:#14613C}
+.dr-judge-no{border-left-color:#B42318;background:#FDF3F2}
+.dr-judge-no b{color:#B42318}
 .dr-ai-role{border:1px solid var(--line,#E2DED6);border-left:4px solid #3A5BA0;border-radius:0 4px 4px 0;background:#F6F8FC;padding:10px 14px;margin:8px 0}
 .dr-chain{margin:6px 0 0;padding-left:20px}
 .dr-chain li{margin:2px 0;line-height:1.6}
