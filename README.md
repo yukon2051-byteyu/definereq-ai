@@ -159,9 +159,9 @@ docker run -p 8501:8501 definereq-ai
 | `scripts/guide_check.py` | 3件のデモの全ステップ（PC幅・スマートフォン幅）、資料のダウンロード、録画の再生 |
 | `scripts/demo_flow_check.py` | デモの一覧・冒頭・見どころ・判断・判断後の仕様・終了画面（デスクトップ） |
 | `scripts/setup_flow_check.py` | 案件の準備、背景と資料の往復、下書きの保持、トップの入口 |
-| `scripts/source_flow_check.py` | 背景・資料の画面の配置、議事録の種類、1回の操作での保存と移動、再開用ファイル |
-| `scripts/next_flow_check.py` | 案件の準備と資料の登録直後の「次にすること」 |
-| `scripts/project_flow_check.py` | 実案件の一連の流れ（AIの応答だけ代替応答に差し替え） |
+| `scripts/entrance_flow_check.py` | 参考資料と議事録の入口、質問・議題 → 会議 → 会議の記録を整理、2回目の議事録、再開用ファイルからの再開 |
+| `scripts/decision_finale_check.py` | 会議記録の候補から判断記録の下書きを作る操作、会議登録後のボタン、再開用ファイルの通知、デモの最終画面 |
+| `scripts/review5_check.py` | 下書きへの登録と正式な合意の区別、会議前のAIの入口、「会議へ進む」の重複、デモの却下の表示 |
 | `scripts/journey_check.py` | 左メニューを閉じたまま、背景入力から成果物の出力・再開まで本文だけで進む。サイドバーの工程名が両モードで一致 |
 | `scripts/demo_evidence_check.py` | デモの登録内容（背景・資料）と判断の根拠（確認メール・発言）を開き、元のステップへ戻る |
 | `scripts/button_color_check.py` | オレンジの主ボタンが状態ごとに1つ。ホバー・フォーカス・無効の表示 |
