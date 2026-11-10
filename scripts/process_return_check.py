@@ -72,7 +72,7 @@ with sync_playwright() as pw:
         if entry == "本文の補助ボタン":
             g.evaluate("document.querySelector('[data-testid=stSidebarCollapseButton] button')?.click()")  # 左メニューを閉じて本文だけで
             wait(g, 900)
-            main(g).get_by_role("button", name="機能画面でAI候補を見る").click()
+            main(g).get_by_role("button", name="機能画面で会議記録の候補を見る").click()
         else:
             opener = g.locator("[data-testid=stExpandSidebarButton]")  # 閉じていれば開く
             if opener.count() and opener.first.is_visible():
@@ -81,12 +81,12 @@ with sync_playwright() as pw:
             side(g).get_by_role("button", name="4. 要件の確認・判断").click()  # 案内中は工程を開くだけ（ステップは変わらない）
             wait(g, 2000)
             check(loc(g) == "デモステップ 3/8 · 会議後の整理" and selected(g) == [], "サイドバー：工程を開いてもステップは変わらず、選択表示もしない")
-            side(g).get_by_role("button", name="AI候補の確認", exact=True).click()
+            side(g).get_by_role("button", name="会議記録の候補確認", exact=True).click()
         wait(g, 3000)
         back = main(g).get_by_role("button", name="← デモステップ 3/8『会議後の整理』に戻る")
         check(back.count() == 1, f"{entry}：工程を開くと本文に「← デモステップ 3/8『会議後の整理』に戻る」")
         if entry == "サイドバー":
-            check(selected(g) == ["AI候補の確認"], f"サイドバー：実際に表示しているページだけを選択（{selected(g)}）")
+            check(selected(g) == ["会議記録の候補確認"], f"サイドバー：実際に表示しているページだけを選択（{selected(g)}）")
             side(g).get_by_role("button", name="要件", exact=True).click()
         else:
             main(g).get_by_role("button", name="この案件の要件一覧を見る").first.click() if main(g).get_by_role("button", name="この案件の要件一覧を見る").count() else None

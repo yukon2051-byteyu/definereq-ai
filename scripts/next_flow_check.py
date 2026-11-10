@@ -196,7 +196,7 @@ with sync_playwright() as pw:
     c.close()
 
     # ---- 要件候補がある案件（条件3）と、再開用ファイルからの復元（条件5） ----
-    for path, want, label in ((candidate_file(), "AI候補を確認する →", "3 確認する要件候補がある案件は「AI候補を確認する」"),
+    for path, want, label in ((candidate_file(), "会議記録の候補確認へ進む →", "3 確認する要件候補がある案件は「会議記録の候補確認へ進む」"),
                               (saved, "会議の記録を整理する →", "5 再開用ファイルから復元した案件にも、状態に合う案内が出る")):
         c = b.new_context(viewport={"width": 1440, "height": H})
         g = c.new_page()
@@ -205,10 +205,10 @@ with sync_playwright() as pw:
             click(g, "← 準備の概要に戻る")
         got = next_button(g).first.inner_text()
         check(got == want, f"{label}（{got}）")
-        if want.startswith("AI候補"):
+        if want.startswith("会議記録の候補"):
             g.screenshot(path=OUT / "3_candidates.png")
             click(g, want, 3000)
-            check(title(g) == "AI候補の確認", "3 1クリックでAI候補の確認画面が開く")
+            check(title(g) == "会議記録の候補確認", "3 1クリックで会議記録の候補確認画面が開く")
         else:
             data = json.loads(path.read_text(encoding="utf-8"))
             check(data["profile"]["background"]["value"] == "申込をメールで受けている" and "取り込み済み 1件" in body(g), "5 復元後も背景と資料が戻る")

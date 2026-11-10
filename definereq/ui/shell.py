@@ -18,7 +18,7 @@ GROUPS = [
     ("案件の準備", [("setup", "準備の概要", prepare.setup), ("overview", "現在の状況", prepare.overview), ("profile", "背景・目的・関係者", prepare.profile), ("refs", "参考資料", materials.references)]),
     ("会議の準備", [("prep", "質問・議題", prepare.prep), ("meetings", "会議", prepare.meetings)]),
     ("記録の取り込み・整理", [("records", "会議の記録を整理", materials.records), ("sources", "資料・議事録", materials.sources), ("recordings", "録画・発言", materials.recordings)]),
-    ("要件の確認・判断", [("candidates", "AI候補の確認", organize.candidates), ("requirements", "要件", organize.requirements), ("refine", "具体化・受入条件", organize.refine), ("decisions", "決定・合意", decide.decisions),
+    ("要件の確認・判断", [("candidates", "会議記録の候補確認", organize.candidates), ("requirements", "要件", organize.requirements), ("refine", "具体化・受入条件", organize.refine), ("decisions", "決定・合意", decide.decisions),
                   ("nfr", "非機能の確認", organize.nfr), ("scope", "範囲・優先順位", organize.scope), ("scenarios", "シナリオ", organize.scenarios), ("issues", "意見調整", decide.issues),
                   ("conflicts", "矛盾", decide.conflicts), ("risks", "リスク", decide.risks)]),
     ("共有・変更管理", [("share", "確認資料・要件定義書", trace.share_page), ("changes", "追加要望と影響", decide.changes), ("trail", "変更履歴", trace.trail), ("why", "なぜこの仕様か", trace.why),

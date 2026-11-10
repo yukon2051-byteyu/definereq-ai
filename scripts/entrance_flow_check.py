@@ -174,9 +174,9 @@ with sync_playwright() as pw:
     click(g, "選択した議事録をAIで整理する", 1000)
     g.get_by_text("件の候補を作成しました").first.wait_for(timeout=60000)
     wait(g, 2500)
-    check(main(g).get_by_role("button", name="AI候補を確認する →").count() == 1, "B AI整理の完了後に「AI候補を確認する」")
-    click(g, "AI候補を確認する →", 3000)
-    check(title(g) == "AI候補の確認", "B AI候補の確認が開く")
+    check(main(g).get_by_role("button", name="会議記録の候補確認へ進む →").count() == 1, "B AI整理の完了後に「会議記録の候補確認へ進む」")
+    click(g, "会議記録の候補確認へ進む →", 3000)
+    check(title(g) == "会議記録の候補確認", "B 会議記録の候補確認が開く")
 
     # ---- C：次回の準備（候補が残っている）。参考資料を追加して戻る ----
     side(g).get_by_role("button", name="2. 会議の準備").click()

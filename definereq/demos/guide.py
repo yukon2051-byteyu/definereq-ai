@@ -416,7 +416,7 @@ def _d1() -> dict:
              main=lambda g: [g.versus(("現場の要望", "承認後でも金額を訂正できるようにしたい"), ("経理の制約", "直接変更は認めない"),
                                       ("アプリの整理（関係者の発言ではありません）", "訂正は必要。ただし、直接変更以外の方法を検討する。"))],
              more=lambda g: [("発言の根拠を見る", [g.full("承認後でも金額を訂正できるようにしたい"), g.full("変更履歴があっても直接変更は認めない")]),
-                             ("AI候補を確認する仕組みを見る", [f"AI候補「{g.candidate('5回')['text']}」は、資料にない数値（{'、'.join(g.candidate('5回')['unsupported_numbers'])}）に印が付き、担当者が「{g.candidate('5回')['state']}」としました。"])],
+                             ("会議記録の候補を確認する仕組みを見る", [f"会議記録の候補「{g.candidate('5回')['text']}」は、資料にない数値（{'、'.join(g.candidate('5回')['unsupported_numbers'])}）に印が付き、担当者が「{g.candidate('5回')['state']}」としました。"])],
              open=lambda g: [(DECIDE, "訂正の方式（次の工程で比較）")], count=lambda g: f"代表例2件／候補 全{len(g.p['candidates'])}件"),
         dict(process="会議での発言", short="第2回の発言", stage=2, page="recordings", title="話者の確認が未実施の発言は、判断の根拠にしない",
              lead=None,

@@ -769,7 +769,7 @@ def test_open_process_and_return_to_step(entry):
 
 def test_body_detail_button_names_the_page():
     at = demo_at("d1", 2)
-    assert button(at, "tour_detail").label == "機能画面でAI候補を見る"
+    assert button(at, "tour_detail").label == "機能画面で会議記録の候補を見る"
     assert button(at, "tour_detail").proto.type == "tertiary" and button(at, "tour_next").proto.type == "primary"
 
 

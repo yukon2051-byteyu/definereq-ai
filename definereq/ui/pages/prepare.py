@@ -447,7 +447,7 @@ def _prep_entrances(p: dict) -> None:
 
 
 def prep(p: dict) -> None:
-    head("質問・議題", "会議で確認することを準備します。AIに候補を作ってもらい、この画面で質問や議題へ追加できます。回答済みの観点は繰り返しません。", "会議の準備")
+    head("質問・議題", "案件の背景や参考資料をもとに、会議で聞く質問や、当日決めたいことをAIが提案します。この画面で質問や議題へ追加できます。回答済みの観点は繰り返しません。", "会議の準備")
     pr = p["prep"]
     if not p.get("is_demo"):
         _prep_entrances(p)
@@ -461,7 +461,7 @@ def prep(p: dict) -> None:
         with tabs[0], edit_block("prepf"):
             _prep_form(p, pr)
     with tabs[1]:
-        board(p, ("prep",), "prep_cand", heading="AIが作成した準備の候補")  # 実行した結果を最初に見せる
+        board(p, ("prep",), "prep_cand", heading="会議前の質問・議題の候補")  # 実行した結果を最初に見せる
         qs = p["questions"]
         if qs:
             order = {"高": 0, "中": 1, "低": 2, None: 3}
@@ -489,6 +489,7 @@ def prep(p: dict) -> None:
                                             "answer": None, "perspective_id": c["perspective_id"], "evidence": []})
                 touch(p)
                 ok_rerun("追加しました")
+        st.caption("案件の背景や参考資料をもとに、会議で聞く質問や、当日決めたいことをAIが提案します。")
         ai_panel(p, "prep")
         ai_runs_list(p, "prep")
     with tabs[2]:

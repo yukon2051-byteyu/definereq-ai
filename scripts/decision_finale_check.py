@@ -1,7 +1,7 @@
 """AI候補からの判断記録・会議登録・再開用ファイルの通知・デモの最終画面の実ブラウザ確認（デスクトップ 1440×900、架空データ）。
 
 AIは代替応答のサーバーで動かす（有料APIは使わない）。確認すること：
-  1. AI候補の確認欄を開いただけでは登録されず、「判断記録の下書きを作成」で1回だけ作られる。
+  1. 会議記録の候補確認欄を開いただけでは登録されず、「判断記録の下書きを作成」で1回だけ作られる。
      判断記録だけの場合と要件も作る場合で、完了表示と遷移先が実際の結果に一致する
   2. 質問・議題の未反映入力を保ったまま会議へ進める。初回・次回の会議の登録直後にボタンが重複せず、選んだ会議が記録画面に引き継がれる
   3. 再開用ファイルを出力して案件を更新すると通知が出て、再出力で消える。読み戻すと更新した内容が戻る
@@ -124,7 +124,7 @@ with sync_playwright() as pw:
     click(g, "選択した議事録をAIで整理する", 1000)
     g.get_by_text("件の候補を作成しました").first.wait_for(timeout=60000)
     wait(g, 2500)
-    click(g, "AI候補を確認する →", 3000)
+    click(g, "会議記録の候補確認へ進む →", 3000)
 
     # ---- 1：判断記録の下書き（判断記録だけ → 要件も作る） ----
     for how, label in (("none", "要件を伴わない判断として記録する"), ("new", "決定の内容から新しい要件の下書きを作る")):
@@ -152,19 +152,19 @@ with sync_playwright() as pw:
         check(dec_id in msg and (("要件の下書き" in msg) == (how == "new")), f"1 {how}：完了表示が実際の結果と一致（{msg[:60]}）")
         check(count(g, "決定・合意で下書きを開く") == 1 and (count(g, "要件の下書きを開く") == 1) == (how == "new") and count(g, "採用した要件を確認する →") == 0,
               f"1 {how}：主ボタン「決定・合意で下書きを開く」{'と副導線「要件の下書きを開く」' if how == 'new' else ''}。結果と違う移動ボタンは出さない")
-        check(title(g) == "AI候補の確認", f"1 {how}：登録後に自動では移動しない")
+        check(title(g) == "会議記録の候補確認", f"1 {how}：登録後に自動では移動しない")
         g.screenshot(path=OUT / f"1_判断記録の下書き_{how}.png")
         if how == "new":
             req_id = done["requirements"][-1]["id"]
             click(g, "要件の下書きを開く", 3000)
             check(title(g).endswith("の要件一覧") and req_id in main(g).inner_text(), f"1 new：要件の下書き（{req_id}）が開く")
-            side(g).get_by_role("button", name="AI候補の確認").click()
+            side(g).get_by_role("button", name="会議記録の候補確認").click()
             wait(g, 3000)
         else:
             click(g, "決定・合意で下書きを開く", 3000)
             sel = main(g).locator("[data-testid=stSelectbox]").filter(has_text="表示する項目").first.locator("input").input_value()
             check(title(g) == "決定・合意" and dec_id in sel, f"1 none：決定・合意で作成した判断記録（{dec_id}）を選択済みで開く")
-            side(g).get_by_role("button", name="AI候補の確認").click()
+            side(g).get_by_role("button", name="会議記録の候補確認").click()
             wait(g, 3000)
 
     # ---- 3：再開用ファイルの通知 ----

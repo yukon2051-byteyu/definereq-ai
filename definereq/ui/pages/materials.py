@@ -457,10 +457,10 @@ def records(p: dict) -> None:
             ai_panel_extract(p, wait_src, wait_rec)
     elif names:
         cs = gd.candidate_status(p)
-        if cs["extracted"]:  # AIで整理した後は、件数と「AI候補を確認する」を先頭に出す
-            st.html(_status("AI整理完了", f"{cs['text']}（整理済みの記録：{'、'.join(names)}）"))
+        if cs["extracted"]:  # AIで整理した後は、抽出した件数と「会議記録の候補確認へ進む」を先頭に出す
+            st.html(_status(f"AIが会議記録から確認候補を{cs['total']}件抽出しました。", f"{cs['text']}（整理済みの記録：{'、'.join(names)}）"))
             if cs["waiting"]:
-                if st.button("AI候補を確認する →", key="records_go_cand", type="primary"):
+                if st.button("会議記録の候補確認へ進む →", key="records_go_cand", type="primary"):
                     from .. import state
                     state.goto("candidates")
             elif cs["adopted"] and st.button("採用した要件を確認する →", key="records_go_reqs", type="primary"):
@@ -475,7 +475,7 @@ def records(p: dict) -> None:
         st.caption(f"対象の会議：{continuity.label(p, st.session_state['rec_meeting'])}（議事録を追加すると、この会議に関連付けます。下の「関連付ける会議」で変更できます）")
     if names:
         if waiting and gd.candidate_status(p)["waiting"]:  # 前回の整理の候補が残っているときは、補助の操作として出す
-            if st.button("前回の整理で作成したAI候補を確認する", key="records_go_cand_prev", type="tertiary"):
+            if st.button("前回の整理で抽出した会議記録の候補を確認する", key="records_go_cand_prev", type="tertiary"):
                 from .. import state
                 state.goto("candidates")
         if not waiting:
@@ -512,7 +512,8 @@ def _records_demo(p: dict, names: list[str], tasks: tuple) -> None:
     """デモ：記録と候補を閲覧する（AIは実行しない）。"""
     st.caption("登録済みの記録：" + "、".join(names) if names else "登録済みの記録はまだありません。")
     ai_panel(p, "extract")
-    board(p, None, "records_cand", None)
+    other = tuple(sorted({r["task"] for r in p["ai_runs"]} - {"prep"}))  # 会議前の質問・議題の候補は出さない
+    board(p, other, "records_cand", None, heading="会議記録の候補")
 
 
 def recordings(p: dict) -> None:

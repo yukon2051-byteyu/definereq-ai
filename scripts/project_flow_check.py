@@ -124,7 +124,7 @@ with sync_playwright() as pw:
     t = body(g)
     check(g.get_by_role("button", name="会議を準備する →").count() > 0 and "次にすることの詳しい説明" in t, "3 状態の1行と主ボタン、詳しい説明は画面の下")
     nav(g, "4. 要件の確認・判断")
-    # 「要件の確認・判断」の最初の画面は「AI候補の確認」。画面独自の状態表示と主ボタンを持つ
+    # 「要件の確認・判断」の最初の画面は「会議記録の候補確認」。画面独自の状態表示と主ボタンを持つ
     check(g.locator(".dr-now").count() > 0 and g.locator("[data-testid=stMain] button[kind=primary]").count() > 0, "3 別の画面でも、見出しの直後に状態の表示と主ボタンが出る")
     shot(g, "02_panel")
 
@@ -146,10 +146,10 @@ with sync_playwright() as pw:
     g.get_by_role("button", name="選択した議事録をAIで整理する").click()
     g.get_by_text("件の候補を作成しました").first.wait_for(timeout=60000)
     wait(g, 2500)
-    check("AI整理完了" in g.locator(".dr-now").first.inner_text() and g.get_by_role("button", name="AI候補を確認する →").count() == 1, "4 AI整理の後、「AI候補を確認する」へ進める")
-    g.get_by_role("button", name="AI候補を確認する →").click()
+    check("確認候補を" in g.locator(".dr-now").first.inner_text() and g.get_by_role("button", name="会議記録の候補確認へ進む →").count() == 1, "4 AI整理の後、「会議記録の候補確認へ進む」へ進める")
+    g.get_by_role("button", name="会議記録の候補確認へ進む →").click()
     wait(g, 2800)
-    check(g.get_by_role("button", name="要件に採用する内容を確認").count() > 0, "4 AI候補の確認の画面で候補を確認できる")
+    check(g.get_by_role("button", name="要件に採用する内容を確認").count() > 0, "4 会議記録の候補確認の画面で候補を確認できる")
     shot(g, "04_candidates")
 
     # 5. 分割

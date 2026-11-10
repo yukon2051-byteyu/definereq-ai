@@ -274,6 +274,47 @@ def _representative(p: dict, demo_id: str) -> None:
             f'<div class="dr-g-sub">{esc(r.get("body") or "")}</div>{src_html}{dec}</div>')
 
 
+def _ai_role(p: dict, steps: list[dict], i: int, step: dict) -> None:
+    """会議前と会議後で、AIが何をする場面かを操作の流れの中で示す。値は既存のデモデータを使う。
+
+    会議前：次の会議で何を聞くか（質問・議題の候補）。会議後：会議で出た要望・決定・未決事項のうち、どれを案件に反映するか
+    （元の発言 → AIが拾った内容 → 人が確認した反映先）。未確認の候補は未確認と表示する。
+    """
+    from .candidates import DESTINATION
+    from ..logic import intake
+
+    tasks = {r["id"]: r["task"] for r in p["ai_runs"]}
+    if step["process"] == "会議前の準備":
+        prep = [c for c in p["candidates"] if tasks.get(c.get("origin_run")) == "prep" and c["kind"] in ("質問", "議題", "今回決めたいこと")]
+        example = f'<div class="dr-g-sub">例：AIが提案した質問「{esc(prep[0]["text"])}」</div>' if prep else ""
+        st.html('<div class="dr-ai-role"><div class="dr-v-lab">会議前：次の会議で何を聞くか</div>'
+                '<div class="dr-g-sub">案件の背景や参考資料をもとに、会議で聞く質問や、当日決めたいことをAIが提案します（「質問・議題」の画面）。</div>'
+                f'{example}</div>')
+        return
+    if i != first_after_meeting(steps):
+        return
+    extracted = [c for c in p["candidates"] if tasks.get(c.get("origin_run")) == "extract"]
+    if not extracted:  # このデモには会議記録から抽出した候補がない
+        return
+    rank = {"決定": 0, "要望": 1, "保留": 2}
+    c = sorted((x for x in extracted if x.get("evidence")), key=lambda x: (x["state"] not in ("採用", "修正して採用"), rank.get(x["kind"], 9)))
+    c = c[0] if c else extracted[0]
+    quote = (c.get("evidence") or [{}])[0].get("quote")
+    if c["state"] in ("採用", "修正して採用"):
+        where = f"{DESTINATION.get(intake.route_for(c['kind']).kind, '記録のみ')}に登録済み"
+    elif c["state"] == "却下":
+        where = "却下（案件には反映していない）"
+    else:
+        where = "未確認（まだ反映していない）"
+    chain = (f'<li><b>元の発言</b>「{esc(quote)}」</li>' if quote else "") + \
+            f'<li><b>AIが拾った内容</b>{esc(c["kind"])}：「{esc(c["text"])}」</li><li><b>人が確認した反映先</b>{esc(where)}</li>'
+    st.html('<div class="dr-ai-role"><div class="dr-v-lab">会議後：会議で出た内容のうち、どれを案件に反映するか</div>'
+            '<div class="dr-g-sub">議事録や録画の発言から、AIが要望・決定・未決事項などを拾い出し、人が確認して反映先を決めます（「会議記録の候補確認」の画面）。</div>'
+            f'<ol class="dr-chain">{chain}</ol></div>')
+    if step["page"] != "candidates" and st.button("機能画面で会議記録の候補を見る", key="tour_cand_open", type="tertiary"):
+        open_detail("candidates")
+
+
 def _lead(step: dict, ctx: guide.Ctx) -> str:
     lead = step.get("lead")
     text = lead(ctx) if callable(lead) else lead
@@ -315,6 +356,7 @@ def render(p: dict) -> None:
     st.html(f'<h1 class="dr-g-h">{esc(step["title"])}</h1>' + _focus(demo_id, i) + _lead(step, ctx))
     if step["page"] in RECORD_PAGES:  # 記録の取り込み・整理のステップ：使った資料名と、登録内容を開く入口
         _used_materials(p)
+    _ai_role(p, steps, i, step)  # 会議前（質問・議題の提案）と会議後（会議記録からの抽出）で、AIが何をするかを短く示す
     blocks = step["main"](ctx)
     inline = blocks[0]["type"] in ("story", "verdict", "change_sum")  # 「次へ」を本文の途中に1つだけ置く画面
     for n, block in enumerate(blocks):
@@ -483,8 +525,8 @@ def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx, show_next: bool 
 
 
 def detail_label(page_name: str) -> str:
-    """機能画面を開く補助ボタンの名前（例：機能画面でAI候補を見る）。「次へ」と区別できるよう、押す前に機能画面へ移ることを示す。"""
-    noun = page_name[:-3] if page_name.endswith("の確認") else page_name
+    """機能画面を開く補助ボタンの名前（例：機能画面で会議記録の候補を見る）。「次へ」と区別できるよう、押す前に機能画面へ移ることを示す。"""
+    noun = page_name[:-3] if page_name.endswith("の確認") else page_name[:-2] if page_name.endswith("候補確認") else page_name
     if noun.endswith("か"):  # 例：「なぜこの仕様か」
         noun = f"「{noun}」"
     return f"機能画面で{noun}を見る"

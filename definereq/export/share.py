@@ -174,7 +174,7 @@ def precheck(p: dict, opt: Options | None = None) -> dict:
             ("未合意の要件", sum(1 for r in reqs if r["status"] != "合意済み"), "requirements"),
             ("分類未設定の要件", sum(1 for r in reqs if not r.get("kind")), "requirements"),
             ("受入条件未設定の要件", sum(1 for r in reqs if not r.get("acceptance")), "refine"),
-            ("未処理のAI候補（文書には入りません）", len(pending_cands), "candidates")]
+            ("未処理の会議記録の候補（文書には入りません）", len(pending_cands), "candidates")]
     return {"rows": rows, "missing_profile": missing_profile, "pending_candidates": pending_cands, "open": opens, "targets": [f"{r['id']} v{r['version']} {r['title']}（{_status_label(r)}）" for r in reqs],
             "is_draft": bool(missing_profile) or any(n and page for _, n, page in rows)}
 
@@ -324,7 +324,7 @@ def build_spec(p: dict, opt: Options) -> list[Section]:
     sections = [Section("この文書について", paragraphs=[
         "本書は登録された情報から作成した下書きを含みます。" if pending else "本書は合意済みの要件から作成しました。",
         f"合意済みの要件 {agreed} 件、未合意の要件 {len(pending)} 件を記載しています。未合意の要件は決定事項ではありません。状態欄を確認してください。" if pending else "記載の範囲について、完全性や正しさを保証するものではありません。",
-        "背景・目的は案件情報を参照しています。未採用のAI候補は本書に含まれません。「未設定」は記録がないこと、「該当なし」は該当しないと確認したことを表します。状態の「下書き」「提案」「確認待ち」「保留」は未合意です。"])]
+        "背景・目的は案件情報を参照しています。未登録の会議記録の候補は本書に含まれません。「未設定」は記録がないこと、「該当なし」は該当しないと確認したことを表します。状態の「下書き」「提案」「確認待ち」「保留」は未合意です。"])]
     sections.append(Section("背景・目的", paragraphs=[f"背景：{display(prof['background']['value'])}", f"目的：{display(prof['purpose']['value'])}", f"課題：{display(prof['problem']['value'])}", f"期待する成果：{display(prof['outcome']['value'])}"]))
     sections.append(Section("関係者", table={"columns": ["ID", "氏名・役割", "所属", "立場", "判断・確認できる範囲"], "rows": [[s["id"], s["name"], display(s.get("org")), display(s.get("position")), display(s.get("authority"))] for s in p["stakeholders"]], "widths": [1.5, 3, 3, 3, 5.5]}))
     sections.append(Section("用語", table={"columns": ["用語", "意味"], "rows": [[g["term"], g["meaning"]] for g in p["glossary"]], "widths": [4, 12], "empty": "用語はまだ登録されていません。"}))

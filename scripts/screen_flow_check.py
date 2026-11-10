@@ -116,12 +116,12 @@ with sync_playwright() as pw:
     run.click()
     g.get_by_text("件の候補を作成しました").first.wait_for(timeout=60000)
     wait(g, 2500)
-    check("AI整理完了" in main(g).locator(".dr-now").first.inner_text() and btn(g, "AI候補を確認する →").count() == 1, "1 AIは押したときに実行され、件数と「AI候補を確認する」が出る（代替応答）")
+    check("確認候補を" in main(g).locator(".dr-now").first.inner_text() and btn(g, "会議記録の候補確認へ進む →").count() == 1, "1 AIは押したときに実行され、件数と「会議記録の候補確認へ進む」が出る（代替応答）")
 
     # 準備画面と記録整理の案内が状態と一致
     click(g, "← 準備の概要に戻る")
     nx = main(g).locator(".dr-next").inner_text()
-    check("確認待ちの要件候補" in nx and btn(g, "AI候補を確認する →").count() == 1, f"2 候補あり：準備画面は「AI候補を確認する」（{nx.splitlines()[0]}）")
+    check("確認待ちの要件候補" in nx and btn(g, "会議記録の候補確認へ進む →").count() == 1, f"2 候補あり：準備画面は「会議記録の候補確認へ進む」（{nx.splitlines()[0]}）")
 
     # 背景を編集して保存
     click(g, "背景・目的・関係者を入力")
@@ -132,7 +132,7 @@ with sync_playwright() as pw:
     wait(g, 800)
     click(g, "案件情報を保存", 2800)
     saved = main(g).get_by_text("案件情報を保存しました", exact=False)
-    nxt = btn(g, "次へ：AI候補を確認する →")
+    nxt = btn(g, "次へ：会議記録の候補確認へ進む →")
     check(saved.count() == 1 and nxt.count() == 1, "3 保存後：フォームの近くに「案件情報を保存しました」と、状態に合う次の操作")
     click(g, "← 準備の概要に戻る")
     click(g, "背景・目的・関係者を編集")

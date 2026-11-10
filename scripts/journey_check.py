@@ -147,12 +147,12 @@ with sync_playwright() as pw:
     g.get_by_text("件の候補を作成しました").first.wait_for(timeout=60000)
     wait(g, 2500)
     status = now(g)
-    check(status.startswith("AI整理完了") and "確認待ち" in status and in_view(btn(g, "AI候補を確認する →")), f"4 AI整理直後：{status}／主操作「AI候補を確認する」")
+    check(status.startswith("AIが会議記録から確認候補を") and "確認待ち" in status and in_view(btn(g, "会議記録の候補確認へ進む →")), f"4 AI整理直後：{status}／主操作「会議記録の候補確認へ進む」")
     g.screenshot(path=OUT / "1_AI整理直後.png")
-    click(g, "AI候補を確認する →", 3000)
+    click(g, "会議記録の候補確認へ進む →", 3000)
     first = now(g)
     waiting = int(first.split("確認待ち")[1].split("件")[0])
-    check(title(g) == "AI候補の確認" and in_view(main(g).locator(".dr-now")) and in_view(btn(g, "未確認の候補を確認する ↓")), f"4 AI候補の確認：{first}")
+    check(title(g) == "会議記録の候補確認" and in_view(main(g).locator(".dr-now")) and in_view(btn(g, "未確認の候補を確認する ↓")), f"4 会議記録の候補確認：{first}")
     exp = main(g).locator("[data-testid=stExpander] summary").all_inner_texts()
     check(any("要望" in x and "要件一覧" in x for x in exp) and any("決定" in x and "判断記録の下書き" in x for x in exp), "4 区分ごとに、確定したときの反映先を表示")
     click(g, "未確認の候補を確認する ↓", 2500)
@@ -169,8 +169,8 @@ with sync_playwright() as pw:
     g.screenshot(path=OUT / "2_1件採用後.png")
     click(g, "登録した要件を開く", 3000)
     check(title(g).endswith("の要件一覧") and "から登録した要件" in g.inner_text("body"), "4 「登録した要件を開く」で今回登録した要件だけを開く")
-    click(g, "← AI候補の確認に戻る", 3000)
-    check(title(g) == "AI候補の確認", "4 要件からAI候補の確認へ戻る")
+    click(g, "← 会議記録の候補確認に戻る", 3000)
+    check(title(g) == "会議記録の候補確認", "4 要件から会議記録の候補確認へ戻る")
     for _ in range(12):  # 残りは却下して、確認待ち0件の状態にする
         rej = main(g).get_by_role("button", name="却下", exact=True)
         if not rej.count():
@@ -210,13 +210,13 @@ with sync_playwright() as pw:
         g = b.new_context(viewport={"width": 1440, "height": H}).new_page()
         resume(g, REVIEW)
         line = now(g)
-        check(title(g) == "準備の概要" and line.startswith("案件を再開しました") and "AI候補が6件確認待ちです" in line and in_view(btn(g, "AI候補を確認する →")),
-              f"5 レビュー用JSON：{line}／主操作「AI候補を確認する」が初期表示に入る")
+        check(title(g) == "準備の概要" and line.startswith("案件を再開しました") and "会議記録の候補が6件確認待ちです" in line and in_view(btn(g, "会議記録の候補確認へ進む →")),
+              f"5 レビュー用JSON：{line}／主操作「会議記録の候補確認へ進む」が初期表示に入る")
         g.screenshot(path=OUT / "3_レビュー用JSONの再開.png")
-        click(g, "AI候補を確認する →", 3000)
+        click(g, "会議記録の候補確認へ進む →", 3000)
         line = now(g)
-        check(title(g) == "AI候補の確認" and "確認待ち6件" in line and "要件に採用 1件" in line and in_view(main(g).locator(".dr-title")) and in_view(btn(g, "未確認の候補を確認する ↓")),
-              f"5 レビュー用JSON：AI候補の確認で「{line}」、見出しと主操作が初期表示")
+        check(title(g) == "会議記録の候補確認" and "確認待ち6件" in line and "要件に採用 1件" in line and in_view(main(g).locator(".dr-title")) and in_view(btn(g, "未確認の候補を確認する ↓")),
+              f"5 レビュー用JSON：会議記録の候補確認で「{line}」、見出しと主操作が初期表示")
         g.screenshot(path=OUT / "4_レビュー用JSONの候補確認.png")
         g.context.close()
 

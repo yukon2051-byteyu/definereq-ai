@@ -36,7 +36,7 @@ def _run_state(p: dict, c: dict) -> str:
 def _adopt_form(p: dict, c: dict, meeting: str | None) -> None:
     """要件へ採用する前の確認。推測は推測として示し、必須にしない。"""
     s = intake.suggest(p, c)
-    st.caption(f"分類は{s['basis']}です。確認してから採用してください。分からない項目は空欄のままで構いません。")
+    st.caption(f"この操作で要件の下書きを登録します（合意にはなりません）。分類は{s['basis']}です。確認してから採用してください。分からない項目は空欄のままで構いません。")
     domains, kinds = [None, *DOMAINS], [None, *REQ_KINDS]
     parts = intake.split_proposal(c["text"])
     split = bool(parts) and st.toggle("複数の要件に分けて採用する", value=True, key=f"split_{c['id']}", help="原文の範囲で分けた案です。分類は1件ずつ確認できます。")
@@ -87,7 +87,7 @@ def _decision_form(p: dict, c: dict, meeting: str | None) -> None:
         else:
             plan = "判断記録の下書きだけを作成します（要件は作成しません）。"
         st.html(f'<div class="dr-kind">作成する内容<b>{esc(plan)}</b></div>')
-        st.caption("合意にはなりません。合意は「決定・合意」で、判断者・判断日・採用案を人が記録して確定します。")
+        st.caption("この操作で判断記録の下書きを作成します。正式な判断・合意にはなりません。合意は「決定・合意」で、判断者・判断日・採用案を人が記録して確定します。")
         if st.button("判断記録の下書きを作成", type="primary", key=f"cd_go_{c['id']}"):
             label = guard(intake.apply, p, c["id"], meeting_id=meeting, link_requirements=linked, new_requirement=how == "new")
             if label:  # 既存の登録処理（候補の状態で二重登録を防ぐ）で作成できたときだけ、結果を候補の近くに出す
@@ -176,7 +176,7 @@ def _after_adopt(p: dict, c: dict) -> None:
     waiting = [i for i in order if (pj.get(p, "candidates", i) or {}).get("state") in ("候補", "要再確認")]
     after = order[order.index(c["id"]) + 1:] if c["id"] in order else []
     nxt = next((i for i in after if i in waiting), waiting[0] if waiting else None)  # 画面の表示順で次の確認待ち
-    reason = f"AI候補「{c['text'][:24]}」から登録した要件"
+    reason = f"会議記録の候補「{c['text'][:24]}」から登録した要件"
     with st.container(horizontal=True, key=f"cand_after_{c['id']}"):
         if nxt:
             if st.button("次の未確認候補へ", key="cand_next", type="primary"):
@@ -213,7 +213,7 @@ def _after_decision(p: dict, c: dict, done: dict, new_reqs: list[str]) -> None:
         if dec and st.button("決定・合意で下書きを開く", key="cand_open_dec", type="primary"):
             state.goto("decisions", keep={"dc_sel": dec})
         if new_reqs and st.button("要件の下書きを開く", key="cand_open_reqs"):
-            state.open_requirements(new_reqs, f"AI候補「{c['text'][:24]}」から作成した要件の下書き", "candidates")
+            state.open_requirements(new_reqs, f"会議記録の候補「{c['text'][:24]}」から作成した要件の下書き", "candidates")
         if nxt and st.button("次の未確認候補へ", key="cand_next", type="tertiary"):
             st.session_state.pop("cand_done", None)
             st.session_state["cand_focus"] = nxt
@@ -249,7 +249,7 @@ def _row(p: dict, c: dict, meeting: str | None, key: str) -> None:
             st.rerun()
 
 
-def board(p: dict, tasks: tuple[str, ...] | None, key: str, meeting: str | None = None, heading: str = "AIの候補") -> None:
+def board(p: dict, tasks: tuple[str, ...] | None, key: str, meeting: str | None = None, heading: str = "会議記録の候補") -> None:
     """候補の一覧。tasks を指定すると、その工程で生成した候補だけを出す。"""
     by_run = {r["id"]: r["task"] for r in p["ai_runs"]}
     items = [c for c in p["candidates"] if tasks is None or by_run.get(c.get("origin_run")) in tasks]

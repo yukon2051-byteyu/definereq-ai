@@ -167,12 +167,12 @@ DECIDE_PAGES = {"requirements", "refine", "decisions", "nfr", "scope", "scenario
 
 
 def resume_summary(p: dict) -> str:
-    """再開した案件で、次に進める作業を1文で示す（例：AI候補が6件確認待ちです）。"""
+    """再開した案件で、次に進める作業を1文で示す（例：会議記録の候補が6件確認待ちです）。"""
     cands, waiting = gd.requirement_candidates(p), gd.unanalyzed_minutes(p)
     if waiting:
         return f"未整理の議事録が{len(waiting)}件あります"
     if cands:
-        return f"AI候補が{len(cands)}件確認待ちです"
+        return f"会議記録の候補が{len(cands)}件確認待ちです"
     return f"要件{len(p['requirements'])}件・判断{len(p['decisions'])}件を復元しました"
 
 

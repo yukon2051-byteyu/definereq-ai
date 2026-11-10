@@ -293,7 +293,7 @@ def test_precheck_counts_come_from_data(p):
     run(p, "extract", [cand("要点", "未処理の候補")])
     c = share.precheck(p)
     rows = {k: n for k, n, _ in c["rows"]}
-    assert rows["合意済みの要件"] == 1 and rows["未合意の要件"] == 1 and rows["受入条件未設定の要件"] == 2 and rows["未処理のAI候補（文書には入りません）"] == 1
+    assert rows["合意済みの要件"] == 1 and rows["未合意の要件"] == 1 and rows["受入条件未設定の要件"] == 2 and rows["未処理の会議記録の候補（文書には入りません）"] == 1
     assert c["missing_profile"] == ["目的"] and c["is_draft"] and len(c["targets"]) == 2
 
 
@@ -601,7 +601,7 @@ def test_records_page_paste_to_candidates_without_moving(p):
     assert not any(b.key == "guide_go" for b in at.button)  # 同じ画面なので移動のボタンを出さない
     run(q, "extract", [cand("要望", "出欠を登録する")], source_ids=[q["sources"][0]["id"]])
     at.run()
-    assert "AI整理完了" in html(at) and key(at, "records_go_cand").label == "AI候補を確認する →"
+    assert "AIが会議記録から確認候補を" in html(at) and key(at, "records_go_cand").label == "会議記録の候補確認へ進む →"
     at = key(at, "records_go_cand").click().run()
     assert at.session_state["page"] == "candidates" and "要件に採用する内容を確認" in [b.label for b in at.button]
 
@@ -975,10 +975,10 @@ def test_setup_next_follows_project_state(p):
     nx = gd.setup_next(p)
     assert (nx["label"], nx["page"]) == ("会議の記録を整理する", "records") and "第1回議事録" in nx["detail"]
     run(p, "extract", [cand("要望", "出欠を登録する")], source_ids=[m["id"]])
-    assert (gd.setup_next(p)["label"], gd.setup_next(p)["page"]) == ("AI候補を確認する", "candidates")
+    assert (gd.setup_next(p)["label"], gd.setup_next(p)["page"]) == ("会議記録の候補確認へ進む", "candidates")
     registry.ingest_paste(p, "第2回議事録", "定員は30名。", kind="議事録")
     nx = gd.setup_next(p)  # 未整理の議事録が増えたら、記録の整理を先に勧め、候補の確認はほかの作業に出す
-    assert nx["page"] == "records" and ("AI候補を確認する", "candidates") in nx["alts"]
+    assert nx["page"] == "records" and ("会議記録の候補確認へ進む", "candidates") in nx["alts"]
 
 
 def test_setup_next_without_profile_goes_to_records(p):
@@ -1088,8 +1088,8 @@ def test_records_after_extract_shows_zero_and_candidates(p):
     m = registry.ingest_paste(p, "議事録", "講師が出欠を登録する。", kind="議事録")
     run(p, "extract", [cand("要望", "出欠を登録する")], source_ids=[m["id"]])
     at = open_app(p, "records")
-    assert "AI整理完了" in html(at) and "確認待ち1件" in html(at)
-    assert key(at, "records_go_cand").label == "AI候補を確認する →"
+    assert "AIが会議記録から確認候補を1件抽出しました。" in html(at) and "確認待ち1件" in html(at)
+    assert key(at, "records_go_cand").label == "会議記録の候補確認へ進む →"
 
 
 def test_empty_setup_uses_cards_as_start(p):
@@ -1182,11 +1182,11 @@ def test_resume_shows_one_line_and_next(p):
     at = AppTest.from_file(APP, default_timeout=60)
     at.session_state["project"], at.session_state["page"], at.session_state["resumed"] = q, "setup", True
     at.run()
-    assert "案件を再開しました" in html(at) and "AI候補が6件確認待ちです" in html(at)
-    assert key(at, "setup_next_go").label == "AI候補を確認する →"
+    assert "案件を再開しました" in html(at) and "会議記録の候補が6件確認待ちです" in html(at)
+    assert key(at, "setup_next_go").label == "会議記録の候補確認へ進む →"
     at.session_state["page"] = "overview"
     at.run()
-    assert key(at, "guide_go").label == "AI候補を確認する →" and "保存した案件を再開しました" not in html(at)
+    assert key(at, "guide_go").label == "会議記録の候補確認へ進む →" and "保存した案件を再開しました" not in html(at)
 
 
 def test_resume_file_records_last_page(p):
@@ -1270,7 +1270,7 @@ def test_primary_follows_the_state(p):
     at = open_app(q, "records")  # テストではAIのキーがないため押せない。主ボタン（押せるとオレンジ）であることを確かめる
     assert key(at, "ai_go_extract").proto.type == "primary" and primaries(at) == []
     run(q, "extract", [cand("要望", "出欠を登録する")], source_ids=[q["sources"][0]["id"]])
-    assert primaries(open_app(q, "records")) == ["AI候補を確認する →"]
+    assert primaries(open_app(q, "records")) == ["会議記録の候補確認へ進む →"]
     at = open_app(q, "candidates")
     assert primaries(at) == ["未確認の候補を確認する ↓"]
     at = next(b for b in at.button if b.label == "要件に採用する内容を確認").click().run()
@@ -1300,7 +1300,7 @@ def test_project_requirements_states_and_links(p):
     at = open_app(p, "requirements")
     assert "要件はまだ登録されていません" in "".join(i.value for i in at.info) and f"{p['name']}の要件一覧" in html(at)
     reviewed(p)
-    assert key(open_app(p, "requirements"), "guide_go").label == "AI候補を確認する →"
+    assert key(open_app(p, "requirements"), "guide_go").label == "会議記録の候補確認へ進む →"
     for c in p["candidates"]:
         if c["state"] == "候補":
             c["state"] = "却下"
@@ -1330,7 +1330,7 @@ def test_resumed_project_next_matches_state(p):
     at = AppTest.from_file(APP, default_timeout=60)
     at.session_state["project"], at.session_state["page"], at.session_state["resumed"] = q, q.pop("last_page"), True
     at.run()
-    assert key(at, "guide_go").label == "AI候補を確認する →" and "行き先：要件の確認・判断 › AI候補の確認" in "".join(c.value for c in at.caption)
+    assert key(at, "guide_go").label == "会議記録の候補確認へ進む →" and "行き先：要件の確認・判断 › 会議記録の候補確認" in "".join(c.value for c in at.caption)
 
 
 # ---- AI候補の採用直後：次の未確認候補へ、登録した要件を開く ----
@@ -1353,7 +1353,7 @@ def test_after_adopt_shows_next_and_open_requirement(p):
     at = adopt_via_ui(open_app(p, "candidates"))
     at = key(at, "cand_open_reqs").click().run()
     assert at.session_state["page"] == "requirements" and set(at.session_state["req_focus"]["ids"]) == {at.session_state["project"]["requirements"][-1]["id"]}
-    assert key(at, "req_back").label == "← AI候補の確認に戻る"
+    assert key(at, "req_back").label == "← 会議記録の候補確認に戻る"
     at = key(at, "req_back").click().run()
     assert at.session_state["page"] == "candidates"
 
@@ -1447,7 +1447,7 @@ def test_empty_requirements_show_candidate_and_manual_entrances(p):
     m = registry.ingest_paste(p, "第1回議事録", "講師が出欠を登録する。", kind="議事録")
     run(p, "extract", [cand("要望", "出欠を登録する")], source_ids=[m["id"]])
     at = open_app(p, "requirements")
-    assert key(at, "rq_empty_cand").label.startswith("AI候補を確認する（確認待ち 1件）")
+    assert key(at, "rq_empty_cand").label.startswith("会議記録の候補確認へ進む（確認待ち 1件）")
     at = key(at, "rq_empty_cand").click().run()
     assert at.session_state["page"] == "candidates"
 

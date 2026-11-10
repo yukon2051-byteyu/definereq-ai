@@ -23,7 +23,7 @@ def current_code() -> str:
 def ai_panel(p: dict, task_key: str, extra: str = "", recordings: bool = False, expanded: bool = False) -> None:
     task = ai.TASKS[task_key]
     if p.get("is_demo"):
-        st.caption("デモではAIを実行できません。準備済みのAI候補を表示しています。")
+        st.caption("デモではAIを実行できません。準備済みの" + ("会議前の質問・議題の候補" if task_key == "prep" else "会議記録の候補" if task_key == "extract" else "AIの結果") + "を表示しています。")
         return
     with st.expander(f"AIで候補を作る：{task.label}", expanded=expanded):
         sources = [s for s in p["sources"] if not s.get("superseded_by")]
@@ -133,7 +133,7 @@ def ai_runs_list(p: dict, task_key: str) -> None:
     runs = [r for r in p["ai_runs"] if r["task"] == task_key]
     if not runs:
         return
-    st.markdown("**準備済みのAI候補**" if p.get("is_demo") else "**AI結果の記録**")
+    st.markdown("**準備済みのAIの結果**" if p.get("is_demo") else "**AI結果の記録**")
     for r in runs:
         status = ai.run_status(p, r)
         st.html(f"<div>{chip(r['id'], 'plain')} {chip(r['source'], 'info')} {chip(status)} {chip(str(r['items']) + '件', 'plain')}</div>")

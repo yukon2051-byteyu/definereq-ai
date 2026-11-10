@@ -17,13 +17,15 @@ from ..components import esc, main_type, STATUS_TONE, add_evidence_form, chip, c
 
 
 def candidates(p: dict) -> None:
-    head("AI候補の確認", "議事録や資料からAIが整理した候補を確認し、内容に合う場所へ反映します。候補のままでは要件や合意になりません。確定は人の操作だけで行います。", "要件の確認・判断")
+    # 画面名で元の情報（会議記録）を、説明で人が行う作業を伝える。デモと自分の案件で同じ説明
+    head("会議記録の候補確認", "議事録や録画の発言から、AIが要望・決定・未決事項などを拾い出します。内容を確認し、必要なものを要件の下書きや確認事項などに登録できます。", "要件の確認・判断")
+    st.caption("候補を登録しても、正式な判断や合意にはなりません。正式な判断・合意は「決定・合意」で、判断者・判断日・採用案を記録して確定します。")
     if not p.get("is_demo"):
         _candidates_top(p)
     if p.get("is_demo"):
-        st.caption("準備済みのAI候補と、担当者が採用・却下した結果を確認できます。")
+        st.caption("準備済みの会議記録の候補と、担当者が登録・却下した結果を確認できます。")
     elif not p["candidates"]:
-        flow([("入力", "選択した資料・発言"), ("AI候補", "要点・要望・決定候補など"), ("人の判断", "採用／修正／却下"), ("結果", "根拠付きの要件・論点")])
+        flow([("入力", "選択した資料・発言"), ("会議記録の候補", "要望・決定・未決事項など"), ("人の判断", "採用／修正／却下"), ("結果", "根拠付きの要件・論点")])
     with edit_block("cand_mtg"):
         meeting = meeting_select(p, "cand_mtg")
     prep_tasks = {r["id"] for r in p["ai_runs"] if r["task"] == "prep"}
@@ -34,7 +36,7 @@ def candidates(p: dict) -> None:
         st.info("候補はありません。")
     elif p.get("is_demo") or other:
         with st.container(key="cand_board"):
-            board(p, None if p.get("is_demo") else other, "cand", meeting)
+            board(p, other, "cand", meeting, heading="会議記録の候補")  # 会議前の質問・議題の候補は「質問・議題」で確認する（デモも同じ）
     ai_panel(p, "extract")
     ai_runs_list(p, "extract")
 
@@ -46,11 +48,11 @@ def _candidates_top(p: dict) -> None:
 
     s = gd.candidate_status(p)
     if not s["total"]:
-        st.html('<div class="dr-now"><b>AI候補はまだありません</b><span>議事録を取り込み、「会議の記録を整理」でAIを実行すると、ここに候補が並びます。</span></div>')
+        st.html('<div class="dr-now"><b>会議記録の候補はまだありません</b><span>議事録を取り込み、「会議の記録を整理」でAIを実行すると、ここに候補が並びます。</span></div>')
         if st.button("会議の記録を整理する →", key="cand_go_records", type="primary"):
             state.goto("records")
         return
-    title = "AI整理完了" if s["extracted"] else "AI候補"
+    title = "AI整理完了" if s["extracted"] else "会議記録の候補"
     st.html(f'<div class="dr-now"><b>{esc(title)}</b><span>{esc(s["text"])}</span></div>')
     if s["waiting"]:
         # 候補の確認欄を開いているときは、その確定ボタンを主操作にする
@@ -114,7 +116,7 @@ def _req_focus(p: dict) -> list[str] | None:
     return ids
 
 
-PAGE_NAMES = {"overview": "現在の状況", "setup": "準備の概要", "candidates": "AI候補の確認"}
+PAGE_NAMES = {"overview": "現在の状況", "setup": "準備の概要", "candidates": "会議記録の候補確認"}
 
 
 def requirements(p: dict) -> None:
@@ -126,11 +128,11 @@ def requirements(p: dict) -> None:
         st.caption(f"表示中のデータ：{STAGES[p['demo']['stage']]}の時点。閲覧専用のため、内容・根拠・版の履歴を確認できます（編集はできません）。")
     focus = _req_focus(p)
     if not p["requirements"] and not p.get("is_demo"):
-        st.info("要件はまだ登録されていません。議事録をAIで整理し、AI候補を確認して採用すると、ここに並びます。下の「要件を追加する」から手で登録することもできます。")
+        st.info("要件はまだ登録されていません。議事録をAIで整理し、会議記録の候補を確認して登録すると、ここに並びます。下の「要件を追加する」から手で登録することもできます。")
         waiting = gd.requirement_candidates(p)
         with st.container(horizontal=True, key="rq_empty_next"):
             if waiting:
-                if st.button(f"AI候補を確認する（確認待ち {len(waiting)}件） →", key="rq_empty_cand", type=main_type()):
+                if st.button(f"会議記録の候補確認へ進む（確認待ち {len(waiting)}件） →", key="rq_empty_cand", type=main_type()):
                     state.goto("candidates")
             elif st.button("会議の記録を整理する →", key="rq_empty_records", type=main_type()):
                 state.goto("records")

@@ -232,7 +232,7 @@ def changes(p: dict) -> None:
                 ok_rerun("保存しました")
 
     st.subheader("影響の調査")
-    st.caption("AI候補と確認済みの関連を区別します。")
+    st.caption("影響の根拠は、AIの推測（「AI候補」と表示）と、人が確認した関連を区別します。")
     st.dataframe(pd.DataFrame([{"領域": i["area"], "対象": display(i.get("target")), "内容": i["note"], "根拠の区分": i["basis"]} for i in c["impacts"]], columns=["領域", "対象", "内容", "根拠の区分"]), hide_index=True, width="stretch")
     left = ag.unsurveyed_areas(c)
     if left:
