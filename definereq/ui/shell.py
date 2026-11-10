@@ -156,8 +156,8 @@ def next_step(key: str, p: dict) -> None:
     text, target = NEXT[key]
     st.divider()
     with st.container(horizontal=True, vertical_alignment="center", key="demo_next"):
-        if p.get("demo") and st.button(f"デモの続きに戻る（{guide.back_label(p)[2:-3]}）", key=f"demo_resume_{key}", type="primary"):
-            guide.back_to_guide(p)
+        if p.get("demo"):  # 押した時点でステップへ戻す（再描画を1回にして、戻った直後の「次へ」が失われないようにする）
+            st.button(f"デモの続きに戻る（{guide.back_label(p)[2:-3]}）", key=f"demo_resume_{key}", type="primary", on_click=guide.back_to_guide, args=(p, False))
         label = "この案件の要件一覧を見る" if target == "requirements" else f"{PAGES[target][0]}を見る"
         if st.button(label, key=f"next_{key}"):
             state.goto(target)
@@ -172,8 +172,7 @@ def back_to_setup(key: str) -> None:  # noqa: D401
 def demo_bar(p: dict) -> None:
     """機能画面（詳細）の上部に、開いた元のステップへの戻り道を示す。戻り先の番号と名前をボタンに出す。"""
     with st.container(key="demo_back", horizontal=True, vertical_alignment="center"):
-        if st.button(guide.back_label(p), key="tour_back"):  # 戻る操作は補助の見た目
-            guide.back_to_guide(p)
+        st.button(guide.back_label(p), key="tour_back", on_click=guide.back_to_guide, args=(p, False))  # 戻る操作は補助の見た目。押した時点で戻す
         st.caption("いま見ているのは機能画面（実際の一覧と記録）です。閲覧専用のため編集はできません。編集は「あなたの案件で試す」から行えます。")
 
 

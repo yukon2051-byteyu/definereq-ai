@@ -241,8 +241,7 @@ def _finale(p: dict, ctx: guide.Ctx, steps: list[dict], i: int, intro: dict) -> 
     block(right, "残っていること", [todo_line(t) for t in s["todo"]], "登録された内容から検出された残件はありません。", "todo")
 
     c3, c4, _ = st.columns([2, 1, 2])
-    if c3.button(f"前へ：{steps[i - 1]['process']}", key="tour_prev", type="tertiary"):
-        jump(steps, i - 1)
+    c3.button(f"前へ：{steps[i - 1]['process']}", key="tour_prev", type="tertiary", on_click=jump, args=(steps, i - 1, False))
     if c4.button("TOPへ戻る", key="tour_home", type="tertiary"):
         state.go_home()
 
@@ -343,10 +342,9 @@ def _phases(demo_id: str, steps: list[dict], i: int) -> None:
         with st.popover("ステップ一覧"):
             for n, step in enumerate(steps):
                 _, phase = guide.phase_of(demo_id, n)
-                if st.button(f"{n + 1}. {step['process']}", key=f"tour_go_{n}", type="secondary" if n == i else "tertiary", disabled=n == i):
-                    jump(steps, n)
-        if st.session_state.get("tour_via_shortcut") == i and st.button("案件の背景から見る", key="tour_from_start", type="tertiary"):
-            jump(steps, 0)
+                st.button(f"{n + 1}. {step['process']}", key=f"tour_go_{n}", type="secondary" if n == i else "tertiary", disabled=n == i, on_click=jump, args=(steps, n, False))
+        if st.session_state.get("tour_via_shortcut") == i:
+            st.button("案件の背景から見る", key="tour_from_start", type="tertiary", on_click=jump, args=(steps, 0, False))
     if st.session_state.get("tour_via_shortcut") == i:  # 一覧の近道で途中から開いたときだけ、その場面までの前提を1文で示す
         st.html(f'<p class="dr-premise">{esc(guide.PREMISES[demo_id])}</p>')
 
@@ -359,8 +357,7 @@ def step_page(p: dict) -> str:
 
 def _next_inline(steps: list[dict], i: int, label: str | None = None) -> None:
     """本文の要点のすぐ下に置く「次へ」。詳細を開いたり最後まで読んだりしなくても押せる。"""
-    if st.button(label or next_label(steps, i), key="tour_next", type="primary"):
-        jump(steps, i + 1)
+    st.button(label or next_label(steps, i), key="tour_next", type="primary", on_click=jump, args=(steps, i + 1, False))
 
 
 RECORD_PAGES = {"sources", "recordings", "records"}  # 「記録の取り込み・整理」の工程の画面
@@ -423,8 +420,7 @@ def _start(steps: list[dict], i: int, demo_id: str) -> None:
     """最初の画面の進み方。順に見る人と、見どころから入りたい人の両方に対応する。"""
     # 冒頭は順番に進む操作を1つ。見どころへの近道はトップのデモ一覧に置く
     with st.container(key="tour_start", horizontal=True):
-        if st.button(next_label(steps, i), key="tour_next", type="primary"):
-            jump(steps, i + 1)
+        st.button(next_label(steps, i), key="tour_next", type="primary", on_click=jump, args=(steps, i + 1, False))
 
 
 def open_detail(page: str, **preset) -> None:
@@ -445,15 +441,15 @@ def back_label(p: dict) -> str:
 def _nav(steps: list[dict], i: int, step: dict, ctx: guide.Ctx, show_next: bool = True) -> None:
     """画面下の移動。「次へ」を本文の途中に置いた画面では、ここに同じボタンを重ねて出さない。"""
     c1, c2, c3 = st.columns([2, 2, 3])
-    if i > 0 and c1.button(f"前へ：{steps[i - 1]['process']}", key="tour_prev", width="stretch"):
-        jump(steps, i - 1)
+    if i > 0:
+        c1.button(f"前へ：{steps[i - 1]['process']}", key="tour_prev", width="stretch", on_click=jump, args=(steps, i - 1, False))
     # 機能ページを開く補助ボタン。開く内容が分かる名前にし、「次へ」と見分ける（工程番号とステップ番号は対応づけない）
     page_name = st.session_state.get("_page_names", {}).get(step["page"], ("", step["detail"](ctx)))[1]
     # ステップ1（案件の背景）からは、会議後の要件や残件へ直接は飛ばない（背景の確認は本文の補助操作で開ける）
     if i > 0 and c2.button(detail_label(page_name), key="tour_detail", type="tertiary", width="stretch"):
         open_detail(step["page"])
-    if show_next and c3.button(next_label(steps, i), key="tour_next", type="primary", width="stretch"):
-        jump(steps, i + 1)
+    if show_next:
+        c3.button(next_label(steps, i), key="tour_next", type="primary", width="stretch", on_click=jump, args=(steps, i + 1, False))
 
 
 def detail_label(page_name: str) -> str:
@@ -479,17 +475,22 @@ def next_label(steps: list[dict], i: int) -> str:
     return f"次へ：{steps[i + 1]['process']}"
 
 
-def jump(steps: list[dict], i: int) -> None:
+def jump(steps: list[dict], i: int, rerun: bool = True) -> None:
+    """ステップを移る。ボタンの on_click から呼ぶときは rerun=False（押した操作の再描画1回で切り替わる）。
+
+    以前はボタンの処理の中で st.rerun() を呼び、描画が2回続いていた。2回目の描画中に押した「次へ」が
+    失われることがあったため、デモのステップ移動はボタンを押した時点（描画の前）に状態を変える。
+    """
     st.session_state.pop("ev_focus", None)  # 根拠から開いた箇所の強調は、ステップへ戻ったら消す
     if st.session_state.get("tour_via_shortcut") != i:
         st.session_state.pop("tour_via_shortcut", None)  # 近道で開いたときだけの案内は、別のステップへ移ったら消す
     st.session_state["tour_index"] = i
-    state.set_stage(steps[i]["stage"], steps[i]["page"])
+    state.set_stage(steps[i]["stage"], steps[i]["page"], rerun=rerun)
 
 
-def back_to_guide(p: dict) -> None:
-    """機能画面から、元の工程へ戻る。"""
+def back_to_guide(p: dict, rerun: bool = True) -> None:
+    """機能画面から、元の工程へ戻る。ボタンの on_click から呼ぶときは rerun=False。"""
     steps = guide.load(p["demo"]["id"])
     i = min(st.session_state.get("tour_index", 0), len(steps) - 1)
     st.session_state["tour_on"] = True
-    jump(steps, i)
+    jump(steps, i, rerun)

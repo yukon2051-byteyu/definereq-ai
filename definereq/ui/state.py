@@ -125,13 +125,14 @@ def goto_minutes() -> None:
     goto("records")
 
 
-def set_stage(stage: int, page: str | None = None) -> None:
+def set_stage(stage: int, page: str | None = None, rerun: bool = True) -> None:
     p = current()
     _clear_widgets()
     st.session_state["project"] = demo_copy(p["demo"]["id"], stage)
     if page:
         st.session_state["page"] = page
-    st.rerun()
+    if rerun:  # ボタンの on_click から呼ぶときは、押した操作の再描画でそのまま反映される
+        st.rerun()
 
 
 def close_project() -> None:
