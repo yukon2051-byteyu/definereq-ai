@@ -155,8 +155,10 @@ with sync_playwright() as pw:
     g.get_by_text("件の候補を作成しました").first.wait_for(timeout=60000)
     wait(g, 2500)
     t = main(g).inner_text()
-    check("会議前の質問・議題の候補" in t and "返却が遅れたときの連絡手順" in t and "確認観点の設定から作成。AIは使っていません" in t,
-          "会議前：AIの結果は「会議前の質問・議題の候補」、設定から作る質問は出所の説明付き")
+    # 本物のAIは毎回文言が変わるため、AIの出力の中身ではなく、表示の名称と出所の説明を条件を分けて確かめる
+    n_prep = re.search(r"(\d+)件の候補を作成しました", t)
+    check("会議前の質問・議題の候補" in t and n_prep and int(n_prep.group(1)) > 0, f"会議前：AIの結果は「会議前の質問・議題の候補」に出る（{n_prep.group(0) if n_prep else '件数なし'}）")
+    check("確認観点の設定から作成。AIは使っていません" in t, "会議前：設定から作る質問は「AIは使っていません」の説明付き")
     g.get_by_role("tab", name="理解と議題").click()
     wait(g, 1500)
     check(main(g).get_by_label("議題（1行に1件）").input_value() == "貸出時の入力項目", "会議前：AIの実行中もタブを移っても入力途中の議題を保持")
@@ -181,7 +183,9 @@ with sync_playwright() as pw:
     click(g, "選択した議事録をAIで整理する", 1000)
     g.get_by_text("件の候補を作成しました").first.wait_for(timeout=60000)
     wait(g, 2500)
-    check("AIが会議記録から確認候補を3件抽出しました。" in main(g).inner_text(), "整理：AIが会議記録から確認候補を3件抽出")
+    # 件数は本物のAIでは変わりうる。決定・要望・未決の3つが拾えたかは、続く候補の登録で確かめる
+    n_ext = re.search(r"AIが会議記録から確認候補を(\d+)件抽出しました。", main(g).inner_text())
+    check(bool(n_ext) and int(n_ext.group(1)) >= 3, f"整理：AIが会議記録から確認候補を抽出（{n_ext.group(1) if n_ext else '?'}件）")
     click(g, "会議記録の候補確認へ進む →", 3000)
     click(g, "判断記録の下書きの内容を確認", 2500)
     main(g).get_by_text("決定の内容から新しい要件の下書きを作る", exact=True).click()
