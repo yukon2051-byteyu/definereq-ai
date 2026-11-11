@@ -161,6 +161,8 @@ docker run -p 8501:8501 definereq-ai
 | `scripts/setup_flow_check.py` | 案件の準備、背景と資料の往復、下書きの保持、トップの入口 |
 | `scripts/entrance_flow_check.py` | 参考資料と議事録の入口、質問・議題 → 会議 → 会議の記録を整理、2回目の議事録、再開用ファイルからの再開 |
 | `scripts/decision_finale_check.py` | 会議記録の候補から判断記録の下書きを作る操作、会議登録後のボタン、再開用ファイルの通知、デモの最終画面 |
+| `scripts/agreement_e2e_check.py` | 会議前の質問づくりから議事録の整理・下書きの登録・正式な合意・要件定義書（Word）・再開用ファイルの読み戻し・Wordの再出力まで。要件・判断記録・根拠の対応を照合 |
+| `scripts/demo_word_match_check.py` | デモ3件の最終画面で、代表例・全文プレビュー・ダウンロードしたWordの要件ID・状態・関連する判断・根拠を照合 |
 | `scripts/review5_check.py` | 下書きへの登録と正式な合意の区別、会議前のAIの入口、「会議へ進む」の重複、デモの却下の表示 |
 | `scripts/journey_check.py` | 左メニューを閉じたまま、背景入力から成果物の出力・再開まで本文だけで進む。サイドバーの工程名が両モードで一致 |
 | `scripts/demo_evidence_check.py` | デモの登録内容（背景・資料）と判断の根拠（確認メール・発言）を開き、元のステップへ戻る |

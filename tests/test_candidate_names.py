@@ -185,3 +185,40 @@ def test_prep_meeting_button_once_after_save(p):
     at = next(t for t in at.text_area if t.key == f"draft_{p['id']}_prep_agenda").set_value("申込の流れ").run()
     at = button(at, "prep_save").click().run()
     assert [b.label for b in at.button].count("会議へ進む →") == 1
+
+
+# ---- 正式な合意から要件定義書まで：要件から判断と根拠をたどれる。下書きを含めない設定では残件表にも出さない ----
+def test_spec_links_requirement_decision_and_evidence_and_hides_excluded_drafts(p):
+    from definereq.export import share
+    from definereq.logic import agreement as ag
+    from definereq.logic import intake
+
+    _extract_project(p)
+    d1, _, _, r = p["candidates"]
+    intake.apply(p, d1["id"], new_requirement=True)
+    dec, req = d1["resolved_items"]
+    draft = intake.adopt_requirement(p, r["id"])[0]["id"]
+    pj.add(p, "stakeholders", {"name": "佐藤", "org": None, "position": None, "authority": "判断者", "certainty": "本人申告", "note": None})
+    pj.get(p, "decisions", dec).update(adopted="A", decider="佐藤", decided_on="2026-11-10")
+    ag.set_state(p, dec, "合意済み", "human")
+    ag.apply_decision(p, dec, [req], "human")
+    text = "\n".join(x for s in share.build(p, share.Options(doc_type="spec")) for x in [s.heading, *s.paragraphs, *("|".join(r) for r in (s.table or {}).get("rows", []))])
+    import re
+
+    block = text[re.search(rf"^{req} .+（合意済み）$", text, re.M).start():]  # 要件ごとの詳細の見出しから読む
+    assert f"関連する判断：{dec}" in block[:600] and "（合意済み・判断日 2026-11-10）" in block[:600] and "根拠：" in block[:600]  # 根拠の資料名と位置は agreement_e2e_check.py で確認
+    opt = share.Options(doc_type="spec")
+    opt.include_drafts = False
+    hidden = "\n".join(x for s in share.build(p, opt) for x in [s.heading, *s.paragraphs, *("|".join(r) for r in (s.table or {}).get("rows", []))])
+    assert draft not in hidden and req in hidden  # 除外した下書きは、記入不足の表にも出さない
+
+
+def test_demo_representative_lists_decision_chain():
+    """最終画面の代表例：途中の判断を経て確定した要件は、関係する判断を判断日の順に示す（要件定義書と同じ）。"""
+    at = AppTest.from_file(APP, default_timeout=60).run()
+    at = button(at, "tour_d1").click().run()
+    at = button(at, "tour_go_7").click().run()
+    h = html(at)
+    rep = h[h.index('class="dr-rep"'):]
+    chain = rep[rep.index("この要件に関係する判断（判断日の順）"):]
+    assert chain.index("DEC-001") < chain.index("DEC-004") and "決め手になった判断" in rep

@@ -257,16 +257,22 @@ def _representative(p: dict, demo_id: str) -> None:
     r, d = pj.get(p, "requirements", rid), pj.get(p, "decisions", did)
     if not r:
         return
+    from ..logic import evidence as ev
+
     quotes = []
-    for e in (r.get("evidence") or [])[:2]:
-        src = pj.get(p, "recordings" if str(e.get("source_id", "")).startswith("REC") else "sources", e.get("source_id"))
-        if src and e.get("quote"):
-            quotes.append(f'<li>「{esc(e["quote"])}」<span class="dr-meta">（{esc(src["name"])}）</span></li>')
+    for e in (r.get("evidence") or [])[:2]:  # 位置は要件定義書（Word）と同じ表記にする
+        if e.get("quote"):
+            quotes.append(f'<li>「{esc(e["quote"])}」<span class="dr-meta">（{esc(ev.citation(p, e))}）</span></li>')
     dec = ""
     if d:
         adopted = next((o["label"] for o in d["options"] if o["id"] == d.get("adopted")), "未定")
-        dec = (f'<div class="dr-v-lab">判断</div><div class="dr-g-sub">{esc(d["topic"])} → <b>{esc(adopted)}</b>（{esc(d["state"])}）</div>'
+        dec = (f'<div class="dr-v-lab">決め手になった判断</div><div class="dr-g-sub">{esc(d["id"])} {esc(d["topic"])} → <b>{esc(adopted)}</b>（{esc(d["state"])}' + (f'・判断日 {esc(d["decided_on"])}' if d.get("decided_on") else "") + '）</div>'
                f'<div class="dr-v-lab">理由</div><div class="dr-g-sub">{esc(d.get("rationale") or "理由の記録がありません")}</div>')
+    # この要件に関係する判断を、判断日の順にすべて示す（途中の判断を経て確定したことを追えるように。要件定義書の「関連する判断」と同じ）
+    chain = sorted((x for x in p["decisions"] if r["id"] in (x.get("related_requirements") or [])), key=lambda x: x.get("decided_on") or "")
+    if len(chain) > 1:
+        items = "".join(f'<li>{esc(x["id"])} {esc(x["topic"])}（{esc(x["state"])}' + (f'・判断日 {esc(x["decided_on"])}' if x.get("decided_on") else "") + '）</li>' for x in chain)
+        dec += f'<div class="dr-v-lab">この要件に関係する判断（判断日の順）</div><ul class="dr-g-list">{items}</ul>'
     src_html = f'<div class="dr-v-lab">元の記録</div><ul class="dr-g-list">{"".join(quotes)}</ul>' if quotes else ""
     st.html(f'<div class="dr-rep"><div class="dr-v-lab">代表的な要件の例</div>'
             f'<div class="dr-rep-t">{esc(r["id"])} {esc(r["title"])}</div>'

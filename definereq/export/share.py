@@ -190,9 +190,11 @@ def _qa_rows(p: dict, opt: Options) -> list[list[str]]:
 def _open_rows(p: dict, opt: Options) -> list[list[str]]:
     rows = []
     bl = checks.backlog(p)
+    # 出力から外した要件（下書きを含めない設定の下書きを含む）は、記入不足の表にも出さない
+    hidden = set(opt.exclude_ids) | ({r["id"] for r in p["requirements"] if r["status"] == "下書き"} if not opt.include_drafts else set())
     for cat, items in bl["categories"].items():
         for it in items:
-            if it["target"] not in opt.exclude_ids:
+            if it["target"] not in hidden:
                 rows.append([it["target"], cat, it["content"], display(it.get("ask")), display(it.get("due"))])
     return rows
 
@@ -233,6 +235,10 @@ def _req_details(p: dict, reqs: list[dict], opt: Options) -> list[Section]:
         lines.append("未確認事項：" + ("、".join(opens) if opens else "登録なし"))
         acc = [a for a in r.get("acceptance") or [] if isinstance(a, dict)]
         lines += [f"受入条件：{a.get('given')}のとき、{a.get('when')}と、{a.get('then')}（確認方法：{a.get('how')}）" for a in acc] or ["受入条件：未設定" if r.get("acceptance") != schema.NA else "受入条件：該当なし"]
+        # 要件から、関係する判断記録（状態・判断日）と根拠の両方へたどれるようにする
+        decs = [d for d in p["decisions"] if r["id"] in (d.get("related_requirements") or []) and d["id"] not in opt.exclude_ids]
+        lines.append("関連する判断：" + ("、".join(f"{d['id']} {short_title(d['topic'], 30)}（{d['state']}" + (f"・判断日 {d['decided_on']}" if d.get("decided_on") else "") + "）" for d in decs)
+                                        if decs else "なし"))
         sources = list(dict.fromkeys(ev.citation(p, e) for e in r.get("evidence") or []))
         lines.append("根拠：" + ("、".join(sources) if sources else "未設定"))
         lines += _quotes(p, r, opt)
